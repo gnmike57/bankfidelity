@@ -12,19 +12,20 @@ fn test_is_borderline() {
 
 #[test]
 fn test_mask_padding_for_attempt() {
-    assert_eq!(mask_padding_for_attempt(1), 2.0);
-    assert_eq!(mask_padding_for_attempt(2), 4.0);
-    assert_eq!(mask_padding_for_attempt(3), 8.0);
-    assert_eq!(mask_padding_for_attempt(5), 12.0);
-    assert_eq!(mask_padding_for_attempt(10), 12.0);
+    // Verification masks are immutable: widening after a failure can hide
+    // collateral mutations and makes replay evidence non-deterministic.
+    for attempt in [1, 2, 3, 5, 10] {
+        assert_eq!(mask_padding_for_attempt(attempt), 0.0);
+    }
 }
 
 #[test]
 fn test_should_accept_near_perfect() {
-    // should_accept_near_perfect = attempt >= 3 && diff_score < threshold * 0.5
-    assert!(should_accept_near_perfect(3, 0.005, 0.02)); // attempt >= 3, 0.005 < 0.01
-    assert!(!should_accept_near_perfect(1, 0.005, 0.02)); // attempt < 3
-    assert!(!should_accept_near_perfect(3, 0.015, 0.02)); // 0.015 > 0.01
+    // A failed mandatory gate never becomes acceptable merely because a
+    // later attempt is numerically close to the threshold.
+    for (attempt, score) in [(1, 0.005), (3, 0.005), (3, 0.015), (99, 0.0)] {
+        assert!(!should_accept_near_perfect(attempt, score, 0.02));
+    }
 }
 
 #[test]

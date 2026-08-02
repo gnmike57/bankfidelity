@@ -28,9 +28,11 @@ fn test_settings_modal_renders() {
         .get_all_by_label_contains("Settings")
         .next()
         .is_some());
-    // Verify some text inside the modal
+    // Verify a stable, always-visible navigation control inside the current
+    // settings modal. Detailed fields are rendered only after their subtab is
+    // selected, while Custom Fonts is present on the initial frame.
     assert!(harness
-        .get_all_by_label_contains("Max Retries")
+        .get_all_by_label_contains("Custom Fonts")
         .next()
         .is_some());
 }
