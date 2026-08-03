@@ -3565,7 +3565,6 @@ def apply_many_edits(pdf_path: str, output_path: str, edits: list, font_path: st
             })
             continue
 
-
         if method == "profiled-type0-inplace-stream":
             try:
                 _replace_profiled_type0_inplace(page, span, source_resource_plan)
