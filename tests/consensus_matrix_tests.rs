@@ -77,6 +77,76 @@ fn test_ai_matrix_consensus() {
 }
 
 #[test]
+fn two_parser_consensus_preserves_semantic_count_and_enriches_geometry() {
+    let semantic = Transaction {
+        page: 1,
+        line_on_page: 0,
+        date: "Government Withholding tax".into(),
+        raw_text: "semantic row".into(),
+        debit: Some(dec!(1000.00)),
+        credit: None,
+        running_balance: Some(dec!(999.99)),
+        bbox: None,
+        field_bboxes: FieldBboxes::default(),
+        provenance: dual_core_pdf_pipeline::engine::model::Provenance::Computed,
+        category: None,
+        canonical: Default::default(),
+    };
+    let mut geometry = semantic.clone();
+    geometry.page = 2;
+    geometry.line_on_page = 14;
+    geometry.date = "13 Jan".into();
+    geometry.raw_text = "13 Jan METRO PRAHRAN 13.29 41,219.03 CR".into();
+    geometry.debit = None;
+    geometry.credit = Some(dec!(13.29));
+    geometry.running_balance = Some(dec!(41219.03));
+    geometry.bbox = Some([54.0, 250.0, 537.0, 262.0]);
+    geometry.field_bboxes = FieldBboxes {
+        date: Some([54.0, 250.0, 84.0, 262.0]),
+        description: Some([88.0, 250.0, 300.0, 262.0]),
+        debit: None,
+        credit: Some([390.0, 250.0, 430.0, 262.0]),
+        running_balance: Some([480.0, 250.0, 537.0, 262.0]),
+    };
+
+    let semantic_statement = BankStatement {
+        total_pages: 4,
+        account_number: None,
+        opening_balance: dec!(20324.91),
+        closing_balance: dec!(35308.14),
+        transactions: vec![semantic],
+        bank_name: None,
+    };
+    let geometry_statement = BankStatement {
+        total_pages: 4,
+        account_number: None,
+        opening_balance: dec!(20324.91),
+        closing_balance: dec!(35308.14),
+        transactions: vec![geometry.clone()],
+        bank_name: None,
+    };
+
+    let consensus = dual_core_pdf_pipeline::engine::consensus::merge_consensus_statements(vec![
+        semantic_statement,
+        geometry_statement,
+    ]);
+    assert_eq!(consensus.transactions.len(), 1);
+    assert_eq!(consensus.transactions[0].page, 2);
+    assert_eq!(consensus.transactions[0].bbox, geometry.bbox);
+    assert_eq!(
+        consensus.transactions[0].field_bboxes,
+        geometry.field_bboxes
+    );
+    assert_eq!(consensus.transactions[0].date, "13 Jan");
+    assert_eq!(consensus.transactions[0].debit, None);
+    assert_eq!(consensus.transactions[0].credit, Some(dec!(13.29)));
+    assert_eq!(
+        consensus.transactions[0].running_balance,
+        Some(dec!(41219.03))
+    );
+}
+
+#[test]
 fn test_recalculation_loop_convergence() {
     // Since testing the actual async loop requires heavy mocking of Gemini/LlamaParse,
     // we test the core logic: a simulation of a recalculation loop delta.

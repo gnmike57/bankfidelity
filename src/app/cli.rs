@@ -374,6 +374,64 @@ fn wait_for_terminal_result(job_rx: &Receiver<JobResult>) -> Result<JobResult, (
     }
 }
 
+fn classify_transfer_result(result: JobResult) -> Option<Result<JobResult, (String, String)>> {
+    match result {
+        JobResult::Progress { label, fraction } => {
+            tracing::info!("[progress] {}: {:.0}%", label, fraction * 100.0);
+            None
+        }
+        result @ JobResult::TransferComplete(_) | result @ JobResult::TransferFailed { .. } => {
+            Some(Ok(result))
+        }
+        JobResult::Error { job_label, message } => Some(Err((job_label, message))),
+        JobResult::TimedOut { job_label, .. } => {
+            Some(Err((job_label, "Transfer timed out".to_string())))
+        }
+        JobResult::Cancelled { .. } => Some(Err((
+            "transfer_transactions".to_string(),
+            "Transfer was cancelled".to_string(),
+        ))),
+        other => {
+            tracing::debug!(
+                result = ?other,
+                "[cli] ignoring non-transfer result while transfer is active"
+            );
+            None
+        }
+    }
+}
+
+/// Wait on a result channel routed exclusively to the transfer job.
+///
+/// The shared runtime channel also carries cleanup watchdog events. A routed
+/// ticket prevents those unrelated events from ending the CLI and cancelling
+/// the asynchronous transfer pipeline.
+fn wait_for_transfer_ticket(
+    ticket: &crate::app::runtime::JobTicket,
+) -> Result<JobResult, (String, String)> {
+    loop {
+        match ticket.recv_timeout(std::time::Duration::from_secs(780)) {
+            Ok(result) => {
+                if let Some(terminal) = classify_transfer_result(result) {
+                    return terminal;
+                }
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                return Err((
+                    "transfer_transactions".to_string(),
+                    "Transfer result wait exceeded 780 seconds".to_string(),
+                ));
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                return Err((
+                    "runtime".to_string(),
+                    "Transfer result channel disconnected".to_string(),
+                ));
+            }
+        }
+    }
+}
+
 struct OperationCompletion {
     disposition: OperationDisposition,
     artifact: Option<PathBuf>,
@@ -1691,12 +1749,18 @@ pub fn run_inner(
             target_pdf,
             output,
         } => {
-            let _ = job_tx.send_headless(Job::TransferTransactions {
+            let ticket = match job_tx.submit_headless(Job::TransferTransactions {
                 source_pdf,
                 target_pdf,
                 output_pdf: output,
-            });
-            match wait_for_terminal_result(&job_rx) {
+            }) {
+                Ok(ticket) => ticket,
+                Err(error) => {
+                    eprintln!("❌ Could not submit transfer: {error}");
+                    return Ok(1);
+                }
+            };
+            match wait_for_transfer_ticket(&ticket) {
                 Ok(JobResult::TransferComplete(result)) => {
                     println!(
                         "✅ Transfer complete. Target has {} transactions.",
@@ -1794,6 +1858,28 @@ pub fn run_inner(
 #[cfg(test)]
 mod batch_extraction_tests {
     use super::*;
+
+    #[test]
+    fn transfer_wait_ignores_premature_generic_job_completion() {
+        let premature = JobResult::JobCompleted {
+            job_label: "transfer_transactions".to_string(),
+            disposition: OperationDisposition::Succeeded,
+            artifact: None,
+            message: "runtime intake returned before asynchronous transfer".to_string(),
+        };
+        assert!(classify_transfer_result(premature).is_none());
+
+        let result = classify_transfer_result(JobResult::TransferFailed {
+            stage: "AnalyzeSource".to_string(),
+            message: "bounded test result".to_string(),
+        })
+        .expect("terminal classification")
+        .expect("transfer result");
+        assert!(matches!(
+            result,
+            JobResult::TransferFailed { ref stage, .. } if stage == "AnalyzeSource"
+        ));
+    }
 
     #[test]
     fn recursive_batch_discovery_is_complete_and_deterministic() -> anyhow::Result<()> {

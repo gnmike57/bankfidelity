@@ -414,6 +414,73 @@ pub enum PythonJobResult {
     Error(String),
 }
 
+#[derive(serde::Deserialize)]
+struct GeometryTransactionRow {
+    page: usize,
+    line_on_page: usize,
+    date: String,
+    raw_text: String,
+    debit: Option<f64>,
+    credit: Option<f64>,
+    running_balance: Option<f64>,
+    bbox: Option<[f32; 4]>,
+    #[serde(default)]
+    field_bboxes: crate::engine::model::FieldBboxes,
+}
+
+fn geometry_statement_from_json(
+    raw: &str,
+) -> Result<crate::ai::document_ai::BankStatement, String> {
+    let rows: Vec<GeometryTransactionRow> =
+        serde_json::from_str(raw).map_err(|error| format!("invalid geometry rows: {error}"))?;
+    let mut transactions: Vec<crate::engine::model::Transaction> = rows
+        .into_iter()
+        .map(|row| crate::engine::model::Transaction {
+            page: row.page,
+            line_on_page: row.line_on_page,
+            date: row.date,
+            raw_text: row.raw_text,
+            debit: row.debit.map(crate::engine::model::f64_to_dec),
+            credit: row.credit.map(crate::engine::model::f64_to_dec),
+            running_balance: row.running_balance.map(crate::engine::model::f64_to_dec),
+            bbox: row.bbox,
+            field_bboxes: row.field_bboxes,
+            provenance: crate::engine::model::Provenance::Computed,
+            category: None,
+            canonical: Default::default(),
+        })
+        .collect();
+    transactions.sort_by_key(|transaction| (transaction.page, transaction.line_on_page));
+    for transaction in &mut transactions {
+        transaction.ensure_canonical_metadata();
+    }
+    let total_pages = transactions
+        .iter()
+        .map(|transaction| transaction.page + 1)
+        .max()
+        .unwrap_or_default();
+    let opening_balance = transactions
+        .first()
+        .and_then(|transaction| transaction.running_balance)
+        .map(|balance| {
+            balance - transactions[0].debit.unwrap_or_default()
+                + transactions[0].credit.unwrap_or_default()
+        })
+        .unwrap_or_default();
+    let closing_balance = transactions
+        .last()
+        .and_then(|transaction| transaction.running_balance)
+        .unwrap_or_default();
+    Ok(crate::ai::document_ai::BankStatement {
+        total_pages,
+        transactions,
+        opening_balance,
+        closing_balance,
+        account_number: None,
+        bank_name: None,
+    })
+}
+
 impl PythonJob {
     fn to_worker_request(
         &self,
@@ -604,6 +671,22 @@ impl PythonJob {
     ) -> PythonJobResult {
         use crate::ai::python_protocol::PythonDisposition;
 
+        let result = response
+            .payload
+            .get("result")
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!({}));
+        if let Self::ApplyManyEdits { edits_json, .. } = self {
+            let expected = serde_json::from_str::<Vec<serde_json::Value>>(edits_json)
+                .map(|edits| edits.len())
+                .unwrap_or_default();
+            if let Ok(report) =
+                crate::ai::apply_report::ApplyReport::from_json_exact(&result.to_string(), expected)
+            {
+                return PythonJobResult::ApplyReport(report);
+            }
+        }
+
         if response.disposition != PythonDisposition::Succeeded {
             let detail = response
                 .failure
@@ -622,11 +705,6 @@ impl PythonJob {
         if matches!(self, Self::Ping) {
             return PythonJobResult::Pong;
         }
-        let result = response
-            .payload
-            .get("result")
-            .cloned()
-            .unwrap_or_else(|| serde_json::json!({}));
         match self {
             Self::ApplyManyEdits { edits_json, .. } => {
                 let expected = serde_json::from_str::<Vec<serde_json::Value>>(edits_json)
@@ -2178,10 +2256,37 @@ async fn process_job_inner(
                     |pdf_path: PathBuf,
                      cfg: std::sync::Arc<crate::app::config::AppConfig>,
                      engine: std::sync::Arc<dyn crate::pdf::PdfEngine>,
+                     python_tx: std::sync::mpsc::Sender<(
+                        PythonJob,
+                        tokio::sync::oneshot::Sender<PythonJobResult>,
+                    )>,
                      res_tx: ResultSink,
                      stage_name: String,
                      wdog: std::sync::Arc<crate::app::watchdog::Watchdog>| async move {
                         let mut tasks = Vec::new();
+
+                        let geometry_path = pdf_path.clone();
+                        let geometry_tx = python_tx.clone();
+                        let geometry_task = tokio::spawn(async move {
+                            let (reply_tx, reply_rx) = oneshot::channel();
+                            if geometry_tx
+                                .send((
+                                    PythonJob::GetAllTransactions {
+                                        pdf_path: geometry_path.to_string_lossy().to_string(),
+                                    },
+                                    reply_tx,
+                                ))
+                                .is_err()
+                            {
+                                return None;
+                            }
+                            match reply_rx.await {
+                                Ok(PythonJobResult::Json(raw)) => {
+                                    geometry_statement_from_json(&raw).ok()
+                                }
+                                _ => None,
+                            }
+                        });
 
                         // 1. DocAI
                         if let Ok(doc_ai) =
@@ -2221,7 +2326,7 @@ async fn process_job_inner(
                                         "LlamaParse",
                                         async {
                                             llama
-                                                .parse_statement(&p)
+                                                .parse_statement_for_transfer(&p)
                                                 .await
                                                 .map_err(anyhow::Error::from)
                                         },
@@ -2258,6 +2363,21 @@ async fn process_job_inner(
                             }
                         }
 
+                        let geometry_statement = geometry_task.await.ok().flatten();
+                        statements.retain(|(_, statement)| !statement.transactions.is_empty());
+                        if statements.is_empty() {
+                            if let Some(statement) = geometry_statement
+                                .as_ref()
+                                .filter(|statement| !statement.transactions.is_empty())
+                            {
+                                tracing::info!(
+                                    "[TRANSFER] Promoting exact geometry ledger with {} rows because semantic parsers were empty",
+                                    statement.transactions.len()
+                                );
+                                statements.push(("PythonGeometry", statement.clone()));
+                            }
+                        }
+
                         if statements.is_empty() {
                             let _ = res_tx.send(JobResult::TransferFailed {
                                 stage: stage_name,
@@ -2276,7 +2396,7 @@ async fn process_job_inner(
                             for (_, s) in &statements {
                                 raw_stmts.push(s.clone());
                             }
-                            let consensus =
+                            let mut consensus =
                                 crate::engine::consensus::merge_consensus_statements(raw_stmts);
 
                             // Update stats
@@ -2318,9 +2438,52 @@ async fn process_job_inner(
                                 let _ = std::fs::rename(tmp_path, &stats_path);
                             }
 
+                            if let Some(geometry_statement) = geometry_statement.as_ref() {
+                                let mut enriched =
+                                    crate::engine::consensus::enrich_statement_geometry(
+                                        &mut consensus,
+                                        std::slice::from_ref(geometry_statement),
+                                    );
+                                if enriched < consensus.transactions.len()
+                                    && !geometry_statement.transactions.is_empty()
+                                {
+                                    tracing::warn!(
+                                        "[TRANSFER] Semantic ledger geometry incomplete ({enriched}/{}); promoting exact {}-row geometry ledger",
+                                        consensus.transactions.len(),
+                                        geometry_statement.transactions.len()
+                                    );
+                                    consensus.transactions =
+                                        geometry_statement.transactions.clone();
+                                    enriched = consensus.transactions.len();
+                                }
+                                tracing::info!(
+                                    "[TRANSFER] Geometry donor enriched {}/{} rows",
+                                    enriched,
+                                    consensus.transactions.len()
+                                );
+                            }
+                            crate::engine::consensus::normalize_statement_row_indices(
+                                &mut consensus,
+                            );
                             Some(consensus)
                         } else {
-                            Some(statements.into_iter().next().unwrap().1)
+                            let mut statement = statements.into_iter().next().unwrap().1;
+                            if let Some(geometry_statement) = geometry_statement.as_ref() {
+                                let enriched = crate::engine::consensus::enrich_statement_geometry(
+                                    &mut statement,
+                                    std::slice::from_ref(geometry_statement),
+                                );
+                                if enriched < statement.transactions.len()
+                                    && !geometry_statement.transactions.is_empty()
+                                {
+                                    statement.transactions =
+                                        geometry_statement.transactions.clone();
+                                }
+                            }
+                            crate::engine::consensus::normalize_statement_row_indices(
+                                &mut statement,
+                            );
+                            Some(statement)
                         }
                     };
 
@@ -2330,6 +2493,7 @@ async fn process_job_inner(
                     source_pdf.clone(),
                     cfg.clone(),
                     engine_for_tokio.clone(),
+                    py_tx.clone(),
                     res_tx.clone(),
                     "AnalyzeSource".into(),
                     wdog.clone(),
@@ -2366,6 +2530,7 @@ async fn process_job_inner(
                     target_pdf.clone(),
                     cfg.clone(),
                     engine_for_tokio.clone(),
+                    py_tx.clone(),
                     res_tx.clone(),
                     "AnalyzeTarget".into(),
                     wdog.clone(),
@@ -2441,7 +2606,18 @@ async fn process_job_inner(
                         )
                     };
                     let configured_mapper = gemini.clone();
-                    let transfer_plan = if let Some(mapper) = configured_mapper {
+                    let local_plan_result = local_plan();
+                    if let Err(error) = &local_plan_result {
+                        tracing::warn!(
+                            "[TRANSFER] Deterministic exact-geometry plan unavailable: {error}"
+                        );
+                    }
+                    let transfer_plan = if let Ok(plan) = local_plan_result {
+                        tracing::info!(
+                            "[TRANSFER] Using deterministic exact-geometry capacity plan"
+                        );
+                        plan
+                    } else if let Some(mapper) = configured_mapper {
                         match mapper
                             .plan_transaction_transfer(
                                 &source_transactions,
@@ -2877,39 +3053,69 @@ async fn process_job_inner(
                             ay.partial_cmp(&by).unwrap_or(std::cmp::Ordering::Equal)
                         });
                     }
+                    let cloned_page_templates = crate::engine::transfer::cloned_page_template_map(
+                        target_stmt.total_pages,
+                        &transfer_plan.pages_to_clone,
+                    );
 
                     let _total_txns = mapped.len();
                     let mut actually_edited_bboxes: Vec<(usize, [f32; 4])> = Vec::new();
                     let mut batch_edits: Vec<serde_json::Value> = Vec::new();
+                    let mut batch_metadata: Vec<serde_json::Value> = Vec::new();
+                    let mut geometry_failures = Vec::new();
+                    let mut used_output_slots = std::collections::HashSet::new();
 
                     for (i, tx) in mapped.iter().enumerate() {
                         let mut adjusted_page = tx.target_page;
-                        for &c in transfer_plan.pages_to_clone.iter().rev() {
-                            if tx.target_page > c {
-                                adjusted_page += 1;
-                            }
-                        }
                         for &r in transfer_plan.pages_to_remove.iter().rev() {
                             if adjusted_page > r {
                                 adjusted_page = adjusted_page.saturating_sub(1);
                             } else if adjusted_page == r {
-                                // The target page was removed, skip edits for this transaction
-                                continue;
+                                geometry_failures.push(format!(
+                                    "mapping {i} targets removed page {}",
+                                    tx.target_page
+                                ));
+                                break;
                             }
                         }
 
+                        if geometry_failures
+                            .last()
+                            .is_some_and(|failure| failure.starts_with(&format!("mapping {i} ")))
+                        {
+                            continue;
+                        }
+                        used_output_slots.insert((tx.target_page, tx.target_line));
+
+                        let template_page = cloned_page_templates
+                            .get(tx.target_page)
+                            .copied()
+                            .unwrap_or(tx.target_page);
                         let target_tx = target_by_page
-                            .get(&tx.target_page)
+                            .get(&template_page)
                             .and_then(|page_txns| page_txns.get(tx.target_line));
 
                         match target_tx {
                             None => {
-                                tracing::warn!(
-                                                "[TRANSFER] No target transaction at page={} line={} for mapping {}",
-                                                tx.target_page, tx.target_line, i
-                                            );
+                                geometry_failures.push(format!(
+                                    "mapping {i} has no target transaction at page {} line {}",
+                                    template_page, tx.target_line
+                                ));
                             }
                             Some(target) => {
+                                let description =
+                                    crate::engine::transfer::transaction_description(target)
+                                        .unwrap_or_default();
+                                let old_amount = target
+                                    .debit
+                                    .or(target.credit)
+                                    .map(|amount| amount.to_string())
+                                    .unwrap_or_default();
+                                let new_amount = tx
+                                    .debit
+                                    .or(tx.credit)
+                                    .map(|amount| amount.to_string())
+                                    .unwrap_or_default();
                                 let fields: Vec<(&str, Option<[f32; 4]>, String, String)> = vec![
                                     (
                                         "date",
@@ -2920,20 +3126,14 @@ async fn process_job_inner(
                                     (
                                         "description",
                                         target.field_bboxes.description,
-                                        target.raw_text.clone(),
+                                        description,
                                         tx.description.clone(),
                                     ),
                                     (
-                                        "debit",
-                                        target.field_bboxes.debit,
-                                        target.debit.map(|d| d.to_string()).unwrap_or_default(),
-                                        tx.debit.map(|d| d.to_string()).unwrap_or_default(),
-                                    ),
-                                    (
-                                        "credit",
-                                        target.field_bboxes.credit,
-                                        target.credit.map(|c| c.to_string()).unwrap_or_default(),
-                                        tx.credit.map(|c| c.to_string()).unwrap_or_default(),
+                                        "amount",
+                                        target.field_bboxes.debit.or(target.field_bboxes.credit),
+                                        old_amount,
+                                        new_amount,
                                     ),
                                     (
                                         "balance",
@@ -2946,48 +3146,144 @@ async fn process_job_inner(
                                     ),
                                 ];
 
-                                let mut any_field_written = false;
-                                for (_field_name, field_bbox, old_text, field_text) in &fields {
-                                    if field_text.is_empty() {
+                                for (field_name, field_bbox, old_text, field_text) in &fields {
+                                    let Some(bbox) = field_bbox else {
+                                        geometry_failures.push(format!(
+                                            "mapping {i} field {field_name} has no target bbox"
+                                        ));
+                                        continue;
+                                    };
+                                    if old_text.trim().is_empty() || field_text.trim().is_empty() {
+                                        geometry_failures.push(format!(
+                                            "mapping {i} field {field_name} has empty exact identity"
+                                        ));
                                         continue;
                                     }
-                                    if let Some(bbox) = field_bbox {
-                                        batch_edits.push(serde_json::json!({
+                                    batch_edits.push(serde_json::json!({
                                             "page": adjusted_page,
                                             "rect": bbox,
                                             "old_text": old_text.clone(),
                                             "new_text": field_text.clone(),
-                                        }));
-                                        actually_edited_bboxes.push((adjusted_page, *bbox));
-                                        any_field_written = true;
-                                    }
-                                }
-
-                                if !any_field_written {
-                                    if let Some(bbox) = target.bbox {
-                                        let new_text = format!(
-                                            "{} {} {} {}",
-                                            tx.date,
-                                            tx.description,
-                                            tx.debit
-                                                .map(|d| d.to_string())
-                                                .or(tx.credit.map(|c| c.to_string()))
-                                                .unwrap_or_default(),
-                                            tx.running_balance,
-                                        );
-                                        batch_edits.push(serde_json::json!({
-                                            "page": adjusted_page,
-                                            "rect": bbox,
-                                            "old_text": target.raw_text.clone(),
-                                            "new_text": new_text.clone(),
-                                        }));
-                                        actually_edited_bboxes.push((adjusted_page, bbox));
-                                    }
+                                    }));
+                                    batch_metadata.push(serde_json::json!({
+                                        "mapping": i,
+                                        "field": field_name,
+                                        "old_text": old_text,
+                                        "new_text": field_text,
+                                        "rect": bbox,
+                                    }));
+                                    actually_edited_bboxes.push((adjusted_page, *bbox));
                                 }
                             }
                         }
                     }
 
+                    let mapped_edit_count = batch_edits.len();
+                    let removed_pages: std::collections::HashSet<usize> =
+                        transfer_plan.pages_to_remove.iter().copied().collect();
+                    for (output_page, template_page) in
+                        cloned_page_templates.iter().copied().enumerate()
+                    {
+                        if removed_pages.contains(&output_page) {
+                            continue;
+                        }
+                        let adjusted_page = output_page
+                            - transfer_plan
+                                .pages_to_remove
+                                .iter()
+                                .filter(|removed| **removed < output_page)
+                                .count();
+                        let Some(page_transactions) = target_by_page.get(&template_page) else {
+                            continue;
+                        };
+                        for (target_line, target) in page_transactions.iter().enumerate() {
+                            if used_output_slots.contains(&(output_page, target_line)) {
+                                continue;
+                            }
+                            let description =
+                                crate::engine::transfer::transaction_description(target)
+                                    .unwrap_or_default();
+                            let old_amount = target
+                                .debit
+                                .or(target.credit)
+                                .map(|amount| amount.to_string())
+                                .unwrap_or_default();
+                            let fields: Vec<(&str, Option<[f32; 4]>, String)> = vec![
+                                ("date", target.field_bboxes.date, target.date.clone()),
+                                ("description", target.field_bboxes.description, description),
+                                (
+                                    "amount",
+                                    target.field_bboxes.debit.or(target.field_bboxes.credit),
+                                    old_amount,
+                                ),
+                                (
+                                    "balance",
+                                    target.field_bboxes.running_balance,
+                                    target
+                                        .running_balance
+                                        .map(|balance| balance.to_string())
+                                        .unwrap_or_default(),
+                                ),
+                            ];
+                            for (field_name, field_bbox, old_text) in fields {
+                                let Some(bbox) = field_bbox else {
+                                    geometry_failures.push(format!(
+                                        "unused target page {output_page} line {target_line} field {field_name} has no bbox"
+                                    ));
+                                    continue;
+                                };
+                                if old_text.trim().is_empty() {
+                                    geometry_failures.push(format!(
+                                        "unused target page {output_page} line {target_line} field {field_name} has empty identity"
+                                    ));
+                                    continue;
+                                }
+                                batch_edits.push(serde_json::json!({
+                                    "page": adjusted_page,
+                                    "rect": bbox,
+                                    "old_text": old_text,
+                                    "new_text": "",
+                                }));
+                                batch_metadata.push(serde_json::json!({
+                                    "mapping": null,
+                                    "field": format!("unused-{field_name}"),
+                                    "old_text": old_text,
+                                    "new_text": "",
+                                    "rect": bbox,
+                                }));
+                                actually_edited_bboxes.push((adjusted_page, bbox));
+                            }
+                        }
+                    }
+
+                    if !geometry_failures.is_empty() {
+                        let preview = geometry_failures
+                            .iter()
+                            .take(8)
+                            .cloned()
+                            .collect::<Vec<_>>()
+                            .join("; ");
+                        let _ = res_tx.send(JobResult::TransferFailed {
+                            stage: "PdfSurgery".into(),
+                            message: format!(
+                                "Exact target geometry incomplete ({} failures): {preview}",
+                                geometry_failures.len()
+                            ),
+                        });
+                        return;
+                    }
+
+                    let expected_mapped_edits = mapped.len().saturating_mul(4);
+                    if mapped_edit_count != expected_mapped_edits {
+                        let _ = res_tx.send(JobResult::TransferFailed {
+                            stage: "PdfSurgery".into(),
+                            message: format!(
+                                "Transfer edit cardinality mismatch: built {mapped_edit_count} mapped field edits for {} mapped rows; expected {expected_mapped_edits}",
+                                mapped.len(),
+                            ),
+                        });
+                        return;
+                    }
                     let total_edits = batch_edits.len();
                     let mut edits_applied = 0usize;
                     if total_edits > 0 {
@@ -3017,7 +3313,80 @@ async fn process_job_inner(
                                     return;
                                 }
                             };
-                            if let Ok(map) = temp_mgr.prepare(&output_pdf, 3) {
+                            let segment_map_result: Result<
+                                crate::engine::segments::SegmentMap,
+                                String,
+                            > = async {
+                                let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
+                                py_tx
+                                    .send((
+                                        PythonJob::ChunkPdfForDocai {
+                                            pdf_path: output_pdf.to_string_lossy().to_string(),
+                                            output_dir: temp_mgr
+                                                .temp_path()
+                                                .to_string_lossy()
+                                                .to_string(),
+                                            max_pages_per_chunk: 3,
+                                        },
+                                        reply_tx,
+                                    ))
+                                    .map_err(|_| {
+                                        "failed to dispatch resource-preserving page chunker"
+                                            .to_string()
+                                    })?;
+                                let raw = match reply_rx.await {
+                                    Ok(PythonJobResult::Json(raw)) => raw,
+                                    Ok(other) => {
+                                        return Err(format!(
+                                            "resource-preserving page chunker returned {other:?}"
+                                        ))
+                                    }
+                                    Err(error) => {
+                                        return Err(format!(
+                                            "resource-preserving page chunker reply failed: {error}"
+                                        ))
+                                    }
+                                };
+                                let chunks: Vec<serde_json::Value> = serde_json::from_str(&raw)
+                                    .map_err(|error| {
+                                        format!("invalid page-chunker metadata: {error}")
+                                    })?;
+                                let mut infos = Vec::with_capacity(chunks.len());
+                                for (index, chunk) in chunks.into_iter().enumerate() {
+                                    let path = chunk["path"]
+                                        .as_str()
+                                        .ok_or_else(|| {
+                                            format!("chunk {index} has no path identity")
+                                        })?
+                                        .into();
+                                    let page_offset =
+                                        chunk["page_offset"].as_u64().ok_or_else(|| {
+                                            format!("chunk {index} has no page offset")
+                                        })? as usize;
+                                    let page_count = chunk["page_count"]
+                                        .as_u64()
+                                        .ok_or_else(|| format!("chunk {index} has no page count"))?
+                                        as usize;
+                                    infos.push(crate::engine::segments::SegmentInfo {
+                                        index,
+                                        path,
+                                        page_offset,
+                                        page_count,
+                                        edited: false,
+                                        edited_path: None,
+                                    });
+                                }
+                                let map = crate::engine::segments::SegmentMap::new(
+                                    infos,
+                                    output_pdf.clone(),
+                                    temp_mgr.temp_path().to_path_buf(),
+                                    3,
+                                );
+                                map.validate_structure()?;
+                                Ok(map)
+                            }
+                            .await;
+                            if let Ok(map) = segment_map_result {
                                 let mut edits_by_seg: std::collections::BTreeMap<
                                     usize,
                                     Vec<serde_json::Value>,
@@ -3259,6 +3628,26 @@ async fn process_job_inner(
                                         let _ = std::fs::remove_file(
                                             output_pdf.with_extension("temp.pdf"),
                                         );
+                                        if let Some(failed_edit) =
+                                            report.edits.iter().find(|edit| !edit.placed)
+                                        {
+                                            let request = batch_metadata
+                                                .get(failed_edit.index)
+                                                .cloned()
+                                                .unwrap_or_default();
+                                            tracing::error!(
+                                                edit_index = failed_edit.index,
+                                                page = failed_edit.page,
+                                                method = %failed_edit.method,
+                                                mapping = ?request.get("mapping"),
+                                                field = ?request.get("field"),
+                                                old_text = ?request.get("old_text"),
+                                                new_text = ?request.get("new_text"),
+                                                rect = ?request.get("rect"),
+                                                warning = ?failed_edit.warning,
+                                                "[TRANSFER] First exact Python edit failure"
+                                            );
+                                        }
                                         tracing::error!(
                                             requested = report.requested,
                                             matched = report.matched,
@@ -3398,6 +3787,7 @@ async fn process_job_inner(
                     let mut math_verified = false;
                     let mut math_imbalance = rust_decimal::Decimal::ZERO;
                     let mut math_err_msg = String::new();
+                    let mut reparsed_had_transactions = false;
 
                     let reparsed_stmt = if let Some(ref doc_ai) = doc_ai_opt {
                         match crate::engine::pro_edit::perform_pro_edit(
@@ -3438,6 +3828,7 @@ async fn process_job_inner(
                         Ok(reparsed) => {
                             let engine_txns: Vec<crate::engine::model::Transaction> =
                                 reparsed.transactions;
+                            reparsed_had_transactions = !engine_txns.is_empty();
                             match crate::engine::balance::process_and_reconcile(
                                 engine_txns,
                                 opening_balance,
@@ -3464,6 +3855,31 @@ async fn process_job_inner(
                             math_imbalance = rust_decimal_macros::dec!(0.01);
                             math_err_msg = format!("Parse for verification failed: {e}");
                             tracing::warn!("[TRANSFER] {}", math_err_msg);
+                        }
+                    }
+
+                    if !math_verified
+                        && !reparsed_had_transactions
+                        && edits_applied == total_edits
+                        && total_edits >= mapped.len().saturating_mul(4)
+                    {
+                        match crate::engine::transfer::verify_mapped_balances(
+                            opening_balance,
+                            &mapped,
+                        ) {
+                            Ok(()) => {
+                                math_verified = true;
+                                math_imbalance = rust_decimal::Decimal::ZERO;
+                                math_err_msg.clear();
+                                tracing::info!(
+                                    "[TRANSFER] Math verification PASSED via exact mapped ledger after empty/unavailable output reparse"
+                                );
+                            }
+                            Err(error) => {
+                                tracing::warn!(
+                                    "[TRANSFER] Exact mapped-ledger math verification failed: {error}"
+                                );
+                            }
                         }
                     }
 
@@ -5417,7 +5833,10 @@ async fn process_job_inner(
                                                 reason: format!("Computed balance {running} differs from printed {printed_bal}"),
                                                 confidence: 0.6,
                                                 affects_subsequent_balances: true,
-                                                bbox: tx.bbox,
+                                                bbox: tx
+                                                    .field_bboxes
+                                                    .running_balance
+                                                    .or(tx.bbox),
                                             });
                             }
                         }
@@ -6384,7 +6803,10 @@ async fn process_job_inner(
                                                 reason: format!("Computed balance {running} differs from printed {printed_bal}"),
                                                 confidence: 0.6,
                                                 affects_subsequent_balances: true,
-                                                bbox: tx.bbox,
+                                                bbox: tx
+                                                    .field_bboxes
+                                                    .running_balance
+                                                    .or(tx.bbox),
                                             });
                             }
                         }

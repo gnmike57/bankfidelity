@@ -18,7 +18,7 @@
   "source_files": {
     "bridge_protocol.py": "70679ba037a12eb5b42b77a1de6333a54c8e90acf8c8e1a4c0889341f63caa4c",
     "font-resource-profiles.json": "51a17ed96607808f2ca988f3d07391f6b6f398d6bafe251f6a10331deabbdf3c",
-    "pymupdf_pro_integration.py": "ff392711a6f472ff0f2e35a4e5fba04ff728866ef0507a0c5a22e1e83cbeb0f6",
+    "pymupdf_pro_integration.py": "162c1a6c3e2e32de757593a4a4129d62db36936b187503282c7a9c100c55d3c6",
     "verify_runtime_manifest.py": "09f3d91d6f7fb035d362922970f7d3f00ad4c9658c0386a6a4453b868c48b45f",
     "verify_runtime_versions.py": "bbd3c8b67408e50f97086e236b0cf3ac14e87376f93f1f90cd2883561dadfe02",
     "worker.py": "1f45d7b76f3d264b519026019b6ae7abb1fd35db04bd98399765ae1d878f0d37"

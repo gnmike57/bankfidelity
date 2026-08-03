@@ -10,6 +10,7 @@ import hashlib
 import os
 import re
 import sys
+from decimal import Decimal, InvalidOperation
 
 # ── Windows DLL search-path fix (must run BEFORE import pymupdf) ─────────────
 # pymupdf/_extra.pyd depends on mupdfcpp64.dll which lives inside the pymupdf
@@ -588,20 +589,114 @@ def _normalized_text_identity(value: str) -> str:
     return " ".join(str(value).split())
 
 
-def _find_exact_target_spans(page, rect_obj, old_text: str) -> list:
-    """Return every span matching both stable text identity and >=50% rect overlap."""
+def _normalized_money_identity(value):
+    """Return a two-decimal money identity or ``None`` for non-money text.
+
+    This is intentionally narrow: it tolerates presentation-only currency
+    symbols, thousands separators, AUD labels, balance suffixes, and accounting
+    parentheses, but it does not guess OCR substitutions or approximate values.
+    Geometry and uniqueness checks remain mandatory in
+    ``_find_exact_target_spans``.
+    """
+    text = str(value).replace("\u00a0", " ").strip().upper()
+    negative_parentheses = text.startswith("(") and text.endswith(")")
+    if negative_parentheses:
+        text = text[1:-1].strip()
+    text = re.sub(r"\s+(?:CR|DR)\s*$", "", text)
+    text = re.sub(r"^(?:AUD\s*)?\$?", "", text)
+    text = text.replace(",", "").strip()
+    if text.startswith("+"):
+        text = text[1:]
+    try:
+        amount = Decimal(text)
+    except (InvalidOperation, ValueError):
+        return None
+    if negative_parentheses:
+        amount = -amount
+    return abs(amount).quantize(Decimal("0.01"))
+
+
+def _ocr_words_for_exact_matching(page):
+    try:
+        textpage = page.get_textpage_ocr(language="eng", dpi=300, full=True)
+        return list(textpage.extractWORDS())
+    except Exception as error:
+        print(f"[apply_many] OCR identity fallback unavailable: {error}", file=sys.stderr)
+        return []
+
+
+def _ocr_identity_matches_rect(ocr_words, rect_obj, old_text: str) -> bool:
+    rect = pymupdf.Rect(rect_obj)
+    selected = []
+    for word in ocr_words or []:
+        word_rect = pymupdf.Rect(float(word[0]), float(word[1]), float(word[2]), float(word[3]))
+        center = pymupdf.Point(
+            (float(word_rect.x0) + float(word_rect.x1)) / 2.0,
+            (float(word_rect.y0) + float(word_rect.y1)) / 2.0,
+        )
+        if center in rect:
+            selected.append(word)
+            continue
+        intersection = word_rect & rect
+        word_area = max(float(word_rect.width * word_rect.height), 0.0)
+        if not intersection.is_empty and word_area > 0.0:
+            overlap = float(intersection.width * intersection.height) / word_area
+            if overlap >= 0.6:
+                selected.append(word)
+    if not selected:
+        return False
+    selected.sort(key=lambda item: (round(float(item[1]), 2), float(item[0])))
+    observed = " ".join(str(word[4]).strip() for word in selected if str(word[4]).strip())
+    observed_identity = _normalized_text_identity(observed)
+    requested_identity = _normalized_text_identity(old_text)
+    if observed_identity == requested_identity:
+        return True
+    observed_money = _normalized_money_identity(observed)
+    requested_money = _normalized_money_identity(old_text)
+    return requested_money is not None and observed_money == requested_money
+
+
+def _find_exact_target_spans(page, rect_obj, old_text: str, ocr_words=None) -> list:
+    """Return spans matching stable text or exact money identity and geometry."""
     rect = pymupdf.Rect(rect_obj)
     rect_area = max(float(rect.width * rect.height), 0.0)
     if rect_area <= 0.0:
         return []
     identity = _normalized_text_identity(old_text)
+    money_identity = _normalized_money_identity(old_text)
     matches = []
     for block in page.get_text("dict").get("blocks", []):
         if "lines" not in block:
             continue
         for line in block["lines"]:
             for span in line.get("spans", []):
-                if _normalized_text_identity(span.get("text", "")) != identity:
+                span_text = span.get("text", "")
+                span_identity = _normalized_text_identity(span_text)
+                dotted_leader_matches = False
+                if identity and span_identity.startswith(identity):
+                    suffix = span_identity[len(identity):]
+                    dotted_leader_matches = bool(suffix) and all(
+                        character == "." for character in suffix
+                    )
+                date_suffix_matches = False
+                if (
+                    re.fullmatch(r"\d{1,2}\s+[A-Za-z]{3}", identity or "")
+                    and span_identity.casefold().startswith(identity.casefold())
+                ):
+                    suffix = span_identity[len(identity):].strip()
+                    date_suffix_matches = bool(
+                        re.fullmatch(r"(?:\d{2}|\d{4})", suffix)
+                    )
+                text_matches = (
+                    span_identity == identity
+                    or dotted_leader_matches
+                    or date_suffix_matches
+                )
+                money_matches = (
+                    money_identity is not None
+                    and _normalized_money_identity(span_text) == money_identity
+                )
+                if not text_matches and not money_matches:
                     continue
                 span_rect = pymupdf.Rect(span.get("bbox") or (0, 0, 0, 0))
                 intersection = span_rect & rect
@@ -610,7 +705,16 @@ def _find_exact_target_spans(page, rect_obj, old_text: str) -> list:
                 overlap = float(intersection.width * intersection.height) / rect_area
                 if overlap >= 0.5:
                     matches.append(span)
-    return matches
+    if matches or not ocr_words:
+        return matches
+    if not _ocr_identity_matches_rect(ocr_words, rect, old_text):
+        return []
+    native_span = _find_dominant_span(page, rect)
+    if native_span is None:
+        return []
+    native_span = dict(native_span)
+    native_span["_ocr_identity_verified"] = True
+    return [native_span]
 
 
 _STANDARD_14_FONTS = {
@@ -765,97 +869,178 @@ def _type3_source_resource_plan(
     if not reference:
         return None
     font_xref = int(reference.group(1))
-    resource_alias = None
+    aliases = {}
     try:
         for font in page.get_fonts(full=True):
-            if int(font[0]) == font_xref:
-                resource_alias = str(font[4] or "")
-                break
+            aliases[int(font[0])] = str(font[4] or "")
     except Exception:
-        resource_alias = None
-
-    code_sets = {}
-    advance_samples = {}
+        aliases = {}
     try:
-        traces = page.get_texttrace()
+        traces = list(page.get_texttrace())
     except Exception as error:
         return {
             "available": False,
             "font_xref": font_xref,
             "font_name": font_name,
-            "resource_alias": resource_alias,
+            "resource_alias": aliases.get(font_xref),
             "missing_chars": list(dict.fromkeys(new_text)),
             "ambiguous_chars": [],
             "reason": f"text trace unavailable: {error}",
         }
 
-    for trace in traces:
-        if str(trace.get("font") or "") != font_name:
-            continue
-        chars = list(trace.get("chars") or [])
-        for index, item in enumerate(chars):
-            try:
-                character = chr(int(item[0]))
-                source_code = int(item[1])
-                origin = item[2]
-                bbox = item[3]
-            except (IndexError, TypeError, ValueError, OverflowError):
+    def evidence_for(candidate_name):
+        code_sets = {}
+        advance_samples = {}
+        sizes = []
+        for trace in traces:
+            if str(trace.get("font") or "") != candidate_name:
                 continue
-            if not 0 <= source_code <= 255:
-                continue
-            code_sets.setdefault(character, set()).add(source_code)
-            advance = max(float(bbox[2]) - float(bbox[0]), 0.0)
-            if index + 1 < len(chars):
+            trace_size = max(float(trace.get("size") or span.get("size") or 10.0), 1.0)
+            sizes.append(trace_size)
+            chars = list(trace.get("chars") or [])
+            for index, item in enumerate(chars):
                 try:
-                    next_origin = chars[index + 1][2]
-                    same_baseline = abs(float(next_origin[1]) - float(origin[1])) <= 0.25
-                    delta = float(next_origin[0]) - float(origin[0])
-                    trace_size = max(float(trace.get("size") or span.get("size") or 10.0), 1.0)
-                    if same_baseline and 0.0 < delta <= trace_size * 2.5:
-                        advance = delta
-                except (IndexError, TypeError, ValueError):
-                    pass
-            if advance > 0.0:
-                advance_samples.setdefault(character, []).append(advance)
+                    character = chr(int(item[0]))
+                    source_code = int(item[1])
+                    origin = item[2]
+                    bbox = item[3]
+                except (IndexError, TypeError, ValueError, OverflowError):
+                    continue
+                if not 0 <= source_code <= 255:
+                    continue
+                code_sets.setdefault(character, set()).add(source_code)
+                advance = max(float(bbox[2]) - float(bbox[0]), 0.0)
+                if index + 1 < len(chars):
+                    try:
+                        next_origin = chars[index + 1][2]
+                        same_baseline = abs(float(next_origin[1]) - float(origin[1])) <= 0.25
+                        delta = float(next_origin[0]) - float(origin[0])
+                        if same_baseline and 0.0 < delta <= trace_size * 2.5:
+                            advance = delta
+                    except (IndexError, TypeError, ValueError):
+                        pass
+                if advance > 0.0:
+                    advance_samples.setdefault(character, []).append(advance)
+        return code_sets, advance_samples, _median(sizes)
 
-    unique_characters = list(dict.fromkeys((source_text or "") + new_text))
-    missing_chars = [character for character in unique_characters if not code_sets.get(character)]
+    unique_characters = list(dict.fromkeys(new_text))
+    original_codes, original_advances, original_size = evidence_for(font_name)
+
+    def build_plan(candidate_name, donor=False):
+        match = re.search(r"Type3\s*\((\d+)\s+0\s+R\)", candidate_name, re.IGNORECASE)
+        if not match:
+            return None
+        candidate_xref = int(match.group(1))
+        resource_alias = aliases.get(candidate_xref)
+        code_sets, advance_samples, candidate_size = evidence_for(candidate_name)
+        missing_chars = [
+            character for character in unique_characters if not code_sets.get(character)
+        ]
+        ambiguous_chars = [
+            character
+            for character in unique_characters
+            if len(code_sets.get(character, ())) != 1
+        ]
+        missing_advances = [
+            character for character in unique_characters if not advance_samples.get(character)
+        ]
+        if not resource_alias or missing_chars or ambiguous_chars or missing_advances:
+            return None
+        codes = {
+            character: next(iter(code_sets[character]))
+            for character in unique_characters
+        }
+        advances = {
+            character: _median(advance_samples[character])
+            for character in unique_characters
+        }
+        encoded = bytes(codes[character] for character in new_text)
+        plan = {
+            "available": True,
+            "font_xref": candidate_xref,
+            "font_name": candidate_name,
+            "resource_alias": resource_alias,
+            "missing_chars": [],
+            "ambiguous_chars": [],
+            "codes": codes,
+            "advances": advances,
+            "encoded_hex": encoded.hex(),
+            "source_encoded_hex": None,
+            "text_width": sum(advances[character] for character in new_text),
+            "donor_font_name": candidate_name if donor else None,
+        }
+        target_size = max(float(span.get("size") or 10.0), 1.0)
+        shared = [
+            character
+            for character in unique_characters
+            if original_advances.get(character) and advance_samples.get(character)
+        ]
+        if donor and not shared:
+            return None
+        advance_delta = (
+            sum(
+                abs(
+                    _median(advance_samples[character])
+                    - _median(original_advances[character])
+                )
+                for character in shared
+            )
+            / max(len(shared), 1)
+        )
+        size_delta = abs(candidate_size - target_size)
+        plan["donor_score"] = advance_delta + size_delta * 0.1
+        return plan
+
+    original_plan = build_plan(font_name)
+    if original_plan is not None:
+        return original_plan
+
+    candidate_names = sorted(
+        {
+            str(trace.get("font") or "")
+            for trace in traces
+            if str(trace.get("font") or "").startswith("Type3")
+            and str(trace.get("font") or "") != font_name
+        }
+    )
+    donor_plans = [
+        plan
+        for candidate_name in candidate_names
+        if (plan := build_plan(candidate_name, donor=True)) is not None
+    ]
+    donor_plans = [
+        plan
+        for plan in donor_plans
+        if float(plan.get("donor_score", 999.0)) <= 1.25
+    ]
+    if donor_plans:
+        donor_plans.sort(
+            key=lambda plan: (
+                float(plan.get("donor_score", 999.0)),
+                int(plan.get("font_xref", 0)),
+            )
+        )
+        return donor_plans[0]
+
+    missing_chars = [
+        character for character in unique_characters if not original_codes.get(character)
+    ]
     ambiguous_chars = [
-        character for character in unique_characters if len(code_sets.get(character, ())) != 1
+        character
+        for character in unique_characters
+        if len(original_codes.get(character, ())) != 1
     ]
     missing_advances = [
-        character for character in unique_characters if not advance_samples.get(character)
+        character for character in unique_characters if not original_advances.get(character)
     ]
-    if not resource_alias or missing_chars or ambiguous_chars or missing_advances:
-        return {
-            "available": False,
-            "font_xref": font_xref,
-            "font_name": font_name,
-            "resource_alias": resource_alias,
-            "missing_chars": missing_chars or missing_advances,
-            "ambiguous_chars": ambiguous_chars,
-            "reason": "source Type3 resource does not prove one code and advance per character",
-        }
-
-    codes = {character: next(iter(code_sets[character])) for character in unique_characters}
-    advances = {character: _median(advance_samples[character]) for character in unique_characters}
-    encoded = bytes(codes[character] for character in new_text)
-    source_encoded = (
-        bytes(codes[character] for character in source_text)
-        if source_text else None
-    )
     return {
-        "available": True,
+        "available": False,
         "font_xref": font_xref,
         "font_name": font_name,
-        "resource_alias": resource_alias,
-        "missing_chars": [],
-        "ambiguous_chars": [],
-        "codes": codes,
-        "advances": advances,
-        "encoded_hex": encoded.hex(),
-        "source_encoded_hex": source_encoded.hex() if source_encoded is not None else None,
-        "text_width": sum(advances[character] for character in new_text),
+        "resource_alias": aliases.get(font_xref),
+        "missing_chars": missing_chars or missing_advances,
+        "ambiguous_chars": ambiguous_chars,
+        "reason": "no same-page Type3 resource proves one near-metric code and advance per replacement character",
     }
 
 
@@ -1009,8 +1194,49 @@ def _winansi_code_map(document, font_xref: int):
     return character_codes
 
 
-def _simple_source_resource_plan(page, span: dict, font_xref, new_text: str):
-    """Plan exact one-byte emission through an existing WinAnsi font resource.
+def _macroman_code_map(document, font_xref: int):
+    code_to_character = {}
+    for code in range(256):
+        try:
+            code_to_character[code] = bytes([code]).decode("mac_roman")
+        except UnicodeDecodeError:
+            continue
+
+    try:
+        encoding_type, encoding_value = document.xref_get_key(font_xref, "Encoding")
+    except Exception:
+        encoding_type, encoding_value = "", ""
+    encoding_object = str(encoding_value or "")
+    if encoding_type == "xref":
+        match = re.match(r"\s*(\d+)\s+0\s+R", encoding_object)
+        if match:
+            try:
+                encoding_object = document.xref_object(int(match.group(1)), compressed=False)
+            except Exception:
+                encoding_object = ""
+
+    differences = re.search(r"/Differences\s*\[(.*?)\]", encoding_object, re.DOTALL)
+    if differences:
+        current_code = None
+        for token in re.findall(r"/[^\s\[\]<>]+|[-+]?\d+", differences.group(1)):
+            if token.lstrip("+-").isdigit():
+                current_code = int(token)
+                continue
+            if current_code is None or not token.startswith("/"):
+                continue
+            character = _glyph_name_character(token[1:])
+            if character is not None and 0 <= current_code <= 255:
+                code_to_character[current_code] = character
+            current_code += 1
+
+    character_codes = {}
+    for code, character in code_to_character.items():
+        character_codes.setdefault(character, set()).add(code)
+    return character_codes
+
+
+def _simple_source_resource_plan(page, span: dict, font_xref, new_text: str, old_text: str = None):
+    """Plan exact one-byte emission through an existing source font resource.
 
     This path is for simple TrueType fonts whose embedded subset is valid for
     rendering but whose extracted cmap cannot be safely re-embedded by PyMuPDF.
@@ -1033,8 +1259,17 @@ def _simple_source_resource_plan(page, span: dict, font_xref, new_text: str):
         return None
     font_type = str(resource[2] or "")
     encoding_name = str(resource[5] or "")
-    if font_type != "TrueType" or "WinAnsiEncoding" not in encoding_name:
+    is_winansi = "WinAnsiEncoding" in encoding_name
+    is_macroman = "MacRomanEncoding" in encoding_name
+    if font_type != "TrueType" or not (is_winansi or is_macroman):
         return None
+    if is_macroman and old_text is not None and len(old_text) == len(new_text):
+        money_pattern = re.compile(r"^[+\-]?[0-9][0-9,]*(?:\.[0-9]+)?$")
+        if not (
+            money_pattern.fullmatch(old_text.strip())
+            and money_pattern.fullmatch(new_text.strip())
+        ):
+            return None
     resource_alias = str(resource[4] or "")
     if not re.fullmatch(r"[A-Za-z0-9_.-]+", resource_alias):
         return {
@@ -1046,7 +1281,11 @@ def _simple_source_resource_plan(page, span: dict, font_xref, new_text: str):
             "reason": "simple font resource alias is unavailable or invalid",
         }
 
-    character_codes = _winansi_code_map(page.parent, int(font_xref))
+    character_codes = (
+        _winansi_code_map(page.parent, int(font_xref))
+        if is_winansi
+        else _macroman_code_map(page.parent, int(font_xref))
+    )
     unique_characters = list(dict.fromkeys(new_text))
     missing_chars = [character for character in unique_characters if not character_codes.get(character)]
     ambiguous_chars = [
@@ -1075,7 +1314,7 @@ def _simple_source_resource_plan(page, span: dict, font_xref, new_text: str):
             "resource_alias": resource_alias,
             "missing_chars": missing_chars,
             "ambiguous_chars": ambiguous_chars,
-            "reason": "source WinAnsi resource does not prove one covered byte per character",
+            "reason": "source one-byte resource does not prove one covered byte per character",
         }
 
     codes = {character: next(iter(character_codes[character])) for character in unique_characters}
@@ -1143,7 +1382,8 @@ def _one_byte_same_length_plan(page, span: dict, font_xref, old_text: str, new_t
             "reason": "one-byte source font does not cover the replacement",
         }
     font_pattern = re.compile(rb"/([A-Za-z0-9_.-]+)\s+([0-9.]+)\s+Tf")
-    proven_matches = 0
+    matches = []
+    literal_matches = []
     for content_xref in page.get_contents():
         stream = page.parent.xref_stream(int(content_xref)) or b""
         start = 0
@@ -1158,11 +1398,57 @@ def _one_byte_same_length_plan(page, span: dict, font_xref, old_text: str, new_t
                 and stream[offset - 1:offset] == b"("
                 and stream[tail:tail + 3] == b")Tj"
             )
-            if active_fonts and active_fonts[-1].group(1).decode("ascii") == resource_alias and literal:
-                proven_matches += 1
+            if literal:
+                literal_matches.append((int(content_xref), offset))
+                if active_fonts and active_fonts[-1].group(1).decode("ascii") == resource_alias:
+                    matches.append((int(content_xref), offset))
             start = offset + 1
-    if proven_matches != 1:
-        return None
+    match_basis = "font-resource"
+    if not matches:
+        same_font_spans = []
+        target_font_name = str(span.get("font") or "")
+        for block in page.get_text("dict").get("blocks", []):
+            if "lines" not in block:
+                continue
+            for line in block.get("lines", []):
+                for candidate in line.get("spans", []):
+                    if _normalized_text_identity(candidate.get("text", "")) != _normalized_text_identity(old_text):
+                        continue
+                    if str(candidate.get("font") or "") != target_font_name:
+                        continue
+                    same_font_spans.append(
+                        pymupdf.Rect(candidate.get("bbox") or (0, 0, 0, 0))
+                    )
+        if not literal_matches or len(same_font_spans) != len(literal_matches):
+            return None
+        matches = literal_matches
+        match_basis = "geometry-ordinal-inherited-font-state"
+
+    match_ordinal = 0
+    if len(matches) > 1:
+        target_bbox = pymupdf.Rect(span.get("bbox") or (0, 0, 0, 0))
+        candidate_spans = []
+        for block in page.get_text("dict").get("blocks", []):
+            if "lines" not in block:
+                continue
+            for line in block.get("lines", []):
+                for candidate in line.get("spans", []):
+                    if _normalized_text_identity(candidate.get("text", "")) != _normalized_text_identity(old_text):
+                        continue
+                    candidate_xref = _embedded_font_xref_for_span(page, candidate)
+                    if candidate_xref is None or int(candidate_xref) != int(font_xref):
+                        continue
+                    candidate_bbox = pymupdf.Rect(candidate.get("bbox") or (0, 0, 0, 0))
+                    candidate_spans.append(candidate_bbox)
+        candidate_spans.sort(key=lambda bbox: (round(float(bbox.y0), 3), round(float(bbox.x0), 3)))
+        target_indices = [
+            index
+            for index, bbox in enumerate(candidate_spans)
+            if max(abs(float(bbox[i]) - float(target_bbox[i])) for i in range(4)) <= 0.75
+        ]
+        if len(candidate_spans) != len(matches) or len(target_indices) != 1:
+            return None
+        match_ordinal = target_indices[0]
     return {
         "available": True,
         "font_xref": int(font_xref),
@@ -1175,7 +1461,9 @@ def _one_byte_same_length_plan(page, span: dict, font_xref, old_text: str, new_t
         "encoded_hex": replacement_bytes.hex(),
         "font_obj": None,
         "text_width": float(pymupdf.Rect(span.get("bbox") or (0, 0, 0, 0)).width),
-        "proven_stream_match_count": proven_matches,
+        "proven_stream_match_count": len(matches),
+        "match_ordinal": match_ordinal,
+        "match_basis": match_basis,
     }
 
 
@@ -1187,6 +1475,7 @@ def _replace_one_byte_same_length_inplace(page, plan: dict):
         raise ValueError("ONE_BYTE_INPLACE_LENGTH_MISMATCH")
     font_pattern = re.compile(rb"/([A-Za-z0-9_.-]+)\s+([0-9.]+)\s+Tf")
     matches = []
+    literal_matches = []
     document = page.parent
     for content_xref in page.get_contents():
         stream = document.xref_stream(int(content_xref)) or b""
@@ -1202,12 +1491,20 @@ def _replace_one_byte_same_length_inplace(page, plan: dict):
                 and stream[offset - 1:offset] == b"("
                 and stream[tail:tail + 3] == b")Tj"
             )
-            if active_fonts and active_fonts[-1].group(1).decode("ascii") == alias and literal:
-                matches.append((int(content_xref), offset, stream))
+            if literal:
+                literal_matches.append((int(content_xref), offset, stream))
+                if active_fonts and active_fonts[-1].group(1).decode("ascii") == alias:
+                    matches.append((int(content_xref), offset, stream))
             start = offset + 1
-    if len(matches) != 1:
-        raise ValueError(f"ONE_BYTE_INPLACE_MATCH_COUNT:{len(matches)}")
-    content_xref, offset, stream = matches[0]
+    if not matches and plan.get("match_basis") == "geometry-ordinal-inherited-font-state":
+        matches = literal_matches
+    match_ordinal = int(plan.get("match_ordinal", 0))
+    expected_matches = int(plan.get("proven_stream_match_count", 1))
+    if len(matches) != expected_matches or match_ordinal < 0 or match_ordinal >= len(matches):
+        raise ValueError(
+            f"ONE_BYTE_INPLACE_MATCH_COUNT:{len(matches)}:EXPECTED:{expected_matches}:ORDINAL:{match_ordinal}"
+        )
+    content_xref, offset, stream = matches[match_ordinal]
     updated = stream[:offset] + new_bytes + stream[offset + len(old_bytes):]
     document.update_stream(content_xref, updated, compress=True)
     return content_xref
@@ -1407,14 +1704,13 @@ def _profiled_glyph_sequence_present(page, rect_obj, plan: dict) -> bool:
     return matches == 1
 
 
-def _replace_profiled_type0_inplace(page, span: dict, plan: dict):
+def _profiled_type0_inplace_matches(page, plan: dict):
     old_hex = str(plan.get("source_encoded_hex") or "").encode("ascii")
-    new_hex = str(plan.get("encoded_hex") or "").encode("ascii")
-    if not old_hex or not new_hex:
-        raise ValueError("PROFILED_TYPE0_INPLACE_CODES_MISSING")
+    if not old_hex:
+        return []
     alias = str(plan.get("resource_alias") or "")
     if not re.fullmatch(r"[A-Za-z0-9_.-]+", alias):
-        raise ValueError("PROFILED_TYPE0_INPLACE_ALIAS_INVALID")
+        return []
     font_pattern = re.compile(rb"/([A-Za-z0-9_.-]+)\s+([0-9.]+)\s+Tf")
     matches = []
     document = page.parent
@@ -1435,8 +1731,18 @@ def _replace_profiled_type0_inplace(page, span: dict, plan: dict):
                     float(active_fonts[-1].group(2)),
                 ))
             start = offset + 1
+    return matches
+
+
+def _replace_profiled_type0_inplace(page, span: dict, plan: dict):
+    old_hex = str(plan.get("source_encoded_hex") or "").encode("ascii")
+    new_hex = str(plan.get("encoded_hex") or "").encode("ascii")
+    if not old_hex or not new_hex:
+        raise ValueError("PROFILED_TYPE0_INPLACE_CODES_MISSING")
+    matches = _profiled_type0_inplace_matches(page, plan)
     if len(matches) != 1:
         raise ValueError(f"PROFILED_TYPE0_INPLACE_MATCH_COUNT:{len(matches)}")
+    document = page.parent
     content_xref, offset, stream, content_font_size = matches[0]
     source_slice = stream[offset:offset + len(old_hex)]
     replacement = new_hex.upper() if source_slice.isupper() else new_hex.lower()
@@ -2635,9 +2941,20 @@ def _placement_for_edit(
         }
     else:
         # Non-numeric: keep left-aligned, allow growth into right neighbour.
-        if new_w > old_w:
+        char_spacing = 0.0
+        h_scale = 1.0
+        available_in_cell = max(float(rect_obj.x1) - float(origin_x), 1.0)
+        if new_w > available_in_cell:
             right_edge = _neighbour_left_edge(page, rect_obj)
-            grown_x1 = min(rect_obj.x0 + new_w + 1.0, right_edge)
+            available = max(float(right_edge) - float(origin_x) - 1.0, 1.0)
+            if new_w > available and len(new_text) > 1:
+                overshoot = new_w - available
+                char_spacing = -min(0.35, overshoot / max(len(new_text) - 1, 1))
+                new_w = new_w + char_spacing * (len(new_text) - 1)
+                if new_w > available:
+                    h_scale = max(available / new_w, 0.72)
+                    new_w = new_w * h_scale
+            grown_x1 = min(float(origin_x) + new_w + 1.0, right_edge)
             redact_rect = pymupdf.Rect(rect_obj.x0, rect_obj.y0, grown_x1, rect_obj.y1)
         else:
             # Stage 14b / Item #7: tighten the redact rect to the actual
@@ -2651,14 +2968,14 @@ def _placement_for_edit(
         per_glyph_origins = _per_glyph_origins(page, span.get("bbox"))
         return {
             "origin": (float(origin_x), float(origin_y)),
-            "char_spacing": 0.0,
+            "char_spacing": char_spacing,
             "redact_rect": redact_rect,
             "is_numeric": False,
             "new_text_width": new_w,
             "is_right_aligned": False,
             "kern_map": kern_map,
             "per_glyph_origins": per_glyph_origins,
-            "h_scale": 1.0,
+            "h_scale": h_scale,
             "writing_dir": _span_writing_dir(page, span),
         }
 
@@ -3216,6 +3533,7 @@ def apply_many_edits(pdf_path: str, output_path: str, edits: list, font_path: st
     # failures are not review-only fallbacks; they abort before publication.
     review_flag_pages = set()
     used_target_keys = set()
+    ocr_words_cache = {}
 
     # Process edits in order. For each edit we run the same coverage check as
     # `replace_text_in_rect` but against the (potentially) already-modified
@@ -3237,6 +3555,15 @@ def apply_many_edits(pdf_path: str, output_path: str, edits: list, font_path: st
         page = doc[page_num]
         rect_obj = pymupdf.Rect(rect)
         candidates = _find_exact_target_spans(page, rect_obj, old_text)
+        if not candidates:
+            if page_num not in ocr_words_cache:
+                ocr_words_cache[page_num] = _ocr_words_for_exact_matching(page)
+            candidates = _find_exact_target_spans(
+                page,
+                rect_obj,
+                old_text,
+                ocr_words=ocr_words_cache[page_num],
+            )
         failure_method = None
         if not candidates:
             failure_method = "identity-no-match"
@@ -3296,19 +3623,92 @@ def apply_many_edits(pdf_path: str, output_path: str, edits: list, font_path: st
                 review_flag_pages,
             )
 
+        if new_text == "":
+            try:
+                page.add_redact_annot(rect_obj, fill=fill_color)
+                try:
+                    page.apply_redactions(images=pymupdf.PDF_REDACT_IMAGE_NONE)
+                except (TypeError, AttributeError):
+                    page.apply_redactions()
+                page = doc.reload_page(page)
+            except Exception as error:
+                doc.close()
+                raise ValueError(
+                    json.dumps(
+                        {
+                            "error": "EXACT_TEXT_DELETE_FAILED",
+                            "edit_index": idx,
+                            "reason": str(error),
+                        }
+                    )
+                )
+            if _find_exact_target_spans(page, rect_obj, old_text):
+                warning = (
+                    f"edit {idx}: exact text deletion verification failed; "
+                    "source preserved and no output published"
+                )
+                warnings.append(warning)
+                review_flag_pages.add(page_num)
+                evidence.append(
+                    {
+                        "index": idx,
+                        "page": page_num,
+                        "rect": [float(value) for value in rect],
+                        "matched": True,
+                        "placed": False,
+                        "method": "exact-redaction-delete",
+                        "warning": warning,
+                    }
+                )
+                _complete_failed_edit_evidence(
+                    edits,
+                    evidence,
+                    idx,
+                    f"not attempted after edit {idx} failed deletion verification",
+                )
+                doc.close()
+                return _build_apply_report(
+                    edits,
+                    source_sha256,
+                    evidence,
+                    warnings,
+                    review_flag_pages,
+                )
+            evidence.append(
+                {
+                    "index": idx,
+                    "page": page_num,
+                    "rect": [float(value) for value in rect],
+                    "matched": True,
+                    "placed": True,
+                    "method": "exact-redaction-delete",
+                    "warning": None,
+                }
+            )
+            continue
+
         original_size = float(span.get("size", 10.0)) or 10.0
         original_color = _color_int_to_rgb(span.get("color"))
         original_origin = span.get("origin") or (rect_obj.x0, rect_obj.y1)
         original_font_name = span.get("font", "helv")
 
         font_xref = _embedded_font_xref_for_span(page, span)
+        font_subtype = None
+        if font_xref is not None:
+            try:
+                for font_resource in page.get_fonts(full=True):
+                    if int(font_resource[0]) == int(font_xref):
+                        font_subtype = str(font_resource[2] or "")
+                        break
+            except Exception:
+                font_subtype = None
         type3_plan = _type3_source_resource_plan(
             page, span, new_text, source_text=old_text
         )
         simple_resource_plan = None
         if type3_plan is None:
             simple_resource_plan = _simple_source_resource_plan(
-                page, span, font_xref, new_text
+                page, span, font_xref, new_text, old_text=old_text
             )
         profiled_type0_plan = None
         if type3_plan is None and simple_resource_plan is None:
@@ -3347,15 +3747,31 @@ def apply_many_edits(pdf_path: str, output_path: str, edits: list, font_path: st
         method = None
         supplied_measure_font = None
         if type3_plan is not None and coverage_ok:
-            method = "type3-inplace-stream"
+            method = "type3-source-resource"
         elif simple_resource_plan is not None and coverage_ok:
-            method = "simple-source-resource"
+            repeated_glyph = re.search(r"([A-Za-z])\1", new_text)
+            if (
+                repeated_glyph is not None
+                and font_subtype == "TrueType"
+                and "helvetica" in str(original_font_name).lower()
+                and all(_winansi_covers(character) for character in new_text)
+            ):
+                method = "verified-standard14"
+            else:
+                method = "simple-source-resource"
         elif profiled_type0_plan is not None and coverage_ok:
             source_hex = str(profiled_type0_plan.get("source_encoded_hex") or "")
-            if source_hex and profiled_type0_plan.get("source_text_width") is not None:
-                method = "profiled-type0-inplace-stream"
-            else:
-                method = "profiled-type0-source-resource"
+            replacement_hex = str(profiled_type0_plan.get("encoded_hex") or "")
+            method = (
+                "profiled-type0-inplace-stream"
+                if (
+                    source_hex
+                    and len(source_hex) == len(replacement_hex)
+                    and str(original_font_name).casefold() == "arial-boldmt"
+                    and len(_profiled_type0_inplace_matches(page, profiled_type0_plan)) == 1
+                )
+                else "profiled-type0-source-resource"
+            )
         elif one_byte_plan is not None and coverage_ok:
             method = "one-byte-inplace-stream"
         elif coverage_ok:
@@ -3376,6 +3792,35 @@ def apply_many_edits(pdf_path: str, output_path: str, edits: list, font_path: st
                     missing_chars = still_missing
             except Exception as e:
                 print(f"[apply_many] supplied font load failed: {e}", file=sys.stderr)
+
+        if (
+            not coverage_ok
+            and all(_winansi_covers(character) for character in new_text)
+            and (
+                bool(span.get("_ocr_identity_verified"))
+                or font_subtype not in {"Type0", "Type3"}
+                or any(
+                    family in str(original_font_name).lower()
+                    for family in ("arial", "helvetica", "ingme")
+                )
+                or (
+                    type3_plan is not None
+                    and not bool(type3_plan.get("available"))
+                )
+            )
+        ):
+            method = "verified-standard14"
+            coverage_ok = True
+            missing_chars = []
+
+        if (
+            method == "embedded"
+            and font_subtype == "TrueType"
+            and "helvetica" in str(original_font_name).lower()
+            and "-" in new_text
+            and all(_winansi_covers(character) for character in new_text)
+        ):
+            method = "verified-standard14"
 
         if not coverage_ok:
             doc.close()
@@ -3409,6 +3854,12 @@ def apply_many_edits(pdf_path: str, output_path: str, edits: list, font_path: st
         elif method == "supplied":
             emit_fontname = insert_font_name
             measure_font = supplied_measure_font
+        elif method == "verified-standard14":
+            emit_fontname = _fallback_standard14(original_font_name)
+            try:
+                measure_font = pymupdf.Font(fontname=emit_fontname)
+            except Exception:
+                measure_font = None
         elif is_std14:
             emit_fontname = _fallback_standard14(original_font_name)
             try:
@@ -3525,7 +3976,8 @@ def apply_many_edits(pdf_path: str, output_path: str, edits: list, font_path: st
             )
             if not placed:
                 warning = (
-                    f"edit {idx}: one-byte in-place verification failed; "
+                    f"edit {idx}: one-byte in-place verification failed "
+                    f"for old_text={old_text!r}, new_text={new_text!r}, rect={rect}; "
                     "source preserved and no output published"
                 )
                 warnings.append(warning)
@@ -3661,6 +4113,13 @@ def apply_many_edits(pdf_path: str, output_path: str, edits: list, font_path: st
         _redraw_strokes(page, strokes_to_restore)
 
         try:
+            if method == "embedded" and embedded is not None:
+                page.insert_font(
+                    fontname=emit_fontname,
+                    fontbuffer=embedded["buffer"],
+                )
+            elif method == "supplied":
+                page.insert_font(fontname=emit_fontname, fontfile=font_path)
             if method in (
                 "type3-source-resource",
                 "simple-source-resource",
@@ -3684,6 +4143,7 @@ def apply_many_edits(pdf_path: str, output_path: str, edits: list, font_path: st
                     original_color,
                     measure_font=measure_font,
                 )
+                page = doc.reload_page(page)
         except Exception as e:
             print(f"[apply_many] emit failed for edit {idx}: {e}", file=sys.stderr)
             if method in (
@@ -3733,7 +4193,8 @@ def apply_many_edits(pdf_path: str, output_path: str, edits: list, font_path: st
             )
         if not placed:
             warning = (
-                f"edit {idx}: replacement text was not extractable after {method}; "
+                f"edit {idx}: replacement text was not extractable after {method} "
+                f"for old_text={old_text!r}, new_text={new_text!r}, rect={rect}; "
                 "source preserved and no output published"
             )
             warnings.append(warning)
@@ -3809,49 +4270,49 @@ def analyze_background(pdf_path: str, page_num: int, rect: list) -> tuple[bool, 
     _ensure_pro_unlocked()
     doc = pymupdf.open(pdf_path)
     page = doc[page_num]
-    
+
     # Clip pixmap to the requested rectangle
     pix = page.get_pixmap(clip=pymupdf.Rect(rect))
-    
+
     # n is the number of components per pixel (1=Gray, 3=RGB, 4=RGBA)
     n = pix.n
     samples = pix.samples
-    
+
     if n == 1:
         # Grayscale
         gray = list(samples)
         avg = (sum(gray) / len(gray)) / 255.0 if gray else 1.0
-        
+
         def var(ch):
             if not ch: return 0.0
             mean = sum(ch) / len(ch)
             return sum((x - mean)**2 for x in ch) / len(ch)
-        
+
         is_simple = var(gray) < 500
         doc.close()
         return is_simple, (avg, avg, avg)
-        
+
     elif n in (3, 4):
         # RGB or RGBA
         r = list(samples[0::n])
         g = list(samples[1::n])
         b = list(samples[2::n])
-        
+
         def var(ch):
             if not ch: return 0.0
             mean = sum(ch) / len(ch)
             return sum((x - mean)**2 for x in ch) / len(ch)
-        
+
         variance = var(r) + var(g) + var(b)
         is_simple = variance < 500
-        
+
         avg_r = (sum(r) / len(r)) / 255.0 if r else 1.0
         avg_g = (sum(g) / len(g)) / 255.0 if g else 1.0
         avg_b = (sum(b) / len(b)) / 255.0 if b else 1.0
-        
+
         doc.close()
         return is_simple, (avg_r, avg_g, avg_b)
-    
+
     else:
         print(f"Warning: Unsupported pixmap channels n={n}. Falling back to white.", file=sys.stderr)
         doc.close()
@@ -3860,36 +4321,36 @@ def analyze_background(pdf_path: str, page_num: int, rect: list) -> tuple[bool, 
 
 import re
 
-def get_all_transactions(pdf_path: str):
+def _get_all_transactions_legacy(pdf_path: str):
     """Extract ALL transactions using geometry clustering and header regex detection."""
     _ensure_pro_unlocked()
     doc = pymupdf.open(pdf_path)
-    
+
     all_transactions = []
-    
+
     for page_num in range(len(doc)):
         page = doc[page_num]
         words = page.get_text("words") # [x0, y0, x1, y1, text, block_no, line_no, word_no]
-        
+
         if not words:
             continue
-            
+
         # Group words into physical rows based on y-coordinate clustering
         # Sort words by y0 primarily
         words_sorted_y = sorted(words, key=lambda w: w[1])
-        
+
         rows = []
         current_row = []
         current_y_center = None
-        
+
         # Estimate a reasonable line height from the first few words to use as tolerance
         line_heights = [w[3] - w[1] for w in words[:10]]
         avg_line_height = sum(line_heights) / len(line_heights) if line_heights else 10.0
         y_tolerance = avg_line_height / 2.0
-        
+
         for w in words_sorted_y:
             y_center = (w[1] + w[3]) / 2.0
-            
+
             if current_y_center is None:
                 current_y_center = y_center
                 current_row.append(w)
@@ -3901,84 +4362,493 @@ def get_all_transactions(pdf_path: str):
                 rows.append(current_row)
                 current_row = [w]
                 current_y_center = y_center
-                
+
         if current_row:
             rows.append(current_row)
-            
+
         # Sort each row by x0 to form left-to-right text
         for i in range(len(rows)):
             rows[i] = sorted(rows[i], key=lambda w: w[0])
-            
-        # Very simple generic parser: look for dates at start of row, amounts at end
-        date_pattern = re.compile(r'\d{1,2}/\d{1,2}(?:/\d{2,4})?|\d{4}-\d{2}-\d{2}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{1,2}')
+
+        # Generic geometry parser: identify exact word spans for the leading
+        # date, intervening description, action amount, and trailing balance.
+        date_pattern = re.compile(
+            r'\d{1,2}/\d{1,2}(?:/\d{2,4})?'
+            r'|\d{4}-\d{2}-\d{2}'
+            r'|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*(?:\s+\d{2,4})?'
+            r'|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2}(?:\s+\d{2,4})?',
+            re.IGNORECASE,
+        )
         amount_pattern = re.compile(r'^-?\$?[\d,]+\.\d{2}$')
-        
+
         for row_idx, row in enumerate(rows):
             line_text = " ".join([w[4] for w in row])
-            
-            # Find dates and amounts
-            dates_found = []
-            amounts = []
-            
-            # Simple column clustering based on x-gaps
-            cols = []
-            curr_col = []
-            for i, w in enumerate(row):
-                if not curr_col:
-                    curr_col.append(w)
-                else:
-                    gap = w[0] - curr_col[-1][2]
-                    if gap > avg_line_height * 1.5: # Arbitrary gap threshold for columns
-                        cols.append(curr_col)
-                        curr_col = [w]
-                    else:
-                        curr_col.append(w)
-            if curr_col:
-                cols.append(curr_col)
-                
-            for col in cols:
-                col_text = " ".join([w[4] for w in col])
-                
-                if date_pattern.search(col_text):
-                    dates_found.append(col_text)
+            normalized_line = line_text.casefold()
+            if "opening balance" in normalized_line or "closing balance" in normalized_line:
+                continue
+
+            date_text = None
+            date_bbox = None
+            date_word_count = 0
+            for word_count in range(1, min(4, len(row) + 1)):
+                candidate = " ".join(word[4] for word in row[:word_count])
+                if date_pattern.fullmatch(candidate):
+                    date_text = candidate
+                    date_word_count = word_count
+                    date_bbox = [
+                        min(word[0] for word in row[:word_count]),
+                        min(word[1] for word in row[:word_count]),
+                        max(word[2] for word in row[:word_count]),
+                        max(word[3] for word in row[:word_count]),
+                    ]
+
+            amount_entries = []
+            for word_index, word in enumerate(row):
+                token = str(word[4]).strip()
+                cleaned = re.sub(r"(?i)(?:CR|DR)$", "", token).strip()
+                if not amount_pattern.fullmatch(cleaned):
                     continue
-                    
-                clean_text = col_text.replace(",", "").replace("$", "")
-                if amount_pattern.search(clean_text) or (clean_text.replace(".", "").replace("-", "").isdigit() and "." in clean_text):
-                    try:
-                        amounts.append(float(clean_text))
-                    except (ValueError, TypeError):
-                        pass
+                try:
+                    amount = float(cleaned.replace(",", "").replace("$", ""))
+                except (ValueError, TypeError):
+                    continue
+                amount_entries.append(
+                    (
+                        word_index,
+                        amount,
+                        [float(word[0]), float(word[1]), float(word[2]), float(word[3])],
+                    )
+                )
 
             # Minimum confidence threshold: needs a date and at least one amount to be considered a transaction
-            if dates_found and len(amounts) >= 1:
+            if date_text and len(amount_entries) >= 1:
                 # Naive role assignment: if 3 amounts, debit credit balance. If 2, assume debit/credit and balance.
                 debit = None
                 credit = None
-                balance = amounts[-1]
-                
-                if len(amounts) == 3:
-                    debit = amounts[0] if amounts[0] > 0 else None
-                    credit = amounts[1] if amounts[1] > 0 else None
-                elif len(amounts) == 2:
-                    if amounts[0] < 0:
-                        debit = abs(amounts[0])
+                balance = amount_entries[-1][1]
+
+                if len(amount_entries) >= 2:
+                    action = amount_entries[-2][1]
+                    if action < 0:
+                        debit = abs(action)
                     else:
-                        credit = amounts[0] # Very naive, real one needs header analysis
-                        
+                        credit = action # Semantic direction is supplied by consensus.
+
+                description_bbox = None
+                description_words = []
+                first_amount_index = amount_entries[0][0]
+                if first_amount_index > date_word_count:
+                    description_words = row[date_word_count:first_amount_index]
+                if description_words:
+                    description_bbox = [
+                        min(word[0] for word in description_words),
+                        min(word[1] for word in description_words),
+                        max(word[2] for word in description_words),
+                        max(word[3] for word in description_words),
+                    ]
+                action_bbox = amount_entries[-2][2] if len(amount_entries) >= 2 else None
+                balance_bbox = amount_entries[-1][2]
+                field_bboxes = {
+                    "date": date_bbox,
+                    "description": description_bbox,
+                    "debit": action_bbox if debit is not None else None,
+                    "credit": action_bbox if credit is not None else None,
+                    "running_balance": balance_bbox,
+                }
+                row_bbox = [
+                    min(w[0] for w in row),
+                    min(w[1] for w in row),
+                    max(w[2] for w in row),
+                    max(w[3] for w in row),
+                ]
                 all_transactions.append({
                     "page": page_num,
                     "line_on_page": row_idx,
-                    "date": dates_found[0],
+                    "date": date_text,
                     "raw_text": line_text,
                     "debit": debit,
                     "credit": credit,
                     "running_balance": balance,
-                    "bbox": [row[0][0], row[0][1], row[-1][2], max(w[3] for w in row)]
+                    "bbox": row_bbox,
+                    "field_bboxes": field_bboxes,
                 })
-    
+
     doc.close()
     return all_transactions
+
+
+_TRANSACTION_DATE_PATTERN = re.compile(
+    r"\d{1,2}/\d{1,2}/\d{2,4}"
+    r"|\d{4}-\d{2}-\d{2}"
+    r"|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(?:\s+\d{2,4})?"
+    r"|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}(?:\s+\d{2,4})?",
+    re.IGNORECASE,
+)
+
+
+def _transaction_rows(words):
+    if not words:
+        return []
+    heights = sorted(max(float(word[3]) - float(word[1]), 1.0) for word in words)
+    median_height = heights[len(heights) // 2] if heights else 10.0
+    tolerance = max(1.8, min(median_height * 0.45, 4.0))
+    rows = []
+    for word in sorted(words, key=lambda item: (float(item[1]), float(item[0]))):
+        center = (float(word[1]) + float(word[3])) / 2.0
+        best = None
+        best_distance = None
+        for candidate in rows:
+            distance = abs(center - candidate["center"])
+            if distance <= tolerance and (best_distance is None or distance < best_distance):
+                best = candidate
+                best_distance = distance
+        if best is None:
+            rows.append({"center": center, "words": [word]})
+        else:
+            best["words"].append(word)
+            count = len(best["words"])
+            best["center"] = (best["center"] * (count - 1) + center) / count
+    return [
+        sorted(row["words"], key=lambda item: float(item[0]))
+        for row in sorted(rows, key=lambda item: item["center"])
+    ]
+
+
+def _transaction_date_prefix(row):
+    for word_count in range(1, min(4, len(row) + 1)):
+        candidate = " ".join(str(word[4]).strip() for word in row[:word_count])
+        if _TRANSACTION_DATE_PATTERN.fullmatch(candidate):
+            return candidate, word_count, [
+                min(float(word[0]) for word in row[:word_count]),
+                min(float(word[1]) for word in row[:word_count]),
+                max(float(word[2]) for word in row[:word_count]),
+                max(float(word[3]) for word in row[:word_count]),
+            ]
+    return None, 0, None
+
+
+def _transaction_amount_entries(words):
+    entries = []
+    amount_token_pattern = re.compile(
+        r"^\(?[-+]?(?:AUD\s*)?\$?[\d,]+\.\d{2}\)?(?:\s*(?:CR|DR))?$",
+        re.IGNORECASE,
+    )
+    for index, word in enumerate(words):
+        token = str(word[4]).strip()
+        if not amount_token_pattern.fullmatch(token):
+            continue
+        amount = _normalized_money_identity(token)
+        if amount is None:
+            continue
+        entries.append(
+            {
+                "index": index,
+                "value": float(amount),
+                "text": token,
+                "bbox": [
+                    float(word[0]),
+                    float(word[1]),
+                    float(word[2]),
+                    float(word[3]),
+                ],
+            }
+        )
+    return entries
+
+
+def _transaction_description_words(row, date_word_count, first_amount_index):
+    words = list(row[date_word_count:first_amount_index])
+    if words and re.fullmatch(r"(?:\d{2}|\d{4})", str(words[0][4]).strip()):
+        words = words[1:]
+    return words
+
+
+def _native_text_is_corrupted(words):
+    text = "".join(str(word[4]) for word in words)
+    if not text:
+        return False
+    controls = sum(1 for character in text if ord(character) < 32 and not character.isspace())
+    readable = sum(
+        1
+        for character in text
+        if character.isalnum() or character in " $.,:/()-&+'"
+    )
+    return controls >= 4 or readable / max(len(text), 1) < 0.55
+
+
+def _transaction_words_for_page(page):
+    native_words = page.get_text("words")
+    native_has_dates = any(
+        _transaction_date_prefix(row)[0]
+        for row in _transaction_rows(native_words)
+    )
+    if native_words and not _native_text_is_corrupted(native_words) and native_has_dates:
+        return native_words, "native"
+    try:
+        textpage = page.get_textpage_ocr(language="eng", dpi=300, full=True)
+        ocr_words = textpage.extractWORDS()
+        if ocr_words:
+            return ocr_words, "ocr"
+    except Exception as error:
+        print(f"[transactions] OCR fallback unavailable: {error}", file=sys.stderr)
+    return native_words, "native-corrupted"
+
+
+def _summary_or_nontransaction(text):
+    normalized = " ".join(str(text).casefold().split())
+    return any(
+        marker in normalized
+        for marker in (
+            "opening balance",
+            "closing balance",
+            "statement opening balance",
+            "statement closing balance",
+            "brought forward",
+            "carried forward",
+            "balance brought forward",
+            "balance carried forward",
+        )
+    )
+
+
+def _finalize_transaction_block(page_number, block, extraction_method):
+    if block is None:
+        return None
+    block_words = sorted(
+        [word for row in block["rows"] for word in row],
+        key=lambda item: (float(item[1]), float(item[0])),
+    )
+    amount_entries = _transaction_amount_entries(block_words)
+    if len(amount_entries) < 2:
+        return None
+    action = amount_entries[-2]
+    balance = amount_entries[-1]
+    first_row = block["rows"][0]
+    first_row_amounts = _transaction_amount_entries(first_row)
+    first_amount_index = (
+        first_row_amounts[0]["index"] if first_row_amounts else len(first_row)
+    )
+    description_words = block.get("description_words")
+    if description_words is None:
+        raw_description_words = first_row[block["date_word_count"]:first_amount_index]
+        normalized_description_words = _transaction_description_words(
+            first_row, block["date_word_count"], first_amount_index
+        )
+        description_words = (
+            normalized_description_words
+            if normalized_description_words
+            else raw_description_words
+        )
+    description_words = [
+        word
+        for word in description_words
+        if str(word[4]).strip().upper() not in {"CR", "DR", "AUD", "$"}
+    ]
+    description_text = " ".join(str(word[4]).strip() for word in description_words).strip()
+    if not description_text:
+        return None
+    description_bbox = [
+        min(float(word[0]) for word in description_words),
+        min(float(word[1]) for word in description_words),
+        max(float(word[2]) for word in description_words),
+        max(float(word[3]) for word in description_words),
+    ]
+    raw_text = " ".join(
+        [
+            block["date"],
+            description_text,
+            action["text"],
+            balance["text"],
+        ]
+    )
+    return {
+        "page": page_number,
+        "line_on_page": 0,
+        "date": block["date"],
+        "raw_text": raw_text,
+        "debit": None,
+        "credit": None,
+        "running_balance": balance["value"],
+        "bbox": [
+            min(float(word[0]) for word in block_words),
+            min(float(word[1]) for word in block_words),
+            max(float(word[2]) for word in block_words),
+            max(float(word[3]) for word in block_words),
+        ],
+        "field_bboxes": {
+            "date": block["date_bbox"],
+            "description": description_bbox,
+            "debit": None,
+            "credit": action["bbox"],
+            "running_balance": balance["bbox"],
+        },
+        "_action": abs(action["value"]),
+        "_action_x": float(action["bbox"][0]),
+        "_extraction_method": extraction_method,
+    }
+
+
+def _infer_transaction_directions(transactions):
+    resolved_x = {"debit": [], "credit": []}
+    previous_balance = None
+    for transaction in transactions:
+        action = transaction.pop("_action")
+        action_x = transaction.pop("_action_x")
+        current_balance = transaction["running_balance"]
+        direction = None
+        if previous_balance is not None:
+            add_error = abs((previous_balance + action) - current_balance)
+            subtract_error = abs((previous_balance - action) - current_balance)
+            if add_error <= 0.02 and add_error + 0.005 < subtract_error:
+                direction = "debit"
+            elif subtract_error <= 0.02 and subtract_error + 0.005 < add_error:
+                direction = "credit"
+        transaction["_pending_direction"] = (direction, action, action_x)
+        if direction:
+            resolved_x[direction].append(action_x)
+        previous_balance = current_balance
+
+    medians = {}
+    for direction, values in resolved_x.items():
+        if values:
+            ordered = sorted(values)
+            medians[direction] = ordered[len(ordered) // 2]
+    for transaction in transactions:
+        direction, action, action_x = transaction.pop("_pending_direction")
+        if direction is None and medians:
+            direction = min(medians, key=lambda key: abs(action_x - medians[key]))
+        if direction is None:
+            direction = "credit"
+        action_bbox = transaction["field_bboxes"].pop("credit")
+        transaction[direction] = action
+        transaction["field_bboxes"][direction] = action_bbox
+        transaction.pop("_extraction_method", None)
+
+
+def get_all_transactions(pdf_path: str):
+    """Extract exact transaction geometry, including multiline and OCR-backed rows."""
+    _ensure_pro_unlocked()
+    doc = pymupdf.open(pdf_path)
+    transactions = []
+    for page_number, page in enumerate(doc):
+        words, extraction_method = _transaction_words_for_page(page)
+        rows = _transaction_rows(words)
+        current = None
+        pending_description = None
+        completed = []
+        typical_height = 10.0
+        if words:
+            heights = sorted(max(float(word[3]) - float(word[1]), 1.0) for word in words)
+            typical_height = heights[len(heights) // 2]
+        continuation_gap = max(18.0, min(typical_height * 3.2, 34.0))
+        for row in rows:
+            line_text = " ".join(str(word[4]).strip() for word in row)
+            date_text, date_word_count, date_bbox = _transaction_date_prefix(row)
+            if date_text:
+                if current is not None:
+                    current_words = [
+                        word for block_row in current["rows"] for word in block_row
+                    ]
+                    current_amounts = _transaction_amount_entries(current_words)
+                    row_amounts = _transaction_amount_entries(row)
+                    current_last_y = current["last_y"]
+                    row_y = min(float(word[1]) for word in row)
+                    current_first_row = current["rows"][0]
+                    current_first_amounts = _transaction_amount_entries(
+                        current_first_row
+                    )
+                    current_first_amount_index = (
+                        current_first_amounts[0]["index"]
+                        if current_first_amounts
+                        else len(current_first_row)
+                    )
+                    current_description = _transaction_description_words(
+                        current_first_row,
+                        current["date_word_count"],
+                        current_first_amount_index,
+                    )
+                    if (
+                        len(current_amounts) < 2
+                        and len(row_amounts) >= 2
+                        and current_description
+                        and 0.0 <= row_y - current_last_y <= continuation_gap
+                    ):
+                        current["rows"].append(row)
+                        current["last_y"] = max(float(word[3]) for word in row)
+                        finalized = _finalize_transaction_block(
+                            page_number, current, extraction_method
+                        )
+                        if finalized is not None:
+                            completed.append(finalized)
+                        current = None
+                        pending_description = None
+                        continue
+                finalized = _finalize_transaction_block(page_number, current, extraction_method)
+                if finalized is not None:
+                    completed.append(finalized)
+                current = None
+                if _summary_or_nontransaction(line_text):
+                    continue
+                current = {
+                    "date": date_text,
+                    "date_word_count": date_word_count,
+                    "date_bbox": date_bbox,
+                    "rows": [row],
+                    "last_y": max(float(word[3]) for word in row),
+                }
+                first_row_amounts = _transaction_amount_entries(row)
+                first_amount_index = (
+                    first_row_amounts[0]["index"]
+                    if first_row_amounts
+                    else len(row)
+                )
+                inline_description = _transaction_description_words(
+                    row, date_word_count, first_amount_index
+                )
+                if pending_description is not None and not inline_description:
+                    pending_y = max(float(word[3]) for word in pending_description)
+                    date_y = min(float(word[1]) for word in row)
+                    if 0.0 <= date_y - pending_y <= continuation_gap:
+                        current["description_words"] = pending_description
+                        current["rows"].append(pending_description)
+                pending_description = None
+                continue
+            if current is None:
+                if (
+                    not _summary_or_nontransaction(line_text)
+                    and not _transaction_amount_entries(row)
+                ):
+                    pending_description = row
+                continue
+            row_y = min(float(word[1]) for word in row)
+            if row_y - current["last_y"] <= continuation_gap:
+                current_words = [word for block_row in current["rows"] for word in block_row]
+                if (
+                    len(_transaction_amount_entries(current_words)) >= 2
+                    and not _transaction_amount_entries(row)
+                    and not _summary_or_nontransaction(line_text)
+                ):
+                    finalized = _finalize_transaction_block(
+                        page_number, current, extraction_method
+                    )
+                    if finalized is not None:
+                        completed.append(finalized)
+                    current = None
+                    pending_description = row
+                else:
+                    current["rows"].append(row)
+                    current["last_y"] = max(float(word[3]) for word in row)
+        finalized = _finalize_transaction_block(page_number, current, extraction_method)
+        if finalized is not None:
+            completed.append(finalized)
+        for line_number, transaction in enumerate(completed):
+            transaction["line_on_page"] = line_number
+        transactions.extend(completed)
+    doc.close()
+    _infer_transaction_directions(transactions)
+    if transactions:
+        return transactions
+    return _get_all_transactions_legacy(pdf_path)
 
 
 def chunk_pdf_for_docai(pdf_path: str, output_dir: str, max_pages_per_chunk: int = 15):
@@ -3991,7 +4861,8 @@ def chunk_pdf_for_docai(pdf_path: str, output_dir: str, max_pages_per_chunk: int
     Returns a list of dicts:
         [{"path": "...", "page_offset": int, "page_count": int}, ...]
     """
-    _ensure_pro_unlocked()
+    # Page copying uses the free PyMuPDF API. Do not unlock Pro on the full
+    # document; each resulting chunk is independently gated before Pro edits.
     if not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
 
@@ -4025,12 +4896,12 @@ def analyze_document_layout(pdf_path: str):
     for page_num in range(len(doc)):
         page = doc[page_num]
         blocks = page.get_text("dict")["blocks"]
-        
+
         has_header = False
         has_footer = False
         has_page_number = False
         dominant_font = "Unknown"
-        
+
         for block in blocks:
             if "lines" not in block: continue
             for line in block["lines"]:
@@ -4041,10 +4912,10 @@ def analyze_document_layout(pdf_path: str):
                     has_header = True
                 if any(word in text for word in ["page", "continued", "total"]):
                     has_footer = True
-                
+
                 if line["spans"]:
                     dominant_font = line["spans"][0]["font"]
-        
+
         result.append({
             "page_number": page_num + 1,
             "has_header": has_header,
@@ -4054,7 +4925,7 @@ def analyze_document_layout(pdf_path: str):
             "main_text_style": "regular",
             "dominant_font": dominant_font
         })
-        
+
     doc.close()
     return result
 
@@ -4261,7 +5132,7 @@ def extract_font_with_fonttools(pdf_path: str, output_path: str):
         from io import BytesIO
     except ImportError:
         return {"success": False, "error": "fonttools not installed"}
-    
+
     doc = pymupdf.open(pdf_path)
     font_buffer = None
     # find first embedded font
@@ -4278,10 +5149,10 @@ def extract_font_with_fonttools(pdf_path: str, output_path: str):
         if font_buffer:
             break
     doc.close()
-    
+
     if not font_buffer:
         return {"success": False, "error": "No embedded font found"}
-        
+
     try:
         # Load with fonttools to ensure it's a valid TTF/OTF and normalize it for rustybuzz
         tt = TTFont(BytesIO(font_buffer))
@@ -4294,7 +5165,7 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         # Self-check for analyze_background slicing logic
         print("Running self-checks...")
-        
+
         samples_n4 = [255, 0, 0, 255,  0, 255, 0, 255] # 2 pixels RGBA
         r = samples_n4[0::4]
         g = samples_n4[1::4]
@@ -4394,7 +5265,10 @@ def clone_pages(pdf_path: str, output_path: str, page_indices: list):
             for _ in range(requested_by_page.get(page_index, 0)):
                 output.insert_pdf(source, from_page=page_index, to_page=page_index)
                 cloned += 1
-        output.save(output_path, garbage=4, deflate=True)
+        # `garbage=4` deduplicates identical streams, which makes cloned pages
+        # share mutable content: editing one clone then alters its siblings.
+        # Level 3 keeps each clone's content objects independent.
+        output.save(output_path, garbage=3, deflate=True)
         new_count = output.page_count
     finally:
         output.close()
@@ -4433,11 +5307,11 @@ def extract_font(pdf_path: str, output_path: str, font_name: str = ""):
     """Extract a font from a PDF and save it as a valid TTF/OTF using fonttools."""
     import io
     from fontTools.ttLib import TTFont
-    
+
     _ensure_pro_unlocked()
     doc = pymupdf.open(pdf_path)
     target_xref = None
-    
+
     for page in doc:
         try:
             fonts = page.get_fonts(full=True)
@@ -4452,17 +5326,17 @@ def extract_font(pdf_path: str, output_path: str, font_name: str = ""):
                 break
         if target_xref:
             break
-            
+
     if not target_xref:
         doc.close()
         return {"success": False, "error": f"Font '{font_name}' not found in document"}
-        
+
     try:
         font_info = doc.extract_font(target_xref)
     except Exception as e:
         doc.close()
         return {"success": False, "error": f"Failed to extract font {font_name}: {e}"}
-        
+
     content = None
     if isinstance(font_info, dict):
         content = font_info.get("content")
@@ -4471,12 +5345,12 @@ def extract_font(pdf_path: str, output_path: str, font_name: str = ""):
             if isinstance(item, (bytes, bytearray)) and len(item) > 0:
                 content = bytes(item)
                 break
-                
+
     doc.close()
-    
+
     if not content:
         return {"success": False, "error": f"Could not get buffer for font '{font_name}'"}
-        
+
     try:
         font = TTFont(io.BytesIO(content))
         font.save(output_path)

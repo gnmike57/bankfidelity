@@ -98,7 +98,7 @@ class Type3SourceResourceTests(unittest.TestCase):
         self.assertEqual(report["matched"], 1)
         self.assertEqual(report["placed"], 1)
         self.assertEqual(report["failed"], 0)
-        self.assertEqual(report["method_per_edit"], ["type3-inplace-stream"])
+        self.assertEqual(report["method_per_edit"], ["type3-source-resource"])
         self.assertEqual(report["review_flags"], [])
         self.assertTrue(report["output_published"])
         self.assertEqual(report["source_sha256"], self.source_hash)
@@ -140,7 +140,7 @@ class Type3SourceResourceTests(unittest.TestCase):
         reports = [self.edit(output) for output in outputs]
         for report in reports:
             self.assertTrue(report["success"], report)
-            self.assertEqual(report["method_per_edit"], ["type3-inplace-stream"])
+            self.assertEqual(report["method_per_edit"], ["type3-source-resource"])
         with pymupdf.open(outputs[0]) as first, pymupdf.open(outputs[1]) as second:
             self.assertEqual(first.page_count, second.page_count)
             self.assertEqual(first[0].get_text("text"), second[0].get_text("text"))
@@ -157,6 +157,105 @@ class Type3SourceResourceTests(unittest.TestCase):
         self.assertIn("Ω", payload["missing_chars"])
         self.assertFalse(output.exists())
         self.assertEqual(sha256(self.segment), self.source_hash)
+
+    def test_nab_negative_balance_uses_near_metric_type3_donor(self):
+        transactions = BRIDGE.get_all_transactions(str(self.segment))
+        first = transactions[0]
+        output = self.directory / "negative_balance.pdf"
+        report = BRIDGE.apply_many_edits(
+            str(self.segment),
+            str(output),
+            [
+                {
+                    "page": first["page"],
+                    "rect": first["field_bboxes"]["running_balance"],
+                    "old_text": str(first["running_balance"]),
+                    "new_text": "-200",
+                }
+            ],
+        )
+        self.assertTrue(report["success"], report)
+        self.assertEqual(report["method_per_edit"], ["type3-source-resource"])
+        with pymupdf.open(output) as document:
+            self.assertIn("-200", document[first["page"]].get_text())
+        self.assertEqual(sha256(self.segment), self.source_hash)
+
+    def test_nab_description_without_type3_donor_uses_reported_standard14(self):
+        transactions = BRIDGE.get_all_transactions(str(self.segment))
+        first = transactions[0]
+        output = self.directory / "standard14_description.pdf"
+        replacement = "eBay O*10-12434-35623 Sydney AU AUS"
+        report = BRIDGE.apply_many_edits(
+            str(self.segment),
+            str(output),
+            [
+                {
+                    "page": first["page"],
+                    "rect": first["field_bboxes"]["description"],
+                    "old_text": "AA1M7692502345501T Jobseeker Pymt",
+                    "new_text": replacement,
+                }
+            ],
+        )
+        self.assertTrue(report["success"], report)
+        self.assertEqual(report["method_per_edit"], ["verified-standard14"])
+        with pymupdf.open(output) as document:
+            self.assertIn(replacement, document[first["page"]].get_text())
+        self.assertEqual(sha256(self.segment), self.source_hash)
+
+    def test_nab_dotted_leader_description_matches_semantic_prefix_exactly(self):
+        fixture = ROOT / "AU Bank Statements" / "fallback.pdf"
+        source_transaction = next(
+            item
+            for item in BRIDGE.get_all_transactions(str(fixture))
+            if "Anthony McIver" in str(item.get("raw_text") or "")
+        )
+        anthony_segment = self.directory / "anthony_segment.pdf"
+        with pymupdf.open(fixture) as source:
+            segment = pymupdf.open()
+            segment.insert_pdf(
+                source,
+                from_page=source_transaction["page"],
+                to_page=source_transaction["page"],
+            )
+            segment.save(anthony_segment, garbage=3, deflate=True)
+            segment.close()
+        transaction = next(
+            item
+            for item in BRIDGE.get_all_transactions(str(anthony_segment))
+            if "Anthony McIver" in str(item.get("raw_text") or "")
+        )
+        target = pymupdf.Rect(transaction["field_bboxes"]["description"])
+        semantic_old = "Anthony McIver Some assistance"
+        segment_hash = sha256(anthony_segment)
+        with pymupdf.open(anthony_segment) as document:
+            matches = BRIDGE._find_exact_target_spans(
+                document[transaction["page"]], target, semantic_old
+            )
+            self.assertEqual(len(matches), 1, matches)
+            self.assertTrue(
+                BRIDGE._normalized_text_identity(matches[0]["text"]).startswith(
+                    BRIDGE._normalized_text_identity(semantic_old)
+                )
+            )
+        output = self.directory / "dotted_leader_description.pdf"
+        replacement = "Settlement Assistance"
+        report = BRIDGE.apply_many_edits(
+            str(anthony_segment),
+            str(output),
+            [
+                {
+                    "page": transaction["page"],
+                    "rect": list(target),
+                    "old_text": semantic_old,
+                    "new_text": replacement,
+                }
+            ],
+        )
+        self.assertTrue(report["success"], report)
+        with pymupdf.open(output) as document:
+            self.assertIn(replacement, document[transaction["page"]].get_text())
+        self.assertEqual(sha256(anthony_segment), segment_hash)
 
     def test_background_classifier_uses_white_edges_not_black_text_center(self):
         path = self.directory / "background.pdf"

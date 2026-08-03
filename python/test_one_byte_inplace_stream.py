@@ -93,6 +93,98 @@ class OneByteInplaceStreamTests(unittest.TestCase):
             mask[target[1]:target[3], target[0]:target[2]] = True
             self.assertEqual(int(np.logical_and(changed, ~mask).sum()), 0)
 
+    def test_commbank_duplicate_date_is_selected_by_exact_geometry(self):
+        output = self.directory / "edited_duplicate_date.pdf"
+        date_target = pymupdf.Rect(
+            54.1441650390625,
+            474.5362548828125,
+            83.08541107177734,
+            485.506591796875,
+        )
+        report = BRIDGE.apply_many_edits(
+            str(self.segment),
+            str(output),
+            [
+                {
+                    "page": 0,
+                    "rect": list(date_target),
+                    "old_text": "19 Dec",
+                    "new_text": "01 Sep",
+                }
+            ],
+        )
+        self.assertTrue(report["success"], report)
+        self.assertEqual(report["method_per_edit"], ["one-byte-inplace-stream"])
+        self.assertEqual(report["review_flags"], [])
+        self.assertEqual(sha256(self.segment), self.source_hash)
+        with pymupdf.open(self.segment) as source, pymupdf.open(output) as edited:
+            self.assertEqual(edited[0].get_text().count("19 Dec"), 2)
+            self.assertEqual(edited[0].get_text().count("01 Sep"), 1)
+            scale = 240 / 72
+            before = source[0].get_pixmap(matrix=pymupdf.Matrix(scale, scale), alpha=False)
+            after = edited[0].get_pixmap(matrix=pymupdf.Matrix(scale, scale), alpha=False)
+            before_array = np.frombuffer(before.samples, dtype=np.uint8).reshape(
+                before.height, before.width, before.n
+            )[:, :, :3]
+            after_array = np.frombuffer(after.samples, dtype=np.uint8).reshape(
+                after.height, after.width, after.n
+            )[:, :, :3]
+            changed = np.any(
+                np.abs(before_array.astype(np.int16) - after_array.astype(np.int16)) > 4,
+                axis=2,
+            )
+            expanded = pymupdf.Rect(date_target)
+            expanded.x0 -= 4
+            expanded.y0 -= 4
+            expanded.x1 += 4
+            expanded.y1 += 4
+            target = [int(round(value * scale)) for value in expanded]
+            mask = np.zeros_like(changed)
+            mask[target[1]:target[3], target[0]:target[2]] = True
+            self.assertEqual(int(np.logical_and(changed, ~mask).sum()), 0)
+
+    def test_commbank_variable_description_reuses_macroman_source_resource(self):
+        output = self.directory / "edited_description.pdf"
+        description_target = pymupdf.Rect(
+            88.4311294555664,
+            475.3078918457031,
+            148.70291137695312,
+            486.2782287597656,
+        )
+        report = BRIDGE.apply_many_edits(
+            str(self.segment),
+            str(output),
+            [
+                {
+                    "page": 0,
+                    "rect": list(description_target),
+                    "old_text": "Settlement Fee",
+                    "new_text": "CREDIT INTEREST",
+                }
+            ],
+        )
+        self.assertTrue(report["success"], report)
+        self.assertEqual(report["method_per_edit"], ["simple-source-resource"])
+        self.assertEqual(report["review_flags"], [])
+        self.assertEqual(sha256(self.segment), self.source_hash)
+        with pymupdf.open(output) as edited:
+            clip = pymupdf.Rect(description_target)
+            clip.x0 -= 3
+            clip.y0 -= 3
+            clip.x1 += 16
+            clip.y1 += 6
+            observed = "".join(edited[0].get_text("text", clip=clip).split())
+            full_text = "".join(edited[0].get_text("text").split())
+            self.assertIn("CREDITINTEREST", observed)
+            self.assertIn("CREDITINTEREST", full_text)
+            self.assertNotIn("SettlementFee", observed)
+            self.assertFalse(
+                any(
+                    str(font[4]).startswith("embf_")
+                    for font in edited[0].get_fonts(full=True)
+                )
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

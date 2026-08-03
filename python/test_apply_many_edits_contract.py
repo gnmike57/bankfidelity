@@ -194,6 +194,37 @@ class ApplyManyEditsContractTests(unittest.TestCase):
             self.assertFalse(report["output_published"])
             self.assertEqual(sha256(output), output_before)
 
+    def test_field_bounded_currency_identity_matches_exact_numeric_value(self):
+        with tempfile.TemporaryDirectory(prefix="apply-report-money-identity-") as temp:
+            root = Path(temp)
+            source = root / "source.pdf"
+            output = root / "output.pdf"
+            bbox = create_text_pdf(source, "$1,234.50 CR")
+
+            report = BRIDGE.apply_many_edits(
+                str(source),
+                str(output),
+                [
+                    {
+                        "page": 0,
+                        "rect": bbox,
+                        "old_text": "1234.50",
+                        "new_text": "1334.50",
+                    }
+                ],
+            )
+
+            self.assertTrue(report["success"], json.dumps(report, indent=2))
+            self.assertEqual(
+                (report["requested"], report["matched"], report["placed"], report["failed"]),
+                (1, 1, 1, 0),
+            )
+            document = pymupdf.open(output)
+            observed = "".join(page.get_text() for page in document)
+            document.close()
+            self.assertIn("1334.50", observed)
+            self.assertNotIn("$1,234.50 CR", observed)
+
     def test_ambiguous_identity_is_non_destructive(self):
         with tempfile.TemporaryDirectory(prefix="apply-report-ambiguous-") as temp:
             root = Path(temp)

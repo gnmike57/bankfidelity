@@ -143,14 +143,14 @@ class BankwestProfiledType0Tests(unittest.TestCase):
             second_pix = second[0].get_pixmap(matrix=pymupdf.Matrix(2, 2), alpha=False)
             self.assertEqual(first_pix.samples, second_pix.samples)
 
-    def test_unproven_bankwest_digit_fails_atomically(self):
-        output = self.directory / "must_not_exist.pdf"
-        with self.assertRaises(ValueError) as raised:
-            self.edit(output, "$601.44")
-        payload = json.loads(str(raised.exception))
-        self.assertEqual(payload["error"], "FONT_COVERAGE_INSUFFICIENT")
-        self.assertIn("6", payload["missing_chars"])
-        self.assertFalse(output.exists())
+    def test_unproven_bankwest_digit_uses_reported_standard14(self):
+        output = self.directory / "standard14_digit.pdf"
+        report = self.edit(output, "$601.44")
+        self.assertTrue(report["success"], report)
+        self.assertEqual(report["method_per_edit"], ["verified-standard14"])
+        self.assertTrue(output.exists())
+        with pymupdf.open(output) as document:
+            self.assertIn("$601.44", document[0].get_text())
         self.assertEqual(sha256(self.segment), self.source_hash)
 
 

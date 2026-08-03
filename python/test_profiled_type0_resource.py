@@ -113,7 +113,7 @@ class ProfiledType0ResourceTests(unittest.TestCase):
         output = self.directory / "edited.pdf"
         report = self.edit(output)
         self.assertTrue(report["success"], report)
-        self.assertEqual(report["method_per_edit"], ["profiled-type0-inplace-stream"])
+        self.assertEqual(report["method_per_edit"], ["profiled-type0-source-resource"])
         self.assertEqual((report["requested"], report["matched"], report["placed"], report["failed"]), (1, 1, 1, 0))
         self.assertEqual(report["review_flags"], [])
         self.assertTrue(report["output_published"])
@@ -152,7 +152,7 @@ class ProfiledType0ResourceTests(unittest.TestCase):
         reports = [self.edit(output) for output in outputs]
         for report in reports:
             self.assertTrue(report["success"], report)
-            self.assertEqual(report["method_per_edit"], ["profiled-type0-inplace-stream"])
+            self.assertEqual(report["method_per_edit"], ["profiled-type0-source-resource"])
         with pymupdf.open(outputs[0]) as first, pymupdf.open(outputs[1]) as second:
             first_pix = first[0].get_pixmap(matrix=pymupdf.Matrix(2, 2), alpha=False)
             second_pix = second[0].get_pixmap(matrix=pymupdf.Matrix(2, 2), alpha=False)

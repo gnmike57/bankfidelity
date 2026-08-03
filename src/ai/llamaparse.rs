@@ -152,6 +152,51 @@ impl LlamaParseClient {
         Ok(stmt)
     }
 
+    /// Parse statement semantics for transfer planning without invoking the
+    /// extraction-repair provider loop. Transfer has its own exact mutation,
+    /// engine-math, optional provider-math, and publication gates; waiting for
+    /// a second provider repair here can otherwise consume the entire job
+    /// deadline before layout mapping begins.
+    pub async fn parse_statement_for_transfer(
+        &self,
+        pdf_path: &Path,
+    ) -> Result<BankStatement, LlamaParseError> {
+        let cache = crate::ai::docai_cache::DocAiCache::open_default(
+            self.passphrase.as_deref().unwrap_or_default(),
+        )
+        .ok();
+        let cache_key = cache.as_ref().and_then(|_| {
+            crate::ai::docai_cache::DocAiCache::make_key(
+                pdf_path,
+                "llamaparse",
+                "global",
+                "default",
+                "v1",
+            )
+            .ok()
+        });
+        if let (Some(cache), Some(cache_key)) = (cache.as_ref(), cache_key.as_ref()) {
+            if let Some(mut cached_stmt) = cache.get(cache_key) {
+                tracing::info!(
+                    "[llamaparse] Found cached parsed statement for transfer (repair skipped)"
+                );
+                cached_stmt.ensure_canonical_metadata();
+                return Ok(cached_stmt);
+            }
+        }
+
+        let job_id = self.upload_document(pdf_path).await?;
+        self.poll_until_complete(&job_id).await?;
+        let markdown = self.fetch_markdown(&job_id).await?;
+        let mut statement = self.parse_markdown_to_statement(&markdown)?;
+        statement.ensure_canonical_metadata();
+        tracing::info!(
+            "[llamaparse] Transfer parse returned {} transactions without extraction repair",
+            statement.transactions.len()
+        );
+        Ok(statement)
+    }
+
     async fn upload_document(&self, pdf_path: &Path) -> Result<String, LlamaParseError> {
         let pdf_bytes = std::fs::read(pdf_path)?;
         let filename = pdf_path

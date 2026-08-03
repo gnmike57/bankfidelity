@@ -215,7 +215,12 @@ static AMOUNT_RE: std::sync::LazyLock<regex::Regex> =
 
 static DATE_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
     regex::Regex::new(
-        r"(?ix)\b(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}(?:[-/.]|\s)(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d{1,2})(?:[-/.]|\s)\d{2,4})\b",
+        r"(?ix)\b(?:
+            \d{4}[-/.]\d{1,2}[-/.]\d{1,2}
+            |\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}
+            |\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*(?:\s+\d{2,4})?
+            |(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}(?:\s+\d{2,4})?
+        )\b",
     )
     .unwrap()
 });
@@ -632,6 +637,18 @@ mod tests {
     fn extract_date_finds_month_name() {
         let d = extract_date("15 Jan 2024 Direct debit $100.00");
         assert_eq!(d, "15 Jan 2024");
+    }
+
+    #[test]
+    fn extract_date_finds_yearless_au_statement_dates() {
+        assert_eq!(
+            extract_date("13 Jan METRO PRAHRAN 13.29 41,219.03 CR"),
+            "13 Jan"
+        );
+        assert_eq!(
+            extract_date("Mar 17 CLOSING BALANCE 35,308.14 CR"),
+            "Mar 17"
+        );
     }
 
     #[test]
