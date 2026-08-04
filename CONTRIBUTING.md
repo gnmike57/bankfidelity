@@ -1,6 +1,6 @@
-# Contributing
+# Contributing to Bank Statement Fidelity Editor
 
-We welcome contributions to the Bank Statement Fidelity Editor!
+We welcome contributions to the Bank Statement Fidelity Editor! This project follows strict guidelines to maintain the cryptographic integrity, mathematical accuracy, and pixel-perfect visual fidelity of the editing engine.
 
 ## Development Setup
 
@@ -17,6 +17,39 @@ On Windows PowerShell, run:
 ```
 
 Copy `.env.example` to `.env` only when testing an optional provider or licensed capability that explicitly requires it.
+
+## Running the Test Suite
+
+The project has a comprehensive test suite covering Rust unit tests, Python integration tests, and full end-to-end (E2E) PDF manipulation tests.
+
+### 1. Rust Unit & Integration Tests
+```bash
+cargo test
+```
+*Note: Some tests require AI provider keys in your `.env` file. Tests without keys will gracefully skip or fall back to offline modes.*
+
+### 2. End-to-End Transfer Stress Matrix
+This test runs a 42-pair transfer matrix across all 7 supported Australian bank templates, ensuring that transactions can be moved between banks while maintaining mathematical balance and visual fidelity.
+
+```bash
+cargo test --test au_transfer_stress -- --ignored --nocapture
+```
+
+### 3. Python E2E Pipeline
+Simulates the exact GUI flow (click, edit, apply, render, diff) via the CLI.
+
+```bash
+python3 scripts/e2e_pipeline.py --build --strict
+```
+
+## Architectural Invariants
+
+When contributing to the core engine, you must respect the following invariants (enforced by Gate 07/08):
+
+1.  **No Widen-on-Fail:** Verification thresholds (e.g., SSIM structural floor of `0.85`) are immutable. The engine must never silently widen a mask or lower a threshold to force a pass.
+2.  **Explicit Provider Outcomes:** Cloud AI providers (Vision, Document AI, pdfRest) are optional and additive. Their outcomes must be explicitly recorded as `PASS`, `FAIL`, or `UNAVAILABLE`. A provider failure must never be converted into a local pass.
+3.  **No Local LLMs:** Per ADR-0003 and Gate 08, local LLMs (e.g., Ollama, Llama.cpp) are explicitly forbidden in the v1 release to preserve deterministic execution and security. Do not submit PRs attempting to bundle local inference adapters.
+4.  **Exact Decimal Math:** All financial calculations must use exact decimal representations. Floating-point floats (`f32`, `f64`) are forbidden in the balance engine.
 
 ## Code Quality
 
@@ -40,10 +73,6 @@ cargo mutants
 
 This verifies that the test suite actually catches bugs in the business logic (especially in `src/engine/balance.rs`, `src/engine/verification.rs`, and `src/engine/offline_parser.rs`).
 
-### Full Validation
-
-Run the complete platform command in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) before submitting. During the remediation program, also complete the ticket evidence fields, run all prior P0 regressions, and update the owning phase manifest under `docs/remediation/evidence/`.
-
 ## Architecture Guidelines
 
 - **Fallback chains:** Every new cloud integration must have an offline fallback. Never leave a pipeline stage with a single point of failure.
@@ -63,13 +92,10 @@ Before merging, verify documentation matches code:
 - [ ] OCR / Typst / Feature-gated capabilities documented with correct prerequisites.
 - [ ] Comments in `src/pdf/selector.rs` accurately describe engine priority and fallback behavior.
 
-## Files
+## Bug Reports
 
-- **`.env.example`** — Template with all configurable keys (safe to commit)
-- **`.env`** — Your local secrets (gitignored, never commit)
-- **`AGENTS.md`** — Agent development rules and autonomy boundaries
-- **`QUICKSTART.md`** — Setup guide for new developers
-- **`CHANGELOG.md`** — Release history
-- **`docs/DEVELOPMENT.md`** — Reproducible Windows/macOS/Linux-development bootstrap and verification
-- **`docs/remediation/MASTER_PLAN.md`** — Sequenced implementation tickets and mandatory gates
-- **`docs/remediation/EVIDENCE_POLICY.md`** — Ticket and phase proof requirements
+If you discover a bug, please run the diagnostic tool and include its output in your report:
+
+```bash
+./target/release/dual-core-pdf-pipeline doctor
+```
