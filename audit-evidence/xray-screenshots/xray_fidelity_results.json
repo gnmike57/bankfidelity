@@ -1,0 +1,76 @@
+{
+  "ANZ": {
+    "status": "EXACT PASS",
+    "ssim_avg": 100.0,
+    "page_scores": [
+      100.0,
+      100.0,
+      100.0
+    ],
+    "pages_checked": 3,
+    "screenshot_dir": "xray-screenshots/ANZ"
+  },
+  "Bankwest": {
+    "status": "EXACT PASS",
+    "ssim_avg": 100.0,
+    "page_scores": [
+      100.0
+    ],
+    "pages_checked": 1,
+    "screenshot_dir": "xray-screenshots/Bankwest"
+  },
+  "CommBank": {
+    "status": "EXACT PASS",
+    "ssim_avg": 100.0,
+    "page_scores": [
+      100.0,
+      100.0,
+      100.0
+    ],
+    "pages_checked": 3,
+    "screenshot_dir": "xray-screenshots/CommBank"
+  },
+  "ING": {
+    "status": "EXACT PASS",
+    "ssim_avg": 100.0,
+    "page_scores": [
+      100.0,
+      100.0,
+      100.0
+    ],
+    "pages_checked": 3,
+    "screenshot_dir": "xray-screenshots/ING"
+  },
+  "Macquarie": {
+    "status": "EXACT PASS",
+    "ssim_avg": 100.0,
+    "page_scores": [
+      100.0,
+      100.0
+    ],
+    "pages_checked": 2,
+    "screenshot_dir": "xray-screenshots/Macquarie"
+  },
+  "NAB": {
+    "status": "EXACT PASS",
+    "ssim_avg": 100.0,
+    "page_scores": [
+      100.0,
+      100.0,
+      100.0
+    ],
+    "pages_checked": 3,
+    "screenshot_dir": "xray-screenshots/NAB"
+  },
+  "Westpac": {
+    "status": "EXACT PASS",
+    "ssim_avg": 100.0,
+    "page_scores": [
+      100.0,
+      100.0,
+      100.0
+    ],
+    "pages_checked": 3,
+    "screenshot_dir": "xray-screenshots/Westpac"
+  }
+}

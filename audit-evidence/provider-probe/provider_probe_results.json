@@ -1,0 +1,226 @@
+{
+  "ANZ": {
+    "offline": {
+      "status": "PASS",
+      "provider": "Offline (PyMuPDF)",
+      "latency_s": 0.021,
+      "text_blocks": 113,
+      "transaction_lines": 0,
+      "score": 0
+    },
+    "gemini": {
+      "status": "PASS",
+      "provider": "Gemini 2.0 Flash",
+      "latency_s": 23.881,
+      "transactions_found": 6,
+      "score": 48,
+      "raw_length": 1222
+    },
+    "mistral": {
+      "status": "PASS",
+      "provider": "Mistral (mistral-small-latest)",
+      "latency_s": 5.686,
+      "transactions_found": 10,
+      "score": 80
+    },
+    "llamaparse": {
+      "status": "PASS",
+      "provider": "LlamaParse",
+      "latency_s": 11.914,
+      "transaction_rows": 1,
+      "score": 6
+    }
+  },
+  "Bankwest": {
+    "offline": {
+      "status": "PASS",
+      "provider": "Offline (PyMuPDF)",
+      "latency_s": 0.009,
+      "text_blocks": 117,
+      "transaction_lines": 13,
+      "score": 65
+    },
+    "gemini": {
+      "status": "PASS",
+      "provider": "Gemini 2.0 Flash",
+      "latency_s": 33.714,
+      "transactions_found": 13,
+      "score": 100,
+      "raw_length": 1978
+    },
+    "mistral": {
+      "status": "PASS",
+      "provider": "Mistral (mistral-small-latest)",
+      "latency_s": 5.936,
+      "transactions_found": 9,
+      "score": 72
+    },
+    "llamaparse": {
+      "status": "PASS",
+      "provider": "LlamaParse",
+      "latency_s": 11.05,
+      "transaction_rows": 1,
+      "score": 6
+    }
+  },
+  "CommBank": {
+    "offline": {
+      "status": "PASS",
+      "provider": "Offline (PyMuPDF)",
+      "latency_s": 0.045,
+      "text_blocks": 135,
+      "transaction_lines": 70,
+      "score": 100
+    },
+    "gemini": {
+      "status": "PASS",
+      "provider": "Gemini 2.0 Flash",
+      "latency_s": 20.747,
+      "transactions_found": 13,
+      "score": 100,
+      "raw_length": 2224
+    },
+    "mistral": {
+      "status": "PASS",
+      "provider": "Mistral (mistral-small-latest)",
+      "latency_s": 7.194,
+      "transactions_found": 13,
+      "score": 100
+    },
+    "llamaparse": {
+      "status": "PASS",
+      "provider": "LlamaParse",
+      "latency_s": 13.007,
+      "transaction_rows": 1,
+      "score": 6
+    }
+  },
+  "ING": {
+    "offline": {
+      "status": "PASS",
+      "provider": "Offline (PyMuPDF)",
+      "latency_s": 0.02,
+      "text_blocks": 78,
+      "transaction_lines": 10,
+      "score": 50
+    },
+    "gemini": {
+      "status": "PASS",
+      "provider": "Gemini 2.0 Flash",
+      "latency_s": 23.103,
+      "transactions_found": 11,
+      "score": 88,
+      "raw_length": 1996
+    },
+    "mistral": {
+      "status": "PASS",
+      "provider": "Mistral (mistral-small-latest)",
+      "latency_s": 9.234,
+      "transactions_found": 16,
+      "score": 100
+    },
+    "llamaparse": {
+      "status": "PASS",
+      "provider": "LlamaParse",
+      "latency_s": 12.235,
+      "transaction_rows": 1,
+      "score": 6
+    }
+  },
+  "Macquarie": {
+    "offline": {
+      "status": "PASS",
+      "provider": "Offline (PyMuPDF)",
+      "latency_s": 0.004,
+      "text_blocks": 33,
+      "transaction_lines": 1,
+      "score": 5
+    },
+    "gemini": {
+      "status": "PASS",
+      "provider": "Gemini 2.0 Flash",
+      "latency_s": 16.016,
+      "transactions_found": 3,
+      "score": 24,
+      "raw_length": 448
+    },
+    "mistral": {
+      "status": "PASS",
+      "provider": "Mistral (mistral-small-latest)",
+      "latency_s": 4.122,
+      "transactions_found": 3,
+      "score": 24
+    },
+    "llamaparse": {
+      "status": "PASS",
+      "provider": "LlamaParse",
+      "latency_s": 10.945,
+      "transaction_rows": 1,
+      "score": 6
+    }
+  },
+  "NAB": {
+    "offline": {
+      "status": "PASS",
+      "provider": "Offline (PyMuPDF)",
+      "latency_s": 0.021,
+      "text_blocks": 47,
+      "transaction_lines": 9,
+      "score": 45
+    },
+    "gemini": {
+      "status": "PASS",
+      "provider": "Gemini 2.0 Flash",
+      "latency_s": 15.742,
+      "transactions_found": 11,
+      "score": 88,
+      "raw_length": 1795
+    },
+    "mistral": {
+      "status": "PASS",
+      "provider": "Mistral (mistral-small-latest)",
+      "latency_s": 4.49,
+      "transactions_found": 5,
+      "score": 40
+    },
+    "llamaparse": {
+      "status": "PASS",
+      "provider": "LlamaParse",
+      "latency_s": 11.14,
+      "transaction_rows": 1,
+      "score": 6
+    }
+  },
+  "Westpac": {
+    "offline": {
+      "status": "PASS",
+      "provider": "Offline (PyMuPDF)",
+      "latency_s": 0.028,
+      "text_blocks": 687,
+      "transaction_lines": 359,
+      "score": 100
+    },
+    "gemini": {
+      "status": "PASS",
+      "provider": "Gemini 2.0 Flash",
+      "latency_s": 14.181,
+      "transactions_found": 13,
+      "score": 100,
+      "raw_length": 2095
+    },
+    "mistral": {
+      "status": "PASS",
+      "provider": "Mistral (mistral-small-latest)",
+      "latency_s": 7.337,
+      "transactions_found": 13,
+      "score": 100
+    },
+    "llamaparse": {
+      "status": "PASS",
+      "provider": "LlamaParse",
+      "latency_s": 11.227,
+      "transaction_rows": 1,
+      "score": 6
+    }
+  }
+}

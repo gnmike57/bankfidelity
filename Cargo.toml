@@ -27,6 +27,8 @@ otel = ["dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp", 
 # are present:
 #   cargo build --features ocr
 ocr = ["dep:ocrs", "dep:rten", "dep:rten-imageproc", "dep:rten-tensor"]
+# Local LLM support for air-gapped deployments (ADR-0004)
+local-llm = []
 
 [dependencies]
 pdfium-render = "0.8"

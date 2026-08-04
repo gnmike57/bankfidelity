@@ -1,0 +1,183 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v1.2.0)"
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_BUILD_JOBS: "2"
+  DUAL_CORE_PASSPHRASE: package-ci-only-passphrase
+
+jobs:
+  # ── macOS Apple Silicon ──────────────────────────────────────────────────────
+  macos-aarch64:
+    name: macOS (Apple Silicon) .app bundle
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assert native Apple Silicon runner
+        run: test "$(uname -m)" = "arm64"
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.89.0
+          targets: aarch64-apple-darwin
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-pro.txt
+
+      - name: Install native build dependencies
+        run: brew install pkg-config openssl@3
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build macOS portable bundle
+        run: ./scripts/build_mac_app.sh
+
+      - name: Verify bundle
+        run: |
+          ROOT="target/release/portable/macos-aarch64/BankStatementFidelityEditor.app"
+          file "$ROOT/Contents/MacOS/dual-core-pdf-pipeline" | grep -q arm64
+          "$ROOT/Contents/MacOS/dual-core-pdf-pipeline" --version
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path("target/release/portable/macos-aarch64/BankStatementFidelityEditor.app")
+          manifest = json.loads((root / "bundle-manifest.json").read_text())
+          assert manifest["platform"] == "macos-aarch64"
+          PY
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-aarch64-bundle
+          path: |
+            target/release/artifacts/BankStatementFidelityEditor-*-macos-aarch64.tar.gz
+            target/release/artifacts/BankStatementFidelityEditor-*-macos-aarch64.tar.gz.sha256
+          if-no-files-found: error
+          compression-level: 0
+
+  # ── Windows x64 ─────────────────────────────────────────────────────────────
+  windows-x86_64:
+    name: Windows (x64) portable bundle
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.89.0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-pro.txt
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build Windows portable bundle
+        shell: pwsh
+        run: ./scripts/build_windows_portable.ps1
+
+      - name: Verify bundle
+        shell: pwsh
+        run: |
+          $Root = "target/release/portable/windows-x86_64/BankStatementFidelityEditor"
+          & "$Root/BankStatementFidelityEditor.exe" --version
+          $Manifest = Get-Content "$Root/bundle-manifest.json" -Raw | ConvertFrom-Json
+          if ($Manifest.platform -ne "windows-x86_64") { throw "wrong platform" }
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64-bundle
+          path: |
+            target/release/artifacts/BankStatementFidelityEditor-*-windows-x86_64.zip
+            target/release/artifacts/BankStatementFidelityEditor-*-windows-x86_64.zip.sha256
+          if-no-files-found: error
+          compression-level: 0
+
+  # ── Publish GitHub Release ───────────────────────────────────────────────────
+  publish:
+    name: Publish GitHub Release
+    needs: [macos-aarch64, windows-x86_64]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Determine release tag
+        id: tag
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Release tag: $TAG"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: "BankFidelity ${{ steps.tag.outputs.tag }}"
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            release-artifacts/**/*.zip
+            release-artifacts/**/*.tar.gz
+            release-artifacts/**/*.sha256
+          body: |
+            ## BankFidelity ${{ steps.tag.outputs.tag }}
+
+            **AU Bank Statement Fidelity Editor** — pixel-perfect PDF editing for 7 Australian banks.
+
+            ### Downloads
+
+            | Platform | File |
+            | :--- | :--- |
+            | **macOS (Apple Silicon)** | `BankStatementFidelityEditor-*-macos-aarch64.tar.gz` |
+            | **Windows (x64)** | `BankStatementFidelityEditor-*-windows-x86_64.zip` |
+
+            ### Supported Banks
+            ANZ · Bankwest · CommBank · ING · Macquarie · NAB · Westpac
+
+            ### What's Included
+            - Native GUI binary (egui, no runtime required)
+            - Bundled Python 3.12 runtime for AI provider integration
+            - Optional local LLM support via Ollama/llama.cpp (`--features local-llm`)
+
+            ### Verification
+            SHA-256 checksums are provided alongside each archive.
+
+            ### Requirements
+            - macOS 14+ (Apple Silicon) or Windows 10/11 (x64)
+            - No additional runtime installation required
+            - For AI provider features: configure `bank-statement-fidelity-editor.env`
+
+            See [QUICKSTART.md](https://github.com/gnmike57/bankfidelity/blob/master/QUICKSTART.md) for setup instructions.
