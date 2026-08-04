@@ -1,0 +1,95 @@
+{
+  "results": [
+    {
+      "input": "target_bank=anz|source=\u003cfile\u003e/home/ubuntu/remediation/bank-statement-fidelity-editor-git/AU Bank Statements/anz_example.pdf\u003c/file\u003e|candidate=\u003cfile\u003e/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-wave3/pairs/westpac_to_anz/output.pdf\u003c/file\u003e|log=\u003cfile\u003e/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-wave3/pairs/westpac_to_anz/run.log\u003c/file\u003e",
+      "output": {
+        "evidence_zip": "https://private-us-east-1.manuscdn.com/sessionFile/MntwtYN1ChrYUdU01ruPaH/sandbox/aedBWAfkCe8UwVq2tqT2Ze_1785764294219_na1fn_L2hvbWUvdWJ1bnR1L3hyYXktYW56LWV2aWRlbmNl.zip?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvTW50d3RZTjFDaHJZVWRVMDFydVBhSC9zYW5kYm94L2FlZEJXQWZrQ2U4VXdWcTJ0cVQyWmVfMTc4NTc2NDI5NDIxOV9uYTFmbl9MMmh2YldVdmRXSjFiblIxTDNoeVlYa3RZVzU2TFdWMmFXUmxibU5sLnppcCIsIkNvbmRpdGlvbiI6eyJEYXRlTGVzc1RoYW4iOnsiQVdTOkVwb2NoVGltZSI6MTc4ODIyMDgwMH19fV19\u0026Key-Pair-Id=K2QY5QTL8JSY6C\u0026Signature=MEYCIQCIXcCZVnlpb5HbAJxr0mnhgDfrYUi5zYhFm2B1gycsXAIhAP4W3uGZe70KAwMlI7Mh-PM4GNFhetL6J6brEHBCnILo",
+        "largest_component_pixels": "",
+        "overall_score": 100,
+        "status": "FAIL",
+        "summary": "The audit for the target bank anz resulted in a FAIL status.",
+        "target_bank": "anz",
+        "worst_outside_ratio": ""
+      },
+      "error": ""
+    },
+    {
+      "input": "target_bank=bankwest|source=\u003cfile\u003e/home/ubuntu/remediation/bank-statement-fidelity-editor-git/AU Bank Statements/bankwest_example.pdf\u003c/file\u003e|candidate=\u003cfile\u003e/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/westpac_to_bankwest/output.pdf\u003c/file\u003e|log=\u003cfile\u003e/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/westpac_to_bankwest/run.log\u003c/file\u003e",
+      "output": {
+        "evidence_zip": "https://private-us-east-1.manuscdn.com/sessionFile/cUkUVpg3SdMfUJLAofU7yt/sandbox/2gywG3VzPA2UPky5HF2ILI_1785764287525_na1fn_L2hvbWUvdWJ1bnR1L3hyYXktYmFua3dlc3QtZXZpZGVuY2U.zip?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvY1VrVVZwZzNTZE1mVUpMQW9mVTd5dC9zYW5kYm94LzJneXdHM1Z6UEEyVVBreTVIRjJJTElfMTc4NTc2NDI4NzUyNV9uYTFmbl9MMmh2YldVdmRXSjFiblIxTDNoeVlYa3RZbUZ1YTNkbGMzUXRaWFpwWkdWdVkyVS56aXAiLCJDb25kaXRpb24iOnsiRGF0ZUxlc3NUaGFuIjp7IkFXUzpFcG9jaFRpbWUiOjE3ODgyMjA4MDB9fX1dfQ__\u0026Key-Pair-Id=K2QY5QTL8JSY6C\u0026Signature=MEYCIQCuy3HYp0eHHlr6L8Nwhw~WwuTFYVtKhIwqINea81zT-QIhANXcTd~wwmrYIvUksQ6WpFvDyFJDRbAN5BM8KEaxQIxn",
+        "largest_component_pixels": "",
+        "overall_score": 99.9,
+        "status": "EXACT PASS",
+        "summary": "Audit passed.",
+        "target_bank": "bankwest",
+        "worst_outside_ratio": ""
+      },
+      "error": ""
+    },
+    {
+      "input": "target_bank=commbank|source=\u003cfile\u003e/home/ubuntu/remediation/bank-statement-fidelity-editor-git/AU Bank Statements/commbank_smartaccess_example.pdf\u003c/file\u003e|candidate=\u003cfile\u003e/home/ubuntu/audit-output/final-pre-release/transfer-matrix/last-pair-final/pairs/westpac_to_commbank/output.pdf\u003c/file\u003e|log=\u003cfile\u003e/home/ubuntu/audit-output/final-pre-release/transfer-matrix/last-pair-final/pairs/westpac_to_commbank/run.log\u003c/file\u003e",
+      "output": {
+        "evidence_zip": "https://private-us-east-1.manuscdn.com/sessionFile/3Tg6D3MU1nYx1AN6L04SWh/sandbox/DaJUYc8j3qaiG6M7hd5gss_1785764342703_na1fn_L2hvbWUvdWJ1bnR1L3hyYXktY29tbWJhbmstZXZpZGVuY2U.zip?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvM1RnNkQzTVUxbll4MUFONkwwNFNXaC9zYW5kYm94L0RhSlVZYzhqM3FhaUc2TTdoZDVnc3NfMTc4NTc2NDM0MjcwM19uYTFmbl9MMmh2YldVdmRXSjFiblIxTDNoeVlYa3RZMjl0YldKaGJtc3RaWFpwWkdWdVkyVS56aXAiLCJDb25kaXRpb24iOnsiRGF0ZUxlc3NUaGFuIjp7IkFXUzpFcG9jaFRpbWUiOjE3ODgyMjA4MDB9fX1dfQ__\u0026Key-Pair-Id=K2QY5QTL8JSY6C\u0026Signature=MEUCIQDZsPr6F7RXnQxPMd~KgBfJa5Z-GdTMiYpPTopR60RHCwIgCZy-qd0Y1e8BadxjyFtlrjBlgGmkvVKiBVJJmO5QlGg_",
+        "largest_component_pixels": "",
+        "overall_score": 100,
+        "status": "EXACT PASS",
+        "summary": "The X-ray fidelity audit for commbank completed successfully with an EXACT PASS status and an overall score of 100.0.",
+        "target_bank": "commbank",
+        "worst_outside_ratio": ""
+      },
+      "error": ""
+    },
+    {
+      "input": "target_bank=ing|source=\u003cfile\u003e/home/ubuntu/remediation/bank-statement-fidelity-editor-git/AU Bank Statements/ing_orangeeveryday_example.pdf\u003c/file\u003e|candidate=\u003cfile\u003e/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/westpac_to_ing/output.pdf\u003c/file\u003e|log=\u003cfile\u003e/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/westpac_to_ing/run.log\u003c/file\u003e",
+      "output": {
+        "evidence_zip": "https://private-us-east-1.manuscdn.com/sessionFile/1pTQuOaP5vk28kfRIT0Ytu/sandbox/onKrN9FhrsjO7FZFEIkpuK_1785764312861_na1fn_L2hvbWUvdWJ1bnR1L3hyYXktaW5nLWV2aWRlbmNl.zip?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvMXBUUXVPYVA1dmsyOGtmUklUMFl0dS9zYW5kYm94L29uS3JOOUZocnNqTzdGWkZFSWtwdUtfMTc4NTc2NDMxMjg2MV9uYTFmbl9MMmh2YldVdmRXSjFiblIxTDNoeVlYa3RhVzVuTFdWMmFXUmxibU5sLnppcCIsIkNvbmRpdGlvbiI6eyJEYXRlTGVzc1RoYW4iOnsiQVdTOkVwb2NoVGltZSI6MTc4ODIyMDgwMH19fV19\u0026Key-Pair-Id=K2QY5QTL8JSY6C\u0026Signature=MEQCIEQawJMZxKQABH6dP72sZjzuw3ekKazsCf0~LJCIvTowAiB8dg1yKdnn7v-Ge1K6rGeaXMSmCRaRsnPRcr-P6RlH3A__",
+        "largest_component_pixels": "",
+        "overall_score": 99.71,
+        "status": "EXACT PASS",
+        "summary": "The X-ray fidelity audit for ING bank completed successfully with an EXACT PASS status and an overall score of 99.71.",
+        "target_bank": "ing",
+        "worst_outside_ratio": ""
+      },
+      "error": ""
+    },
+    {
+      "input": "target_bank=macquarie|source=\u003cfile\u003e/home/ubuntu/remediation/bank-statement-fidelity-editor-git/AU Bank Statements/macquarie_example.pdf\u003c/file\u003e|candidate=\u003cfile\u003e/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/westpac_to_macquarie/output.pdf\u003c/file\u003e|log=\u003cfile\u003e/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/westpac_to_macquarie/run.log\u003c/file\u003e",
+      "output": {
+        "evidence_zip": "https://private-us-east-1.manuscdn.com/sessionFile/memH0vulIkxaEZwJpx20Vl/sandbox/3nupU6ENdvyjdibnmHTKsT_1785764366856_na1fn_L2hvbWUvdWJ1bnR1L3hyYXktbWFjcXVhcmllLWV2aWRlbmNl.zip?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvbWVtSDB2dWxJa3hhRVp3SnB4MjBWbC9zYW5kYm94LzNudXBVNkVOZHZ5amRpYm5tSFRLc1RfMTc4NTc2NDM2Njg1Nl9uYTFmbl9MMmh2YldVdmRXSjFiblIxTDNoeVlYa3RiV0ZqY1hWaGNtbGxMV1YyYVdSbGJtTmwuemlwIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzg4MjIwODAwfX19XX0_\u0026Key-Pair-Id=K2QY5QTL8JSY6C\u0026Signature=MEQCIFwud-jKfG7~cho1WMaTdLQESZ8xu7fYahqtD8xuE-N1AiAYFg6ZeUHd1-WMAIUwL2mOEJP0AsvYEjNMScr0rrKujg__",
+        "largest_component_pixels": "",
+        "overall_score": 99.71428571428571,
+        "status": "EXACT PASS",
+        "summary": "The X-ray fidelity audit for Macquarie bank completed successfully with an EXACT PASS status and an overall score of 99.71.",
+        "target_bank": "macquarie",
+        "worst_outside_ratio": ""
+      },
+      "error": ""
+    },
+    {
+      "input": "target_bank=nab|source=\u003cfile\u003e/home/ubuntu/remediation/bank-statement-fidelity-editor-git/AU Bank Statements/fallback.pdf\u003c/file\u003e|candidate=\u003cfile\u003e/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/westpac_to_nab/output.pdf\u003c/file\u003e|log=\u003cfile\u003e/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/westpac_to_nab/run.log\u003c/file\u003e",
+      "output": {
+        "evidence_zip": "https://private-us-east-1.manuscdn.com/sessionFile/9g7a3dsRbmWtQmInIkFy2f/sandbox/njwTBbXWckL8E13zUg0Lo8_1785764351351_na1fn_L2hvbWUvdWJ1bnR1L3hyYXktbmFiLWV2aWRlbmNl.zip?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvOWc3YTNkc1JibVd0UW1JbklrRnkyZi9zYW5kYm94L25qd1RCYlhXY2tMOEUxM3pVZzBMbzhfMTc4NTc2NDM1MTM1MV9uYTFmbl9MMmh2YldVdmRXSjFiblIxTDNoeVlYa3RibUZpTFdWMmFXUmxibU5sLnppcCIsIkNvbmRpdGlvbiI6eyJEYXRlTGVzc1RoYW4iOnsiQVdTOkVwb2NoVGltZSI6MTc4ODIyMDgwMH19fV19\u0026Key-Pair-Id=K2QY5QTL8JSY6C\u0026Signature=MEQCICGGc4WvrlVLO6g103iYFLfIyaXYfAWmnWaWj2mKy1e8AiBqxV5HGphwX336rFzrYgoG6PzZLgrTSinc0MTSQomtsg__",
+        "largest_component_pixels": "",
+        "overall_score": 71.14,
+        "status": "FAIL",
+        "summary": "The audit failed with an overall score of 71.14 due to critical failures in native text extraction and editability provenance.",
+        "target_bank": "nab",
+        "worst_outside_ratio": ""
+      },
+      "error": ""
+    },
+    {
+      "input": "target_bank=westpac|source=\u003cfile\u003e/home/ubuntu/remediation/bank-statement-fidelity-editor-git/AU Bank Statements/westpac_choicebasic_example.pdf\u003c/file\u003e|candidate=\u003cfile\u003e/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/ing_to_westpac/output.pdf\u003c/file\u003e|log=\u003cfile\u003e/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/ing_to_westpac/run.log\u003c/file\u003e",
+      "output": {
+        "evidence_zip": "https://private-us-east-1.manuscdn.com/sessionFile/IzdcUu0v5DYKxhvDeBMBxG/sandbox/SqhQAZyvCRAm5hInmQH6jj_1785764430325_na1fn_L2hvbWUvdWJ1bnR1L3hyYXktd2VzdHBhYy1ldmlkZW5jZQ.zip?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvSXpkY1V1MHY1RFlLeGh2RGVCTUJ4Ry9zYW5kYm94L1NxaFFBWnl2Q1JBbTVoSW5tUUg2ampfMTc4NTc2NDQzMDMyNV9uYTFmbl9MMmh2YldVdmRXSjFiblIxTDNoeVlYa3RkMlZ6ZEhCaFl5MWxkbWxrWlc1alpRLnppcCIsIkNvbmRpdGlvbiI6eyJEYXRlTGVzc1RoYW4iOnsiQVdTOkVwb2NoVGltZSI6MTc4ODIyMDgwMH19fV19\u0026Key-Pair-Id=K2QY5QTL8JSY6C\u0026Signature=MEYCIQDS7RZQchYKsm5ZLQawIUOtarNjv~hNg11ntleFERT95gIhAO2Yuu0zN205gcStKu3w8~ZwbYxtpMsuTo8Hrr1SM7xT",
+        "largest_component_pixels": 23,
+        "overall_score": 99.71,
+        "status": "EXACT PASS",
+        "summary": "The X-ray fidelity audit for Westpac completed successfully with an EXACT PASS status, achieving an overall score of 99.71 and a worst outside-mask changed ratio of 0.0001399.",
+        "target_bank": "westpac",
+        "worst_outside_ratio": 0.0001399001
+      },
+      "error": ""
+    }
+  ]
+}

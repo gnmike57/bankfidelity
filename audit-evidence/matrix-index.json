@@ -1,0 +1,1748 @@
+{
+  "schema_version": 1,
+  "status": "PASS",
+  "pair_count": 42,
+  "banks": [
+    "anz",
+    "bankwest",
+    "commbank",
+    "ing",
+    "macquarie",
+    "nab",
+    "westpac"
+  ],
+  "selection_priority": [
+    "final-42",
+    "bankwest-corrected",
+    "repaired-17",
+    "repaired-wave2",
+    "final-wave3",
+    "last-pair-final"
+  ],
+  "pairs": [
+    {
+      "pair": "anz_to_bankwest",
+      "source_bank": "anz",
+      "target_bank": "bankwest",
+      "evidence_root": "repaired-wave2",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/anz_to_bankwest/output.pdf",
+      "artifact_sha256": "a6998f3350e81057781c373590108f44cb69938a6e3cedda5ccdf48c94992826",
+      "artifact_bytes": 120147,
+      "duration_seconds": 127,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/anz_to_bankwest/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/anz_to_bankwest.pdf"
+    },
+    {
+      "pair": "anz_to_commbank",
+      "source_bank": "anz",
+      "target_bank": "commbank",
+      "evidence_root": "repaired-17",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/anz_to_commbank/output.pdf",
+      "artifact_sha256": "0bb5b3e38cbe2b32385d15b97edfb7c1ada8b38853f7a89deeccb58f08b287af",
+      "artifact_bytes": 440352,
+      "duration_seconds": 164,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/anz_to_commbank/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/anz_to_commbank.pdf"
+    },
+    {
+      "pair": "anz_to_ing",
+      "source_bank": "anz",
+      "target_bank": "ing",
+      "evidence_root": "final-42",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/anz_to_ing/output.pdf",
+      "artifact_sha256": "c4d0fd83b971cf2a2e129f03e112a9e2cbcdc914289ec153cff9009b81bb94aa",
+      "artifact_bytes": 523325,
+      "duration_seconds": 139,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/anz_to_ing/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/anz_to_ing.pdf"
+    },
+    {
+      "pair": "anz_to_macquarie",
+      "source_bank": "anz",
+      "target_bank": "macquarie",
+      "evidence_root": "final-42",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/anz_to_macquarie/output.pdf",
+      "artifact_sha256": "67eb085bd8069c4cffc7c675111ef1eb24f68796a15b272587455da84af303de",
+      "artifact_bytes": 212925,
+      "duration_seconds": 119,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/anz_to_macquarie/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/anz_to_macquarie.pdf"
+    },
+    {
+      "pair": "anz_to_nab",
+      "source_bank": "anz",
+      "target_bank": "nab",
+      "evidence_root": "final-42",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/anz_to_nab/output.pdf",
+      "artifact_sha256": "2bc9acd127ea5bd90aa48f2b508ad5f8cb0db6544873dc0ec6fbebcc258601dd",
+      "artifact_bytes": 759901,
+      "duration_seconds": 159,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/anz_to_nab/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/anz_to_nab.pdf"
+    },
+    {
+      "pair": "anz_to_westpac",
+      "source_bank": "anz",
+      "target_bank": "westpac",
+      "evidence_root": "final-42",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/anz_to_westpac/output.pdf",
+      "artifact_sha256": "46335709007b07d2cb7fdeddb39c9de9eba03333066688400fdee5b3c0d57b95",
+      "artifact_bytes": 35961,
+      "duration_seconds": 113,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/anz_to_westpac/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/anz_to_westpac.pdf"
+    },
+    {
+      "pair": "bankwest_to_anz",
+      "source_bank": "bankwest",
+      "target_bank": "anz",
+      "evidence_root": "bankwest-corrected",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/bankwest-corrected/pairs/bankwest_to_anz/output.pdf",
+      "artifact_sha256": "41363d3d802319574ce2c350d38f74afa1acb27f703af23e946e1985df152f33",
+      "artifact_bytes": 129808,
+      "duration_seconds": 170,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/bankwest-corrected/pairs/bankwest_to_anz/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/bankwest_to_anz.pdf"
+    },
+    {
+      "pair": "bankwest_to_commbank",
+      "source_bank": "bankwest",
+      "target_bank": "commbank",
+      "evidence_root": "repaired-17",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/bankwest_to_commbank/output.pdf",
+      "artifact_sha256": "479234fed4597626c5ee386d3a7b3987c9e2ddef353fc43aaeebd5dbc4fcc953",
+      "artifact_bytes": 150453,
+      "duration_seconds": 50,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/bankwest_to_commbank/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/bankwest_to_commbank.pdf"
+    },
+    {
+      "pair": "bankwest_to_ing",
+      "source_bank": "bankwest",
+      "target_bank": "ing",
+      "evidence_root": "bankwest-corrected",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/bankwest-corrected/pairs/bankwest_to_ing/output.pdf",
+      "artifact_sha256": "b5751fa4408cd09dbd17d6d13371a47ea590ea85f04d40404298c1449fd5b911",
+      "artifact_bytes": 514002,
+      "duration_seconds": 185,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/bankwest-corrected/pairs/bankwest_to_ing/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/bankwest_to_ing.pdf"
+    },
+    {
+      "pair": "bankwest_to_macquarie",
+      "source_bank": "bankwest",
+      "target_bank": "macquarie",
+      "evidence_root": "bankwest-corrected",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/bankwest-corrected/pairs/bankwest_to_macquarie/output.pdf",
+      "artifact_sha256": "f18446d1a056ba5a9480aef694302741493b0d70dc798afabb2aac2aaba68318",
+      "artifact_bytes": 76971,
+      "duration_seconds": 95,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/bankwest-corrected/pairs/bankwest_to_macquarie/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/bankwest_to_macquarie.pdf"
+    },
+    {
+      "pair": "bankwest_to_nab",
+      "source_bank": "bankwest",
+      "target_bank": "nab",
+      "evidence_root": "bankwest-corrected",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/bankwest-corrected/pairs/bankwest_to_nab/output.pdf",
+      "artifact_sha256": "5f17b458c6b2d38b578f6d0e41ce24e8e38faee9e18afd690b4c862fdfbe3cc1",
+      "artifact_bytes": 130821,
+      "duration_seconds": 145,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/bankwest-corrected/pairs/bankwest_to_nab/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/bankwest_to_nab.pdf"
+    },
+    {
+      "pair": "bankwest_to_westpac",
+      "source_bank": "bankwest",
+      "target_bank": "westpac",
+      "evidence_root": "bankwest-corrected",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/bankwest-corrected/pairs/bankwest_to_westpac/output.pdf",
+      "artifact_sha256": "5d9e673255fb85fd1bfbee5c71bbf109d03fedfc980f22fb3f970ff72b3c22db",
+      "artifact_bytes": 24707,
+      "duration_seconds": 92,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/bankwest-corrected/pairs/bankwest_to_westpac/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/bankwest_to_westpac.pdf"
+    },
+    {
+      "pair": "commbank_to_anz",
+      "source_bank": "commbank",
+      "target_bank": "anz",
+      "evidence_root": "final-42",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/commbank_to_anz/output.pdf",
+      "artifact_sha256": "fb6b129b9cbd3cb1ca22e5696d87fd6abe9734946d8f504a2492ce92b3c4e5b5",
+      "artifact_bytes": 424621,
+      "duration_seconds": 153,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/commbank_to_anz/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/commbank_to_anz.pdf"
+    },
+    {
+      "pair": "commbank_to_bankwest",
+      "source_bank": "commbank",
+      "target_bank": "bankwest",
+      "evidence_root": "repaired-wave2",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/commbank_to_bankwest/output.pdf",
+      "artifact_sha256": "8234e28cf3697105a04e454d642c3af1dbafb07665bbb48324ab0b851b599d50",
+      "artifact_bytes": 666714,
+      "duration_seconds": 132,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/commbank_to_bankwest/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/commbank_to_bankwest.pdf"
+    },
+    {
+      "pair": "commbank_to_ing",
+      "source_bank": "commbank",
+      "target_bank": "ing",
+      "evidence_root": "final-42",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/commbank_to_ing/output.pdf",
+      "artifact_sha256": "c2e4852abcc654ff68d394f6e0a823d0947026a1b5417c2f078e760fe12a7681",
+      "artifact_bytes": 1330066,
+      "duration_seconds": 157,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/commbank_to_ing/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/commbank_to_ing.pdf"
+    },
+    {
+      "pair": "commbank_to_macquarie",
+      "source_bank": "commbank",
+      "target_bank": "macquarie",
+      "evidence_root": "final-42",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/commbank_to_macquarie/output.pdf",
+      "artifact_sha256": "ab9568d2ef5ac34bf5fe351c15866031886c45059b793c4c4eedb094d0d12494",
+      "artifact_bytes": 418171,
+      "duration_seconds": 148,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/commbank_to_macquarie/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/commbank_to_macquarie.pdf"
+    },
+    {
+      "pair": "commbank_to_nab",
+      "source_bank": "commbank",
+      "target_bank": "nab",
+      "evidence_root": "final-42",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/commbank_to_nab/output.pdf",
+      "artifact_sha256": "96b66eae688ec852956540ed75816c7381422fd0b4335b4f37433625d93bbe4f",
+      "artifact_bytes": 19365015,
+      "duration_seconds": 209,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/commbank_to_nab/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/commbank_to_nab.pdf"
+    },
+    {
+      "pair": "commbank_to_westpac",
+      "source_bank": "commbank",
+      "target_bank": "westpac",
+      "evidence_root": "repaired-17",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/commbank_to_westpac/output.pdf",
+      "artifact_sha256": "d4792d415b5f7c372fbc85aacd033a8b1ce4cb80b6e8077725ef0c8cdf352971",
+      "artifact_bytes": 277318,
+      "duration_seconds": 137,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/commbank_to_westpac/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/commbank_to_westpac.pdf"
+    },
+    {
+      "pair": "ing_to_anz",
+      "source_bank": "ing",
+      "target_bank": "anz",
+      "evidence_root": "final-42",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/ing_to_anz/output.pdf",
+      "artifact_sha256": "cfe018df432500d6682b39b58fd1c8c606d7b231d08dc876a8b95d25b90707d5",
+      "artifact_bytes": 1275719,
+      "duration_seconds": 280,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/ing_to_anz/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/ing_to_anz.pdf"
+    },
+    {
+      "pair": "ing_to_bankwest",
+      "source_bank": "ing",
+      "target_bank": "bankwest",
+      "evidence_root": "repaired-wave2",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/ing_to_bankwest/output.pdf",
+      "artifact_sha256": "0e44fc1a4952c36ea6187d04579a52b69d6d6fc80877d95ace26734f243e1b3e",
+      "artifact_bytes": 2233742,
+      "duration_seconds": 232,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/ing_to_bankwest/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/ing_to_bankwest.pdf"
+    },
+    {
+      "pair": "ing_to_commbank",
+      "source_bank": "ing",
+      "target_bank": "commbank",
+      "evidence_root": "final-wave3",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-wave3/pairs/ing_to_commbank/output.pdf",
+      "artifact_sha256": "a398d9dfc21d204e13eb3c36c3140fc57e65a359ee96a6944fd278f80d81b417",
+      "artifact_bytes": 3989951,
+      "duration_seconds": 421,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-wave3/pairs/ing_to_commbank/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/ing_to_commbank.pdf"
+    },
+    {
+      "pair": "ing_to_macquarie",
+      "source_bank": "ing",
+      "target_bank": "macquarie",
+      "evidence_root": "final-42",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/ing_to_macquarie/output.pdf",
+      "artifact_sha256": "f9dda29095783e90196496800a1847c6a8c28491ef0d42a47c6a1ba21faf2956",
+      "artifact_bytes": 1353367,
+      "duration_seconds": 380,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/ing_to_macquarie/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/ing_to_macquarie.pdf"
+    },
+    {
+      "pair": "ing_to_nab",
+      "source_bank": "ing",
+      "target_bank": "nab",
+      "evidence_root": "final-42",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/ing_to_nab/output.pdf",
+      "artifact_sha256": "53ab3da08649575e452c4ea37aca396e5b0cd63ef1b3951ed7fbf7534cab9d1e",
+      "artifact_bytes": 20310751,
+      "duration_seconds": 408,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/ing_to_nab/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/ing_to_nab.pdf"
+    },
+    {
+      "pair": "ing_to_westpac",
+      "source_bank": "ing",
+      "target_bank": "westpac",
+      "evidence_root": "repaired-wave2",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/ing_to_westpac/output.pdf",
+      "artifact_sha256": "fd89706d138bd898ba4ba3ed88179503473e940c6b038575256421fb81903d9c",
+      "artifact_bytes": 820542,
+      "duration_seconds": 417,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/ing_to_westpac/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/ing_to_westpac.pdf"
+    },
+    {
+      "pair": "macquarie_to_anz",
+      "source_bank": "macquarie",
+      "target_bank": "anz",
+      "evidence_root": "final-42",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/macquarie_to_anz/output.pdf",
+      "artifact_sha256": "b0260a14f9564785bcb5dbdfb627a3d234cfc54d9bc3a8a9ee5cf3b3809ee080",
+      "artifact_bytes": 128862,
+      "duration_seconds": 45,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/macquarie_to_anz/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/macquarie_to_anz.pdf"
+    },
+    {
+      "pair": "macquarie_to_bankwest",
+      "source_bank": "macquarie",
+      "target_bank": "bankwest",
+      "evidence_root": "repaired-wave2",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/macquarie_to_bankwest/output.pdf",
+      "artifact_sha256": "a6c9e0be349a03f352282cb655ccc975f099e278ea405fa3d829345de255e387",
+      "artifact_bytes": 95908,
+      "duration_seconds": 90,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/macquarie_to_bankwest/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/macquarie_to_bankwest.pdf"
+    },
+    {
+      "pair": "macquarie_to_commbank",
+      "source_bank": "macquarie",
+      "target_bank": "commbank",
+      "evidence_root": "final-42",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/macquarie_to_commbank/output.pdf",
+      "artifact_sha256": "e38ef228c73380aecb0f06cff7fd1df6152ed9d49bcc3ce9239a9abdb49c2a82",
+      "artifact_bytes": 138522,
+      "duration_seconds": 75,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/macquarie_to_commbank/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/macquarie_to_commbank.pdf"
+    },
+    {
+      "pair": "macquarie_to_ing",
+      "source_bank": "macquarie",
+      "target_bank": "ing",
+      "evidence_root": "final-42",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/macquarie_to_ing/output.pdf",
+      "artifact_sha256": "39a4d930b6517b833d37c0910736057107e1eca9097078593743ce40cb21a5fc",
+      "artifact_bytes": 509373,
+      "duration_seconds": 87,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/macquarie_to_ing/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/macquarie_to_ing.pdf"
+    },
+    {
+      "pair": "macquarie_to_nab",
+      "source_bank": "macquarie",
+      "target_bank": "nab",
+      "evidence_root": "final-42",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/macquarie_to_nab/output.pdf",
+      "artifact_sha256": "d1ab430bfac4ca019de130c5a0dd5f3185712ee6cf90390424525fd8df8716b6",
+      "artifact_bytes": 123314,
+      "duration_seconds": 108,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/macquarie_to_nab/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/macquarie_to_nab.pdf"
+    },
+    {
+      "pair": "macquarie_to_westpac",
+      "source_bank": "macquarie",
+      "target_bank": "westpac",
+      "evidence_root": "final-42",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/macquarie_to_westpac/output.pdf",
+      "artifact_sha256": "75565f3faccb61a8a621c0e4a7a53617759c20a23195a00c8e505f80eb586b25",
+      "artifact_bytes": 21321,
+      "duration_seconds": 48,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/macquarie_to_westpac/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/macquarie_to_westpac.pdf"
+    },
+    {
+      "pair": "nab_to_anz",
+      "source_bank": "nab",
+      "target_bank": "anz",
+      "evidence_root": "final-42",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/nab_to_anz/output.pdf",
+      "artifact_sha256": "ca9800e48ae0406a764b48dda6264e9fe8e74a6c52924b79ba4049683800ab2d",
+      "artifact_bytes": 251447,
+      "duration_seconds": 132,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/nab_to_anz/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/nab_to_anz.pdf"
+    },
+    {
+      "pair": "nab_to_bankwest",
+      "source_bank": "nab",
+      "target_bank": "bankwest",
+      "evidence_root": "repaired-wave2",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/nab_to_bankwest/output.pdf",
+      "artifact_sha256": "6cc88029a6df59972db491a66b70111b46a133110ffc19ef56c374199f7e9a0c",
+      "artifact_bytes": 120568,
+      "duration_seconds": 289,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/nab_to_bankwest/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/nab_to_bankwest.pdf"
+    },
+    {
+      "pair": "nab_to_commbank",
+      "source_bank": "nab",
+      "target_bank": "commbank",
+      "evidence_root": "repaired-17",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/nab_to_commbank/output.pdf",
+      "artifact_sha256": "261537e22d45bf40436291e95c8485edabb60d6f7fa4dec120b24727ee049232",
+      "artifact_bytes": 439905,
+      "duration_seconds": 156,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/nab_to_commbank/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/nab_to_commbank.pdf"
+    },
+    {
+      "pair": "nab_to_ing",
+      "source_bank": "nab",
+      "target_bank": "ing",
+      "evidence_root": "final-42",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/nab_to_ing/output.pdf",
+      "artifact_sha256": "8a8af62d8d315a733e8bd5166e6fd258e62f85c311cc1c0d5c265809e2649c83",
+      "artifact_bytes": 524739,
+      "duration_seconds": 127,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/nab_to_ing/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/nab_to_ing.pdf"
+    },
+    {
+      "pair": "nab_to_macquarie",
+      "source_bank": "nab",
+      "target_bank": "macquarie",
+      "evidence_root": "final-42",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/nab_to_macquarie/output.pdf",
+      "artifact_sha256": "34e05f99fc50fff2b1a1f5f0757862b480be5d1602ce4db04b955f607ed59e01",
+      "artifact_bytes": 211405,
+      "duration_seconds": 120,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/nab_to_macquarie/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/nab_to_macquarie.pdf"
+    },
+    {
+      "pair": "nab_to_westpac",
+      "source_bank": "nab",
+      "target_bank": "westpac",
+      "evidence_root": "final-42",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/nab_to_westpac/output.pdf",
+      "artifact_sha256": "9fcd846a37b482a3e7cc5ea421388d3a4c7d6c339652585d764b44340b1edfc7",
+      "artifact_bytes": 36445,
+      "duration_seconds": 122,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/nab_to_westpac/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/nab_to_westpac.pdf"
+    },
+    {
+      "pair": "westpac_to_anz",
+      "source_bank": "westpac",
+      "target_bank": "anz",
+      "evidence_root": "final-wave3",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-wave3/pairs/westpac_to_anz/output.pdf",
+      "artifact_sha256": "e325f4a2c665dbab84e24c0f643d374f1005cd380f893d63d6e3df91068b05e4",
+      "artifact_bytes": 2117064,
+      "duration_seconds": 408,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-wave3/pairs/westpac_to_anz/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/westpac_to_anz.pdf"
+    },
+    {
+      "pair": "westpac_to_bankwest",
+      "source_bank": "westpac",
+      "target_bank": "bankwest",
+      "evidence_root": "repaired-wave2",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/westpac_to_bankwest/output.pdf",
+      "artifact_sha256": "782faa86cf07982c0a261d258b8ca954da9e06cb869b37c79d2a5fe0a403f3a5",
+      "artifact_bytes": 3688978,
+      "duration_seconds": 351,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/westpac_to_bankwest/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/westpac_to_bankwest.pdf"
+    },
+    {
+      "pair": "westpac_to_commbank",
+      "source_bank": "westpac",
+      "target_bank": "commbank",
+      "evidence_root": "last-pair-final",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/last-pair-final/pairs/westpac_to_commbank/output.pdf",
+      "artifact_sha256": "4f0ec29ed6c7dfd9fa966a6d0574f15211fe8e2de88689b46640ba33733638e3",
+      "artifact_bytes": 4529902,
+      "duration_seconds": 284,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/last-pair-final/pairs/westpac_to_commbank/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/westpac_to_commbank.pdf"
+    },
+    {
+      "pair": "westpac_to_ing",
+      "source_bank": "westpac",
+      "target_bank": "ing",
+      "evidence_root": "repaired-17",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/westpac_to_ing/output.pdf",
+      "artifact_sha256": "81ff9a5a1ddbf281579d5ed0c9e7783643c95e07b877654d4eb61b5d3a51916a",
+      "artifact_bytes": 2628617,
+      "duration_seconds": 321,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/westpac_to_ing/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/westpac_to_ing.pdf"
+    },
+    {
+      "pair": "westpac_to_macquarie",
+      "source_bank": "westpac",
+      "target_bank": "macquarie",
+      "evidence_root": "repaired-17",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/westpac_to_macquarie/output.pdf",
+      "artifact_sha256": "991d0c00f912abe5a84a31c70a258ce1c67504858cbd5f89f1933c1e491717bc",
+      "artifact_bytes": 2243631,
+      "duration_seconds": 530,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/westpac_to_macquarie/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/westpac_to_macquarie.pdf"
+    },
+    {
+      "pair": "westpac_to_nab",
+      "source_bank": "westpac",
+      "target_bank": "nab",
+      "evidence_root": "repaired-17",
+      "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/westpac_to_nab/output.pdf",
+      "artifact_sha256": "aeccc027cf1cb44f0f3bfd51968f06dd2b9c739cf5511af39c281db9e9b9826e",
+      "artifact_bytes": 21031311,
+      "duration_seconds": 471,
+      "exit_status": 0,
+      "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/westpac_to_nab/run.log",
+      "gate_evidence": {
+        "transfer_completed": true,
+        "engine_math_pass": true,
+        "provider_math_pass": false,
+        "atomic_publication": false,
+        "failure_marker_present": false
+      },
+      "canonical_artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/canonical/artifacts/westpac_to_nab.pdf"
+    }
+  ],
+  "history": {
+    "anz_to_bankwest": [
+      {
+        "pair": "anz_to_bankwest",
+        "source_bank": "anz",
+        "target_bank": "bankwest",
+        "evidence_root": "repaired-wave2",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/anz_to_bankwest/output.pdf",
+        "artifact_sha256": "a6998f3350e81057781c373590108f44cb69938a6e3cedda5ccdf48c94992826",
+        "artifact_bytes": 120147,
+        "duration_seconds": 127,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/anz_to_bankwest/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "anz_to_commbank": [
+      {
+        "pair": "anz_to_commbank",
+        "source_bank": "anz",
+        "target_bank": "commbank",
+        "evidence_root": "repaired-17",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/anz_to_commbank/output.pdf",
+        "artifact_sha256": "0bb5b3e38cbe2b32385d15b97edfb7c1ada8b38853f7a89deeccb58f08b287af",
+        "artifact_bytes": 440352,
+        "duration_seconds": 164,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/anz_to_commbank/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "anz_to_ing": [
+      {
+        "pair": "anz_to_ing",
+        "source_bank": "anz",
+        "target_bank": "ing",
+        "evidence_root": "final-42",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/anz_to_ing/output.pdf",
+        "artifact_sha256": "c4d0fd83b971cf2a2e129f03e112a9e2cbcdc914289ec153cff9009b81bb94aa",
+        "artifact_bytes": 523325,
+        "duration_seconds": 139,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/anz_to_ing/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "anz_to_macquarie": [
+      {
+        "pair": "anz_to_macquarie",
+        "source_bank": "anz",
+        "target_bank": "macquarie",
+        "evidence_root": "final-42",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/anz_to_macquarie/output.pdf",
+        "artifact_sha256": "67eb085bd8069c4cffc7c675111ef1eb24f68796a15b272587455da84af303de",
+        "artifact_bytes": 212925,
+        "duration_seconds": 119,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/anz_to_macquarie/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "anz_to_nab": [
+      {
+        "pair": "anz_to_nab",
+        "source_bank": "anz",
+        "target_bank": "nab",
+        "evidence_root": "final-42",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/anz_to_nab/output.pdf",
+        "artifact_sha256": "2bc9acd127ea5bd90aa48f2b508ad5f8cb0db6544873dc0ec6fbebcc258601dd",
+        "artifact_bytes": 759901,
+        "duration_seconds": 159,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/anz_to_nab/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "anz_to_westpac": [
+      {
+        "pair": "anz_to_westpac",
+        "source_bank": "anz",
+        "target_bank": "westpac",
+        "evidence_root": "final-42",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/anz_to_westpac/output.pdf",
+        "artifact_sha256": "46335709007b07d2cb7fdeddb39c9de9eba03333066688400fdee5b3c0d57b95",
+        "artifact_bytes": 35961,
+        "duration_seconds": 113,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/anz_to_westpac/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "bankwest_to_anz": [
+      {
+        "pair": "bankwest_to_anz",
+        "source_bank": "bankwest",
+        "target_bank": "anz",
+        "evidence_root": "bankwest-corrected",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/bankwest-corrected/pairs/bankwest_to_anz/output.pdf",
+        "artifact_sha256": "41363d3d802319574ce2c350d38f74afa1acb27f703af23e946e1985df152f33",
+        "artifact_bytes": 129808,
+        "duration_seconds": 170,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/bankwest-corrected/pairs/bankwest_to_anz/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "bankwest_to_commbank": [
+      {
+        "pair": "bankwest_to_commbank",
+        "source_bank": "bankwest",
+        "target_bank": "commbank",
+        "evidence_root": "repaired-17",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/bankwest_to_commbank/output.pdf",
+        "artifact_sha256": "479234fed4597626c5ee386d3a7b3987c9e2ddef353fc43aaeebd5dbc4fcc953",
+        "artifact_bytes": 150453,
+        "duration_seconds": 50,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/bankwest_to_commbank/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "bankwest_to_ing": [
+      {
+        "pair": "bankwest_to_ing",
+        "source_bank": "bankwest",
+        "target_bank": "ing",
+        "evidence_root": "bankwest-corrected",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/bankwest-corrected/pairs/bankwest_to_ing/output.pdf",
+        "artifact_sha256": "b5751fa4408cd09dbd17d6d13371a47ea590ea85f04d40404298c1449fd5b911",
+        "artifact_bytes": 514002,
+        "duration_seconds": 185,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/bankwest-corrected/pairs/bankwest_to_ing/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "bankwest_to_macquarie": [
+      {
+        "pair": "bankwest_to_macquarie",
+        "source_bank": "bankwest",
+        "target_bank": "macquarie",
+        "evidence_root": "bankwest-corrected",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/bankwest-corrected/pairs/bankwest_to_macquarie/output.pdf",
+        "artifact_sha256": "f18446d1a056ba5a9480aef694302741493b0d70dc798afabb2aac2aaba68318",
+        "artifact_bytes": 76971,
+        "duration_seconds": 95,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/bankwest-corrected/pairs/bankwest_to_macquarie/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "bankwest_to_nab": [
+      {
+        "pair": "bankwest_to_nab",
+        "source_bank": "bankwest",
+        "target_bank": "nab",
+        "evidence_root": "bankwest-corrected",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/bankwest-corrected/pairs/bankwest_to_nab/output.pdf",
+        "artifact_sha256": "5f17b458c6b2d38b578f6d0e41ce24e8e38faee9e18afd690b4c862fdfbe3cc1",
+        "artifact_bytes": 130821,
+        "duration_seconds": 145,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/bankwest-corrected/pairs/bankwest_to_nab/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "bankwest_to_westpac": [
+      {
+        "pair": "bankwest_to_westpac",
+        "source_bank": "bankwest",
+        "target_bank": "westpac",
+        "evidence_root": "bankwest-corrected",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/bankwest-corrected/pairs/bankwest_to_westpac/output.pdf",
+        "artifact_sha256": "5d9e673255fb85fd1bfbee5c71bbf109d03fedfc980f22fb3f970ff72b3c22db",
+        "artifact_bytes": 24707,
+        "duration_seconds": 92,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/bankwest-corrected/pairs/bankwest_to_westpac/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "commbank_to_anz": [
+      {
+        "pair": "commbank_to_anz",
+        "source_bank": "commbank",
+        "target_bank": "anz",
+        "evidence_root": "final-42",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/commbank_to_anz/output.pdf",
+        "artifact_sha256": "fb6b129b9cbd3cb1ca22e5696d87fd6abe9734946d8f504a2492ce92b3c4e5b5",
+        "artifact_bytes": 424621,
+        "duration_seconds": 153,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/commbank_to_anz/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "commbank_to_bankwest": [
+      {
+        "pair": "commbank_to_bankwest",
+        "source_bank": "commbank",
+        "target_bank": "bankwest",
+        "evidence_root": "repaired-wave2",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/commbank_to_bankwest/output.pdf",
+        "artifact_sha256": "8234e28cf3697105a04e454d642c3af1dbafb07665bbb48324ab0b851b599d50",
+        "artifact_bytes": 666714,
+        "duration_seconds": 132,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/commbank_to_bankwest/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "commbank_to_ing": [
+      {
+        "pair": "commbank_to_ing",
+        "source_bank": "commbank",
+        "target_bank": "ing",
+        "evidence_root": "final-42",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/commbank_to_ing/output.pdf",
+        "artifact_sha256": "c2e4852abcc654ff68d394f6e0a823d0947026a1b5417c2f078e760fe12a7681",
+        "artifact_bytes": 1330066,
+        "duration_seconds": 157,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/commbank_to_ing/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "commbank_to_macquarie": [
+      {
+        "pair": "commbank_to_macquarie",
+        "source_bank": "commbank",
+        "target_bank": "macquarie",
+        "evidence_root": "final-42",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/commbank_to_macquarie/output.pdf",
+        "artifact_sha256": "ab9568d2ef5ac34bf5fe351c15866031886c45059b793c4c4eedb094d0d12494",
+        "artifact_bytes": 418171,
+        "duration_seconds": 148,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/commbank_to_macquarie/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "commbank_to_nab": [
+      {
+        "pair": "commbank_to_nab",
+        "source_bank": "commbank",
+        "target_bank": "nab",
+        "evidence_root": "final-42",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/commbank_to_nab/output.pdf",
+        "artifact_sha256": "96b66eae688ec852956540ed75816c7381422fd0b4335b4f37433625d93bbe4f",
+        "artifact_bytes": 19365015,
+        "duration_seconds": 209,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/commbank_to_nab/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "commbank_to_westpac": [
+      {
+        "pair": "commbank_to_westpac",
+        "source_bank": "commbank",
+        "target_bank": "westpac",
+        "evidence_root": "repaired-17",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/commbank_to_westpac/output.pdf",
+        "artifact_sha256": "d4792d415b5f7c372fbc85aacd033a8b1ce4cb80b6e8077725ef0c8cdf352971",
+        "artifact_bytes": 277318,
+        "duration_seconds": 137,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/commbank_to_westpac/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "ing_to_anz": [
+      {
+        "pair": "ing_to_anz",
+        "source_bank": "ing",
+        "target_bank": "anz",
+        "evidence_root": "final-42",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/ing_to_anz/output.pdf",
+        "artifact_sha256": "cfe018df432500d6682b39b58fd1c8c606d7b231d08dc876a8b95d25b90707d5",
+        "artifact_bytes": 1275719,
+        "duration_seconds": 280,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/ing_to_anz/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "ing_to_bankwest": [
+      {
+        "pair": "ing_to_bankwest",
+        "source_bank": "ing",
+        "target_bank": "bankwest",
+        "evidence_root": "repaired-wave2",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/ing_to_bankwest/output.pdf",
+        "artifact_sha256": "0e44fc1a4952c36ea6187d04579a52b69d6d6fc80877d95ace26734f243e1b3e",
+        "artifact_bytes": 2233742,
+        "duration_seconds": 232,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/ing_to_bankwest/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "ing_to_commbank": [
+      {
+        "pair": "ing_to_commbank",
+        "source_bank": "ing",
+        "target_bank": "commbank",
+        "evidence_root": "final-wave3",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-wave3/pairs/ing_to_commbank/output.pdf",
+        "artifact_sha256": "a398d9dfc21d204e13eb3c36c3140fc57e65a359ee96a6944fd278f80d81b417",
+        "artifact_bytes": 3989951,
+        "duration_seconds": 421,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-wave3/pairs/ing_to_commbank/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "ing_to_macquarie": [
+      {
+        "pair": "ing_to_macquarie",
+        "source_bank": "ing",
+        "target_bank": "macquarie",
+        "evidence_root": "final-42",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/ing_to_macquarie/output.pdf",
+        "artifact_sha256": "f9dda29095783e90196496800a1847c6a8c28491ef0d42a47c6a1ba21faf2956",
+        "artifact_bytes": 1353367,
+        "duration_seconds": 380,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/ing_to_macquarie/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "ing_to_nab": [
+      {
+        "pair": "ing_to_nab",
+        "source_bank": "ing",
+        "target_bank": "nab",
+        "evidence_root": "final-42",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/ing_to_nab/output.pdf",
+        "artifact_sha256": "53ab3da08649575e452c4ea37aca396e5b0cd63ef1b3951ed7fbf7534cab9d1e",
+        "artifact_bytes": 20310751,
+        "duration_seconds": 408,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/ing_to_nab/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "ing_to_westpac": [
+      {
+        "pair": "ing_to_westpac",
+        "source_bank": "ing",
+        "target_bank": "westpac",
+        "evidence_root": "repaired-wave2",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/ing_to_westpac/output.pdf",
+        "artifact_sha256": "fd89706d138bd898ba4ba3ed88179503473e940c6b038575256421fb81903d9c",
+        "artifact_bytes": 820542,
+        "duration_seconds": 417,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/ing_to_westpac/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "macquarie_to_anz": [
+      {
+        "pair": "macquarie_to_anz",
+        "source_bank": "macquarie",
+        "target_bank": "anz",
+        "evidence_root": "final-42",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/macquarie_to_anz/output.pdf",
+        "artifact_sha256": "b0260a14f9564785bcb5dbdfb627a3d234cfc54d9bc3a8a9ee5cf3b3809ee080",
+        "artifact_bytes": 128862,
+        "duration_seconds": 45,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/macquarie_to_anz/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "macquarie_to_bankwest": [
+      {
+        "pair": "macquarie_to_bankwest",
+        "source_bank": "macquarie",
+        "target_bank": "bankwest",
+        "evidence_root": "repaired-wave2",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/macquarie_to_bankwest/output.pdf",
+        "artifact_sha256": "a6c9e0be349a03f352282cb655ccc975f099e278ea405fa3d829345de255e387",
+        "artifact_bytes": 95908,
+        "duration_seconds": 90,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/macquarie_to_bankwest/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "macquarie_to_commbank": [
+      {
+        "pair": "macquarie_to_commbank",
+        "source_bank": "macquarie",
+        "target_bank": "commbank",
+        "evidence_root": "final-42",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/macquarie_to_commbank/output.pdf",
+        "artifact_sha256": "e38ef228c73380aecb0f06cff7fd1df6152ed9d49bcc3ce9239a9abdb49c2a82",
+        "artifact_bytes": 138522,
+        "duration_seconds": 75,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/macquarie_to_commbank/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "macquarie_to_ing": [
+      {
+        "pair": "macquarie_to_ing",
+        "source_bank": "macquarie",
+        "target_bank": "ing",
+        "evidence_root": "final-42",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/macquarie_to_ing/output.pdf",
+        "artifact_sha256": "39a4d930b6517b833d37c0910736057107e1eca9097078593743ce40cb21a5fc",
+        "artifact_bytes": 509373,
+        "duration_seconds": 87,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/macquarie_to_ing/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "macquarie_to_nab": [
+      {
+        "pair": "macquarie_to_nab",
+        "source_bank": "macquarie",
+        "target_bank": "nab",
+        "evidence_root": "final-42",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/macquarie_to_nab/output.pdf",
+        "artifact_sha256": "d1ab430bfac4ca019de130c5a0dd5f3185712ee6cf90390424525fd8df8716b6",
+        "artifact_bytes": 123314,
+        "duration_seconds": 108,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/macquarie_to_nab/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "macquarie_to_westpac": [
+      {
+        "pair": "macquarie_to_westpac",
+        "source_bank": "macquarie",
+        "target_bank": "westpac",
+        "evidence_root": "final-42",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/macquarie_to_westpac/output.pdf",
+        "artifact_sha256": "75565f3faccb61a8a621c0e4a7a53617759c20a23195a00c8e505f80eb586b25",
+        "artifact_bytes": 21321,
+        "duration_seconds": 48,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/macquarie_to_westpac/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "nab_to_anz": [
+      {
+        "pair": "nab_to_anz",
+        "source_bank": "nab",
+        "target_bank": "anz",
+        "evidence_root": "final-42",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/nab_to_anz/output.pdf",
+        "artifact_sha256": "ca9800e48ae0406a764b48dda6264e9fe8e74a6c52924b79ba4049683800ab2d",
+        "artifact_bytes": 251447,
+        "duration_seconds": 132,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/nab_to_anz/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "nab_to_bankwest": [
+      {
+        "pair": "nab_to_bankwest",
+        "source_bank": "nab",
+        "target_bank": "bankwest",
+        "evidence_root": "repaired-wave2",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/nab_to_bankwest/output.pdf",
+        "artifact_sha256": "6cc88029a6df59972db491a66b70111b46a133110ffc19ef56c374199f7e9a0c",
+        "artifact_bytes": 120568,
+        "duration_seconds": 289,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/nab_to_bankwest/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "nab_to_commbank": [
+      {
+        "pair": "nab_to_commbank",
+        "source_bank": "nab",
+        "target_bank": "commbank",
+        "evidence_root": "repaired-17",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/nab_to_commbank/output.pdf",
+        "artifact_sha256": "261537e22d45bf40436291e95c8485edabb60d6f7fa4dec120b24727ee049232",
+        "artifact_bytes": 439905,
+        "duration_seconds": 156,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/nab_to_commbank/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "nab_to_ing": [
+      {
+        "pair": "nab_to_ing",
+        "source_bank": "nab",
+        "target_bank": "ing",
+        "evidence_root": "final-42",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/nab_to_ing/output.pdf",
+        "artifact_sha256": "8a8af62d8d315a733e8bd5166e6fd258e62f85c311cc1c0d5c265809e2649c83",
+        "artifact_bytes": 524739,
+        "duration_seconds": 127,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/nab_to_ing/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "nab_to_macquarie": [
+      {
+        "pair": "nab_to_macquarie",
+        "source_bank": "nab",
+        "target_bank": "macquarie",
+        "evidence_root": "final-42",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/nab_to_macquarie/output.pdf",
+        "artifact_sha256": "34e05f99fc50fff2b1a1f5f0757862b480be5d1602ce4db04b955f607ed59e01",
+        "artifact_bytes": 211405,
+        "duration_seconds": 120,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/nab_to_macquarie/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "nab_to_westpac": [
+      {
+        "pair": "nab_to_westpac",
+        "source_bank": "nab",
+        "target_bank": "westpac",
+        "evidence_root": "final-42",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/nab_to_westpac/output.pdf",
+        "artifact_sha256": "9fcd846a37b482a3e7cc5ea421388d3a4c7d6c339652585d764b44340b1edfc7",
+        "artifact_bytes": 36445,
+        "duration_seconds": 122,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-42/pairs/nab_to_westpac/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "westpac_to_anz": [
+      {
+        "pair": "westpac_to_anz",
+        "source_bank": "westpac",
+        "target_bank": "anz",
+        "evidence_root": "final-wave3",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-wave3/pairs/westpac_to_anz/output.pdf",
+        "artifact_sha256": "e325f4a2c665dbab84e24c0f643d374f1005cd380f893d63d6e3df91068b05e4",
+        "artifact_bytes": 2117064,
+        "duration_seconds": 408,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/final-wave3/pairs/westpac_to_anz/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "westpac_to_bankwest": [
+      {
+        "pair": "westpac_to_bankwest",
+        "source_bank": "westpac",
+        "target_bank": "bankwest",
+        "evidence_root": "repaired-wave2",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/westpac_to_bankwest/output.pdf",
+        "artifact_sha256": "782faa86cf07982c0a261d258b8ca954da9e06cb869b37c79d2a5fe0a403f3a5",
+        "artifact_bytes": 3688978,
+        "duration_seconds": 351,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-wave2/pairs/westpac_to_bankwest/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "westpac_to_commbank": [
+      {
+        "pair": "westpac_to_commbank",
+        "source_bank": "westpac",
+        "target_bank": "commbank",
+        "evidence_root": "last-pair-final",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/last-pair-final/pairs/westpac_to_commbank/output.pdf",
+        "artifact_sha256": "4f0ec29ed6c7dfd9fa966a6d0574f15211fe8e2de88689b46640ba33733638e3",
+        "artifact_bytes": 4529902,
+        "duration_seconds": 284,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/last-pair-final/pairs/westpac_to_commbank/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "westpac_to_ing": [
+      {
+        "pair": "westpac_to_ing",
+        "source_bank": "westpac",
+        "target_bank": "ing",
+        "evidence_root": "repaired-17",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/westpac_to_ing/output.pdf",
+        "artifact_sha256": "81ff9a5a1ddbf281579d5ed0c9e7783643c95e07b877654d4eb61b5d3a51916a",
+        "artifact_bytes": 2628617,
+        "duration_seconds": 321,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/westpac_to_ing/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "westpac_to_macquarie": [
+      {
+        "pair": "westpac_to_macquarie",
+        "source_bank": "westpac",
+        "target_bank": "macquarie",
+        "evidence_root": "repaired-17",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/westpac_to_macquarie/output.pdf",
+        "artifact_sha256": "991d0c00f912abe5a84a31c70a258ce1c67504858cbd5f89f1933c1e491717bc",
+        "artifact_bytes": 2243631,
+        "duration_seconds": 530,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/westpac_to_macquarie/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ],
+    "westpac_to_nab": [
+      {
+        "pair": "westpac_to_nab",
+        "source_bank": "westpac",
+        "target_bank": "nab",
+        "evidence_root": "repaired-17",
+        "artifact_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/westpac_to_nab/output.pdf",
+        "artifact_sha256": "aeccc027cf1cb44f0f3bfd51968f06dd2b9c739cf5511af39c281db9e9b9826e",
+        "artifact_bytes": 21031311,
+        "duration_seconds": 471,
+        "exit_status": 0,
+        "run_log_path": "/home/ubuntu/audit-output/final-pre-release/transfer-matrix/repaired-17/pairs/westpac_to_nab/run.log",
+        "gate_evidence": {
+          "transfer_completed": true,
+          "engine_math_pass": true,
+          "provider_math_pass": false,
+          "atomic_publication": false,
+          "failure_marker_present": false
+        }
+      }
+    ]
+  }
+}
