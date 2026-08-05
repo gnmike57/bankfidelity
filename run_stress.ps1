@@ -1,5 +1,14 @@
 $env:Path = "$env:USERPROFILE\.cargo\bin;" + $env:Path
 
+if (Test-Path ".env") {
+    Get-Content .env | Where-Object { $_ -match "^[^#].*=" } | ForEach-Object {
+        $name, $value = $_ -split '=', 2
+        $name = $name.Trim()
+        $value = $value.Trim().Trim('"').Trim("'")
+        [Environment]::SetEnvironmentVariable($name, $value)
+    }
+}
+
 $pythonDir = "C:\bankfidelity\bankfidelity\.bin\python-3.12"
 if (-not (Test-Path "$pythonDir\python.exe")) {
     Write-Host "Bootstrapping isolated Python 3.12..."
@@ -19,8 +28,4 @@ if (-not (Test-Path "$pythonDir\python.exe")) {
 
 $env:PYTHON_EXECUTABLE = "$pythonDir\python.exe"
 
-Remove-Item Env:\AI_PROVIDER -ErrorAction SilentlyContinue
-Remove-Item Env:\GEMINI_API_KEY -ErrorAction SilentlyContinue
-Remove-Item Env:\APPLITOOLS_API_KEY -ErrorAction SilentlyContinue
-Remove-Item Env:\DUAL_CORE_PASSPHRASE -ErrorAction SilentlyContinue
 cargo test --test au_transfer_stress -- --nocapture --ignored

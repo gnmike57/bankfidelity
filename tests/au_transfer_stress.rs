@@ -102,8 +102,8 @@ fn test_all_au_transfer_pairs() {
     let cfg = Arc::new(cfg_obj);
     let dir_path = Path::new("AU Bank Statements");
     let mut pdfs = collect_pdfs(dir_path);
-    pdfs.truncate(2); // Limit to 2 PDFs -> 2 pairs
-
+    pdfs.retain(|p| !p.to_string_lossy().contains("anz_example"));
+    pdfs.truncate(4); // Use 4 PDFs -> 12 pairs
     eprintln!("\n╔══════════════════════════════════════════════════════════════╗");
     eprintln!("║  AU Bank Statement Cross-Transfer Stress Test              ║");
     eprintln!(
