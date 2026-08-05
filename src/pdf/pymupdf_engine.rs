@@ -17,9 +17,14 @@ where
     T: Send + 'static,
 {
     // PdfEngine methods are synchronous and executed inside `spawn_blocking` threads.
-    // Calling `block_in_place` from a blocking thread panics in tokio, so we just
-    // use `blocking_recv()` directly which correctly parks the current blocking thread.
-    rx.blocking_recv()
+    // Calling `blocking_recv()` directly panics if we are still inside a tokio runtime context
+    // (even if we are in a blocking thread, depending on how it was spawned).
+    // The correct way to block in a blocking thread that might have a Handle context is
+    // to use `tokio::task::block_in_place` (if not already inside it) or just use the handle.
+    match tokio::runtime::Handle::try_current() {
+        Ok(handle) => tokio::task::block_in_place(move || handle.block_on(rx)),
+        Err(_) => rx.blocking_recv(),
+    }
 }
 
 #[derive(Debug)]
