@@ -276,16 +276,11 @@ def generate_visual_proof(pdf_path: str, output_path: str, edits_json: str):
         old_text = edit.get("old_text", "")
         new_text = edit.get("new_text", "")
         
-        # Draw a red transparent rectangle over the old text
+        # Draw a white rectangle to blank out the original text, with a blue stroke (blue bounding box)
         annot = page.add_rect_annot(r)
-        annot.set_colors(stroke=(1, 0, 0), fill=(1, 0.8, 0.8))
-        annot.set_opacity(0.5)
+        annot.set_colors(stroke=(0, 0, 1), fill=(1, 1, 1))
+        annot.set_opacity(1.0)
         annot.update()
-        
-        # Add text describing the change
-        # Place it slightly below the rect
-        text_p = pymupdf.Point(r.x0, r.y1 + 10)
-        page.insert_text(text_p, f"[{old_text}] -> [{new_text}]", color=(0, 0.5, 0), fontsize=8)
 
     doc.save(output_path)
     doc.close()

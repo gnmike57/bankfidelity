@@ -2166,10 +2166,11 @@ impl MyApp {
                 self.progress = None;
                 self.in_flight = self.in_flight.saturating_sub(1);
                 let msg = format!(
-                    "✅ Transfer complete: {} txns -> output, math: {}, visual: {} ({:.1}s)",
+                    "✓ Transfer complete: {} txns -> output, math: {}, visual: {} (AI Layout: {}), ({:.1}s)",
                     result.source_tx_count,
                     if result.math_verified { "✓" } else { "✗" },
                     if result.visual_verified { "✓" } else { "✗" },
+                    if result.visual_proof_path.is_some() { "APPROVED" } else { "N/A" },
                     result.total_duration_secs,
                 );
                 self.status = msg.clone();

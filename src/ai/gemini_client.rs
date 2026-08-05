@@ -169,8 +169,8 @@ pub struct GeminiClient {
 /// The best available Gemini **Pro** model id, tried first for all reasoning
 /// and vision calls.
 ///
-/// `gemini-2.0-flash` is Google's most advanced generally available reasoning model.
-const GEMINI_PRO_MODEL: &str = "gemini-pro-latest";
+/// `gemini-pro-preview` is Google's most advanced generally available reasoning model.
+const GEMINI_PRO_MODEL: &str = "gemini-pro-preview";
 
 /// If `gemini-pro-latest` fails or is unavailable, fallback to next best
 const GEMINI_PRO_FALLBACK: &str = "gemini-flash-latest";
