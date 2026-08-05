@@ -913,6 +913,9 @@ mod tests {
             let operation_id = request.operation_id;
             let response = supervisor.execute(&request).unwrap();
             assert_eq!(response.operation_id, operation_id);
+            if response.disposition != crate::ai::python_protocol::PythonDisposition::Succeeded {
+                println!("Failed python response: {:?}", response);
+            }
             assert_eq!(
                 response.disposition,
                 crate::ai::python_protocol::PythonDisposition::Succeeded
