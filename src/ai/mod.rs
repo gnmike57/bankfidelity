@@ -5,6 +5,8 @@ pub mod document_ai;
 pub mod gemini_client;
 pub mod llamaparse;
 pub mod openai_client;
+pub mod ufo;
+pub mod mcp;
 
 pub mod pdfrest;
 pub mod python_protocol;

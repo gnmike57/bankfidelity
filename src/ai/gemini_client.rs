@@ -136,6 +136,19 @@ impl GeminiVisionReport {
     }
 }
 
+#[derive(Debug)]
+pub struct Nudge {
+    pub index: usize,
+    pub dx: f32,
+    pub dy: f32,
+}
+
+#[derive(Debug)]
+pub enum ValidationResponse {
+    Approved,
+    RejectedWithNudges(Vec<Nudge>),
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum GeminiError {
     #[error("Missing Configuration: GEMINI_API_KEY")]
@@ -1094,29 +1107,32 @@ impl GeminiClient {
 
     pub async fn review_visual_proof(
         &self,
-        proof_png_bytes: &[u8],
-    ) -> Result<bool, GeminiError> {
+        proof_pngs: &[Vec<u8>],
+    ) -> Result<ValidationResponse, GeminiError> {
         use base64::Engine;
         if self.api_key.is_empty() {
-            return Ok(true); // Auto-approve if no Gemini API key (offline mode)
+            return Ok(ValidationResponse::Approved); // Auto-approve if no Gemini API key (offline mode)
         }
         
-        let prompt = "You are a visual layout verifier for a PDF editor. 
-Look at this PNG proof image. The original text has been blanked out and replaced with blue bounding boxes showing where the new text will be placed. 
-Your job is to verify that these blue boxes are perfectly aligned with the surrounding text, don't overlap boundaries, and look visually correct.
-Reply with exactly 'APPROVED' if the layout looks flawless, or 'REJECTED: <reason>' if there are layout issues.";
+        let prompt = "You are a micro-typographical visual layout verifier.
+Look at these 300 DPI PNG proofs. The red text shows where the new edits will be placed. The yellow highlight is the bounding box.
+Verify if the red text perfectly aligns with the surrounding text baselines and margins.
+If flawless, reply exactly 'APPROVED'.
+If misaligned, reply with JSON specifying the required shift in points: {\"nudges\": [{\"index\": 0, \"dx\": 0.0, \"dy\": 1.5}]}";
 
-        let b64 = base64::engine::general_purpose::STANDARD.encode(proof_png_bytes);
-        
-        let parts = vec![
-            serde_json::json!({ "text": prompt }),
-            serde_json::json!({
+        let mut parts = vec![
+            serde_json::json!({ "text": prompt })
+        ];
+
+        for png_bytes in proof_pngs {
+            let b64 = base64::engine::general_purpose::STANDARD.encode(png_bytes);
+            parts.push(serde_json::json!({
                 "inline_data": {
                     "mime_type": "image/png",
                     "data": b64
                 }
-            })
-        ];
+            }));
+        }
 
         let payload = serde_json::json!({
             "contents": [{ "parts": parts }],
@@ -1133,13 +1149,45 @@ Reply with exactly 'APPROVED' if the layout looks flawless, or 'REJECTED: <reaso
                 if let Some(parts) = first["content"]["parts"].as_array() {
                     if let Some(text) = parts[0]["text"].as_str() {
                         tracing::info!("AI Visual Review result: {}", text.trim());
-                        return Ok(text.trim().starts_with("APPROVED"));
+                        if text.trim().starts_with("APPROVED") {
+                            return Ok(ValidationResponse::Approved);
+                        } else {
+                            // Try to parse JSON nudges
+                            // Extract JSON if it's wrapped in markdown blocks
+                            let mut json_str = text.trim();
+                            if json_str.starts_with("```json") {
+                                json_str = json_str.trim_start_matches("```json").trim_end_matches("```").trim();
+                            } else if json_str.starts_with("```") {
+                                json_str = json_str.trim_start_matches("```").trim_end_matches("```").trim();
+                            }
+                            
+                            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(json_str) {
+                                if let Some(nudges_array) = parsed["nudges"].as_array() {
+                                    let mut nudges = Vec::new();
+                                    for n in nudges_array {
+                                        if let (Some(idx), Some(dx), Some(dy)) = (
+                                            n["index"].as_u64(),
+                                            n["dx"].as_f64(),
+                                            n["dy"].as_f64(),
+                                        ) {
+                                            nudges.push(Nudge {
+                                                index: idx as usize,
+                                                dx: dx as f32,
+                                                dy: dy as f32,
+                                            });
+                                        }
+                                    }
+                                    return Ok(ValidationResponse::RejectedWithNudges(nudges));
+                                }
+                            }
+                            return Ok(ValidationResponse::RejectedWithNudges(vec![]));
+                        }
                     }
                 }
             }
         }
         
-        Ok(false)
+        Ok(ValidationResponse::RejectedWithNudges(vec![]))
     }
 
     pub async fn apply_natural_language_edit(

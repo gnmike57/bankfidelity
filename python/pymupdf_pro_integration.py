@@ -276,11 +276,26 @@ def generate_visual_proof(pdf_path: str, output_path: str, edits_json: str):
         old_text = edit.get("old_text", "")
         new_text = edit.get("new_text", "")
         
-        # Draw a white rectangle to blank out the original text, with a blue stroke (blue bounding box)
+        # Draw a translucent yellow highlighter box
         annot = page.add_rect_annot(r)
-        annot.set_colors(stroke=(0, 0, 1), fill=(1, 1, 1))
-        annot.set_opacity(1.0)
+        annot.set_colors(stroke=(1, 0, 0), fill=(1, 1, 0)) # Red border, yellow fill
+        annot.set_opacity(0.3)
         annot.update()
+        
+        # Inject the new_text onto the page in red
+        if new_text:
+            # We don't have perfect font logic here, so we use a standard font 
+            # and position it at the top-left of the bounding box.
+            # PyMuPDF insert_textbox is robust.
+            font_size = edit.get("size", 10.0)
+            page.insert_textbox(
+                r,
+                new_text,
+                fontsize=font_size,
+                color=(1, 0, 0), # Red overlay text
+                fontname="helv",
+                align=0 # Left aligned
+            )
 
     doc.save(output_path)
     doc.close()

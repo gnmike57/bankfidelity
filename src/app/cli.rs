@@ -36,6 +36,9 @@ pub enum Commands {
     /// Launch the GUI (recommended)
     Gui,
 
+    /// Start the Model Context Protocol (MCP) Server loop over stdio.
+    Mcp,
+
     /// Run headless and expose an HTTP health surface (for containers /
     /// cloud platforms like Railway). Binds 0.0.0.0:$PORT (default 8080)
     /// and keeps the worker runtime alive. Reuses the same Job/JobResult
@@ -1137,6 +1140,10 @@ pub fn run_inner(
                     Ok(exit_code::GENERAL)
                 }
             }
+        }
+        Commands::Mcp => {
+            crate::ai::mcp::McpServer::start();
+            Ok(exit_code::SUCCESS)
         }
         Commands::Gui => {
             // [Phase 0.1] Environment & Memory Assertions
