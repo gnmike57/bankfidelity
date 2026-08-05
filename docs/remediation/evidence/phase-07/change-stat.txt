@@ -1,0 +1,15 @@
+ .env.example                      |   4 [31m-[m
+ README.md                         |  63 [32m++++++[m[31m------[m
+ docs/TECH_STACK.md                |  55 [32m+++++[m[31m------[m
+ package.json                      |   7 [32m+[m[31m-[m
+ python/pymupdf_pro_integration.py |  66 [32m++++[m[31m---------[m
+ python/runtime-manifest.json      |   2 [32m+[m[31m-[m
+ src/ai/pdfrest.rs                 | 195 [32m+++++++++++++++++++++++++++++++++++[m[31m---[m
+ src/app/config.rs                 |   7 [31m--[m
+ src/app/error.rs                  |  18 [32m++[m[31m--[m
+ src/app/gui.rs                    |   7 [31m--[m
+ src/app/modals.rs                 |  15 [32m+[m[31m--[m
+ src/engine/verification.rs        |  31 [32m++++[m[31m--[m
+ src/engine/verification_v2.rs     |  73 [32m+++++++[m[31m-------[m
+ tests/run_stress_benchmark.py     |  83 [31m----------------[m
+ 14 files changed, 329 insertions(+), 297 deletions(-)

@@ -1,0 +1,12 @@
+check	result
+Rust library suite	309 passed, 0 failed
+Structural controls	4 passed, 0 failed
+Content/editability controls	5 passed, 0 failed
+Engine evidence controls	3 passed, 0 failed
+CLI contracts	2 passed, 0 failed
+Three-run repeatability	1 passed, 0 failed
+Vision contracts	6 passed, 0 failed
+pdfRest contracts	5 passed, 0 failed
+All-target check	PASS
+Strict Clippy	PASS
+Formatting	PASS

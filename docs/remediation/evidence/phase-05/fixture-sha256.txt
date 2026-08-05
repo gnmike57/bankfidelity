@@ -1,0 +1,1 @@
+32487726f40c44a7d02e4c187929fbfe3b7f799bbe60d6faca1efb922965a438  tests/stress_pdfs/Standard_Bank_Statement_01.pdf

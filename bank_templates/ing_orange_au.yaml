@@ -1,0 +1,14 @@
+id: ing_orange_au
+header_signatures:
+  - "ING"
+  - "Orange"
+  - "Everyday"
+date_format: "%d/%m/%Y"
+amount_regex: "^-?\\$?[0-9,]+\\.\\d{2}$"
+# Layout learned from page 2 of ING OrangeEveryday.pdf.
+# Two-amount columns: amount (debit/credit signed) at ~314, balance at ~505.
+column_x_ranges:
+  date: [30.0, 105.0]
+  description: [110.0, 280.0]
+  amount: [285.0, 320.0]
+  balance: [400.0, 510.0]

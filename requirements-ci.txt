@@ -1,0 +1,3 @@
+# Reproducible Python dependency for the executable base-state CI matrix.
+# The permanent bundled runtime and full compatibility lock are completed in PY-004/PY-009.
+PyMuPDF==1.28.0

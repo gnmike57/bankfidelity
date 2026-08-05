@@ -1,0 +1,11 @@
+id: bofa
+header_signatures:
+  - "Bank of America"
+  - "BofA"
+date_format: "%m/%d/%Y"
+amount_regex: "^-?\\$?[0-9,]+\\.\\d{2}$"
+column_x_ranges:
+  date: [40.0, 90.0]
+  description: [100.0, 320.0]
+  amount: [330.0, 420.0]
+  balance: [430.0, 520.0]

@@ -1,0 +1,110 @@
+name: Remediation ticket
+description: Execute one audited remediation ticket with reproducible evidence and a blocking verification contract.
+title: "[TICKET-ID] "
+labels:
+  - remediation
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Every ticket must be reproducible, narrowly implemented, and independently verified. Do not close a ticket by weakening a test, widening a failed threshold, disabling a gate, accepting a missing artifact, or converting a failure into a warning.
+  - type: input
+    id: ticket_id
+    attributes:
+      label: Ticket ID
+      placeholder: INT-002
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - P0 / Critical
+        - P1 / Major
+        - P2 / Medium
+        - P3 / Minor
+    validations:
+      required: true
+  - type: input
+    id: phase
+    attributes:
+      label: Owning phase and gate
+      placeholder: Phase 02 / Gate 02
+    validations:
+      required: true
+  - type: input
+    id: findings
+    attributes:
+      label: Audited finding IDs
+      description: Use "New" only for an implementation finding that is added to the finding register.
+      placeholder: COR-02, COR-05
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Baseline evidence and reproduction
+      description: Include source paths/lines, fixture hashes, exact commands, exit statuses, and observed artifacts.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior and invariants
+      description: State the exact postconditions and forbidden outcomes.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Implementation scope and non-goals
+      description: Identify the narrow files/contracts to change and the behavior that must remain stable.
+    validations:
+      required: true
+  - type: textarea
+    id: tests
+    attributes:
+      label: Failing test first and ticket-local verification
+      description: List the red test, focused checks, negative/boundary cases, Python contract checks where relevant, and required platforms.
+    validations:
+      required: true
+  - type: textarea
+    id: regression
+    attributes:
+      label: Required regressions and phase-gate impact
+      description: Include all prior P0 tests and affected lifecycle/package suites.
+    validations:
+      required: true
+  - type: textarea
+    id: migration
+    attributes:
+      label: Migration, compatibility, and rollback
+      description: State "none" only after checking config, history, schema, package, Python protocol, and CLI compatibility.
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Regression, data-integrity, security, and resource risks
+    validations:
+      required: true
+  - type: checkboxes
+    id: completion
+    attributes:
+      label: Closure checklist
+      options:
+        - label: The original defect is reproduced or the non-code baseline is documented.
+          required: true
+        - label: A meaningful failing test exists before the implementation change.
+          required: true
+        - label: Ticket-local checks pass on every required platform for this ticket.
+          required: true
+        - label: All prior P0 regressions pass.
+          required: true
+        - label: No test, threshold, error, or assertion was weakened to obtain a pass.
+          required: true
+        - label: The diff contains no secret, private statement, generated output, disabled test, placeholder, or unrelated change.
+          required: true
+        - label: Evidence and rollback instructions are attached.
+          required: true

@@ -1,0 +1,11 @@
+id: chase
+header_signatures:
+  - "JPMorgan Chase Bank"
+  - "CHASE"
+date_format: "%m/%d"
+amount_regex: "^-?\\$?[0-9,]+\\.\\d{2}$"
+column_x_ranges:
+  date: [50.0, 100.0]
+  description: [110.0, 300.0]
+  amount: [350.0, 450.0]
+  balance: [460.0, 550.0]

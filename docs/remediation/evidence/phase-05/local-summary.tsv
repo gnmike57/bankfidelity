@@ -1,0 +1,8 @@
+check	result	evidence
+rust_library_tests	PASS	285 passed, 0 failed
+integrity_regressions	PASS	5 passed, 0 failed
+provider_free_transfer	PASS	1 passed, 0 failed
+strict_clippy	PASS	-D warnings
+rustfmt	PASS	check clean
+batch_extraction	PASS	2/2 files, 30 rows each, bounded concurrency=2
+offline_router	PASS	30 rows with canonical IDs and confidence

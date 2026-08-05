@@ -1,0 +1,272 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_BUILD_JOBS: "2"
+  RUST_BACKTRACE: "1"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  DUAL_CORE_PASSPHRASE: ci-only-passphrase-do-not-use-in-prod
+
+jobs:
+  format:
+    name: rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.89.0
+          components: rustfmt
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+  lint:
+    name: clippy production surfaces
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.89.0
+          components: clippy, rustfmt
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libfontconfig1-dev \
+            libfreetype6-dev \
+            libssl-dev \
+            pkg-config
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-ci.txt
+      - name: Install Python base runtime
+        run: python -m pip install --requirement requirements-ci.txt
+      - uses: Swatinem/rust-cache@v2
+      - name: Lint production library and binaries
+        run: cargo clippy --locked --lib --bins -- -D warnings
+
+  base-state:
+    name: base state (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.89.0
+          components: clippy, rustfmt
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-ci.txt
+
+      - name: Install Python base runtime
+        run: python -m pip install --requirement requirements-ci.txt
+
+      - name: Select Python for PyO3
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            echo "PYO3_PYTHON=python" >> "$GITHUB_ENV"
+          else
+            echo "PYO3_PYTHON=$(command -v python3)" >> "$GITHUB_ENV"
+          fi
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libfontconfig1-dev \
+            libfreetype6-dev \
+            libssl-dev \
+            pkg-config
+
+      - name: Install macOS build dependencies
+        if: runner.os == 'macOS'
+        run: brew install pkg-config openssl@3
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Python production-bridge smoke
+        run: python python/smoke_test.py
+
+      - name: Python runtime manifest, protocol contract, and fixture parity
+        env:
+          PYTHONPATH: python
+        run: |
+          python scripts/generate_python_runtime_manifest.py --check
+          python python/verify_runtime_manifest.py --tier base
+          python scripts/generate_python_protocol_fixtures.py --check
+          python -m unittest -v python.test_runtime_manifest python.test_bridge_protocol python.test_worker
+
+      - name: Offline bundled Python runtime smoke
+        run: python scripts/test_python_bundle_layout.py
+
+      - name: Compile every host target
+        run: cargo check --locked --all-targets --message-format=short
+
+      - name: Build production executable
+        run: cargo build --locked --bin dual-core-pdf-pipeline --message-format=short
+
+      - name: Run library tests
+        run: cargo test --locked --lib --no-fail-fast --message-format=short
+
+      - name: Run portable runtime smoke
+        run: cargo test --locked --test runtime_smoke --message-format=short
+
+      - name: Verify executable startup contracts
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            BIN="target/debug/dual-core-pdf-pipeline.exe"
+          else
+            BIN="target/debug/dual-core-pdf-pipeline"
+          fi
+          "$BIN" --version
+          "$BIN" --help
+
+  python-pro-smoke:
+    name: optional PyMuPDF Pro import (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - windows-latest
+          - macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-pro.txt
+      - name: Install pinned base and Pro packages
+        run: python -m pip install --requirement requirements-pro.txt
+      - name: Verify exact core, Pro, manifest, and bridge runtime
+        env:
+          PYTHONPATH: python
+        run: |
+          python python/verify_runtime_versions.py
+          python scripts/generate_python_runtime_manifest.py --check
+          python python/verify_runtime_manifest.py --tier pro
+      - name: Run production-bridge smoke with Pro package present
+        run: python python/smoke_test.py
+
+  p0-integrity:
+    name: P0 integrity regressions (${{ matrix.os }})
+    needs: base-state
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.89.0
+          components: rustfmt, clippy
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-pro.txt
+      - name: Install pinned Python and PyMuPDF Pro runtime
+        run: python -m pip install --requirement requirements-pro.txt
+      - name: Verify exact core, Pro, manifest, and bridge runtime
+        env:
+          PYTHONPATH: python
+        run: |
+          python python/verify_runtime_versions.py
+          python scripts/generate_python_runtime_manifest.py --check
+          python python/verify_runtime_manifest.py --tier pro
+      - name: Select Python for PyO3
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            echo "PYO3_PYTHON=python" >> "$GITHUB_ENV"
+          else
+            echo "PYO3_PYTHON=$(command -v python3)" >> "$GITHUB_ENV"
+          fi
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libfontconfig1-dev \
+            libfreetype6-dev \
+            libssl-dev \
+            pkg-config
+      - name: Install macOS build dependencies
+        if: runner.os == 'macOS'
+        run: brew install pkg-config openssl@3
+      - uses: Swatinem/rust-cache@v2
+      - name: Pro-installed worker protocol and exact-count contract
+        shell: bash
+        env:
+          PYTHONPATH: python
+        run: |
+          python -m unittest -v \
+            python.test_worker.WorkerTests.test_handshake_and_ping_are_versioned_and_complete \
+            python.test_worker.WorkerTests.test_pro_batch_maps_placed_count_and_publishes_exactly
+      - name: Python exact-application regressions
+        run: python python/test_apply_many_edits_contract.py
+      - name: Audit snapshot and tamper regressions
+        run: cargo test --locked --lib app::audit::tests --message-format=short
+      - name: Commit-barrier rollback regressions
+        run: cargo test --locked --lib app::commit::tests --message-format=short
+      - name: Real runtime integrity regressions
+        run: cargo test --locked --test integrity_regressions --message-format=short
+
+  advisory-inventory:
+    name: deferred hardening inventory
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.89.0
+      - name: Install advisory and policy tools
+        run: |
+          cargo install --locked cargo-audit
+          cargo install --locked cargo-deny
+      - name: Record dependency advisories
+        run: cargo audit
+      - name: Record dependency policy findings
+        run: cargo deny check

@@ -1,0 +1,280 @@
+{
+  "opening_balance": 5000.0,
+  "displayed_closing": 10850.21,
+  "correct_closing": 10805.21,
+  "discrepancy": 45.0,
+  "error_introduced_at_line": 17,
+  "transaction_count": 30,
+  "transactions": [
+    {
+      "line": 1,
+      "date": "2026-03-01",
+      "description": "Payroll Deposit",
+      "debit": null,
+      "credit": 1606.42,
+      "correct_balance": 6606.42,
+      "displayed_balance": 6606.42
+    },
+    {
+      "line": 2,
+      "date": "2026-03-02",
+      "description": "Office Supplies",
+      "debit": 42.42,
+      "credit": null,
+      "correct_balance": 6564.0,
+      "displayed_balance": 6564.0
+    },
+    {
+      "line": 3,
+      "date": "2026-03-03",
+      "description": "Utility Payment",
+      "debit": 264.3,
+      "credit": null,
+      "correct_balance": 6299.7,
+      "displayed_balance": 6299.7
+    },
+    {
+      "line": 4,
+      "date": "2026-03-04",
+      "description": "Client Invoice",
+      "debit": 180.65,
+      "credit": null,
+      "correct_balance": 6119.05,
+      "displayed_balance": 6119.05
+    },
+    {
+      "line": 5,
+      "date": "2026-03-05",
+      "description": "Equipment Lease",
+      "debit": null,
+      "credit": 1083.0,
+      "correct_balance": 7202.05,
+      "displayed_balance": 7202.05
+    },
+    {
+      "line": 6,
+      "date": "2026-03-06",
+      "description": "Travel Expense",
+      "debit": 56.98,
+      "credit": null,
+      "correct_balance": 7145.07,
+      "displayed_balance": 7145.07
+    },
+    {
+      "line": 7,
+      "date": "2026-03-07",
+      "description": "Insurance",
+      "debit": 243.63,
+      "credit": null,
+      "correct_balance": 6901.44,
+      "displayed_balance": 6901.44
+    },
+    {
+      "line": 8,
+      "date": "2026-03-08",
+      "description": "Marketing",
+      "debit": 109.07,
+      "credit": null,
+      "correct_balance": 6792.37,
+      "displayed_balance": 6792.37
+    },
+    {
+      "line": 9,
+      "date": "2026-03-09",
+      "description": "Software License",
+      "debit": null,
+      "credit": 1630.12,
+      "correct_balance": 8422.49,
+      "displayed_balance": 8422.49
+    },
+    {
+      "line": 10,
+      "date": "2026-03-10",
+      "description": "Consulting",
+      "debit": 256.64,
+      "credit": null,
+      "correct_balance": 8165.85,
+      "displayed_balance": 8165.85
+    },
+    {
+      "line": 11,
+      "date": "2026-03-11",
+      "description": "Payroll Deposit",
+      "debit": 47.28,
+      "credit": null,
+      "correct_balance": 8118.57,
+      "displayed_balance": 8118.57
+    },
+    {
+      "line": 12,
+      "date": "2026-03-12",
+      "description": "Office Supplies",
+      "debit": 298.43,
+      "credit": null,
+      "correct_balance": 7820.14,
+      "displayed_balance": 7820.14
+    },
+    {
+      "line": 13,
+      "date": "2026-03-13",
+      "description": "Utility Payment",
+      "debit": null,
+      "credit": 538.41,
+      "correct_balance": 8358.55,
+      "displayed_balance": 8358.55
+    },
+    {
+      "line": 14,
+      "date": "2026-03-14",
+      "description": "Client Invoice",
+      "debit": 94.08,
+      "credit": null,
+      "correct_balance": 8264.47,
+      "displayed_balance": 8264.47
+    },
+    {
+      "line": 15,
+      "date": "2026-03-15",
+      "description": "Equipment Lease",
+      "debit": 179.86,
+      "credit": null,
+      "correct_balance": 8084.61,
+      "displayed_balance": 8084.61
+    },
+    {
+      "line": 16,
+      "date": "2026-03-16",
+      "description": "Travel Expense",
+      "debit": 216.59,
+      "credit": null,
+      "correct_balance": 7868.02,
+      "displayed_balance": 7868.02
+    },
+    {
+      "line": 17,
+      "date": "2026-03-17",
+      "description": "Insurance",
+      "debit": null,
+      "credit": 656.67,
+      "correct_balance": 8524.69,
+      "displayed_balance": 8569.69
+    },
+    {
+      "line": 18,
+      "date": "2026-03-18",
+      "description": "Marketing",
+      "debit": 266.54,
+      "credit": null,
+      "correct_balance": 8258.15,
+      "displayed_balance": 8303.15
+    },
+    {
+      "line": 19,
+      "date": "2026-03-19",
+      "description": "Software License",
+      "debit": 295.95,
+      "credit": null,
+      "correct_balance": 7962.2,
+      "displayed_balance": 8007.2
+    },
+    {
+      "line": 20,
+      "date": "2026-03-20",
+      "description": "Consulting",
+      "debit": 83.49,
+      "credit": null,
+      "correct_balance": 7878.71,
+      "displayed_balance": 7923.71
+    },
+    {
+      "line": 21,
+      "date": "2026-03-21",
+      "description": "Payroll Deposit",
+      "debit": null,
+      "credit": 1336.34,
+      "correct_balance": 9215.05,
+      "displayed_balance": 9260.05
+    },
+    {
+      "line": 22,
+      "date": "2026-03-22",
+      "description": "Office Supplies",
+      "debit": 40.96,
+      "credit": null,
+      "correct_balance": 9174.09,
+      "displayed_balance": 9219.09
+    },
+    {
+      "line": 23,
+      "date": "2026-03-23",
+      "description": "Utility Payment",
+      "debit": 26.58,
+      "credit": null,
+      "correct_balance": 9147.51,
+      "displayed_balance": 9192.51
+    },
+    {
+      "line": 24,
+      "date": "2026-03-24",
+      "description": "Client Invoice",
+      "debit": 76.05,
+      "credit": null,
+      "correct_balance": 9071.46,
+      "displayed_balance": 9116.46
+    },
+    {
+      "line": 25,
+      "date": "2026-03-25",
+      "description": "Equipment Lease",
+      "debit": null,
+      "credit": 1945.95,
+      "correct_balance": 11017.41,
+      "displayed_balance": 11062.41
+    },
+    {
+      "line": 26,
+      "date": "2026-03-26",
+      "description": "Travel Expense",
+      "debit": 160.07,
+      "credit": null,
+      "correct_balance": 10857.34,
+      "displayed_balance": 10902.34
+    },
+    {
+      "line": 27,
+      "date": "2026-03-27",
+      "description": "Insurance",
+      "debit": 72.16,
+      "credit": null,
+      "correct_balance": 10785.18,
+      "displayed_balance": 10830.18
+    },
+    {
+      "line": 28,
+      "date": "2026-03-28",
+      "description": "Marketing",
+      "debit": 209.01,
+      "credit": null,
+      "correct_balance": 10576.17,
+      "displayed_balance": 10621.17
+    },
+    {
+      "line": 29,
+      "date": "2026-03-01",
+      "description": "Software License",
+      "debit": null,
+      "credit": 496.85,
+      "correct_balance": 11073.02,
+      "displayed_balance": 11118.02
+    },
+    {
+      "line": 30,
+      "date": "2026-03-02",
+      "description": "Consulting",
+      "debit": 267.81,
+      "credit": null,
+      "correct_balance": 10805.21,
+      "displayed_balance": 10850.21
+    }
+  ]
+}

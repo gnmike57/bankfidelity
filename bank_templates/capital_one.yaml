@@ -1,0 +1,10 @@
+id: capital_one
+header_signatures:
+  - "Capital One"
+date_format: "%m/%d"
+amount_regex: "^-?\\$?[0-9,]+\\.\\d{2}$"
+column_x_ranges:
+  date: [35.0, 85.0]
+  description: [95.0, 300.0]
+  amount: [310.0, 410.0]
+  balance: [420.0, 510.0]

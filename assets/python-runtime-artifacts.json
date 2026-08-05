@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "source_repository": "https://github.com/astral-sh/python-build-standalone",
+  "release_tag": "20260728",
+  "python_version": "3.12.13",
+  "artifacts": {
+    "macos-aarch64": {
+      "asset": "cpython-3.12.13+20260728-aarch64-apple-darwin-install_only_stripped.tar.gz",
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260728/cpython-3.12.13%2B20260728-aarch64-apple-darwin-install_only_stripped.tar.gz",
+      "size_bytes": 24983743,
+      "archive_sha256": "2f18cdef4125ca1440dd1ba00ebcb267526efb532138c0860438f755ea4eebac",
+      "python_member": "python/bin/python3"
+    },
+    "windows-x86_64": {
+      "asset": "cpython-3.12.13+20260728-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260728/cpython-3.12.13%2B20260728-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+      "size_bytes": 21932566,
+      "archive_sha256": "242b94b37682ac55f9bf9eb624348dc8d17c64f74f56028104545ea3ffe35e26",
+      "python_member": "python/python.exe"
+    }
+  }
+}

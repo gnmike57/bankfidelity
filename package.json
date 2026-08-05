@@ -1,0 +1,29 @@
+{
+  "name": "bank-statement-modifier",
+  "version": "1.0.0",
+  "description": "A high-fidelity PDF text editor focused on bank statements: replace text and numbers in-place with the original kerning, font, size, color, and position preserved, then keep all transactions and running balances mathematically consistent.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "example": "examples",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/flak3dd/bank-statement-fidelity-editor-remediated.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/flak3dd/bank-statement-fidelity-editor-remediated/issues"
+  },
+  "homepage": "https://github.com/flak3dd/bank-statement-fidelity-editor-remediated#readme",
+  "dependencies": {
+    "agy": "^0.0.0"
+  }
+}

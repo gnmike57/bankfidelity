@@ -1,0 +1,11 @@
+id: citi
+header_signatures:
+  - "Citibank"
+  - "Citi"
+date_format: "%m/%d"
+amount_regex: "^-?\\$?[0-9,]+\\.\\d{2}$"
+column_x_ranges:
+  date: [55.0, 105.0]
+  description: [115.0, 330.0]
+  amount: [340.0, 460.0]
+  balance: [470.0, 560.0]

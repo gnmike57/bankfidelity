@@ -1,0 +1,25 @@
+b1ac6025647957410644d67209554c44179a703d	2026-08-01T12:19:47+00:00	docs(remediation): close gate 03
+aac58198179c854586ae1e4d67803f8902eb9172	2026-08-01T12:31:29+00:00	feat(python): add versioned operation protocol
+8a8c9c1e05790b2a2670f595ed12f6be8ae1a09c	2026-08-01T12:31:59+00:00	ci(python): gate protocol parity on all hosts
+4e7fe993bfeab7dcd41053fa872de34ee6399501	2026-08-01T12:41:45+00:00	feat(python): add supervised operation worker
+a76bfe253e5f5868627706aa1bd12edf011a5d74	2026-08-01T12:42:16+00:00	ci(python): gate worker lifecycle on all hosts
+0f2780f55bf6e1efa552e7a198e520fdf611f8d9	2026-08-01T12:48:01+00:00	feat(python): add supervised worker client
+cd9d4536506df4bdaa6776094ee452f629fda2e2	2026-08-01T12:53:52+00:00	refactor(runtime): isolate Python execution
+65f21fb58541b9301230b28d7c1cdebe0208710d	2026-08-01T13:01:30+00:00	refactor(config): probe supervised Python worker
+04e1554a08392a6399a8b6aa137b0317ee99af0f	2026-08-01T13:03:09+00:00	feat(python): bound worker resource growth
+4ebb3b6e8a3da1718b347baba567bea47a3eb937	2026-08-01T13:07:39+00:00	test(python): inject worker lifecycle faults
+eff0780037e322c7fd17da8818b3bbc977483833	2026-08-01T13:11:39+00:00	feat(python): normalize worker failures
+ca85e89d21867ecbe5de62ee3828a266e0795488	2026-08-01T13:13:40+00:00	fix(python): enforce Pro segmentation boundary
+4cb50e3a266612bef3ca2c9c717a48095041abd3	2026-08-01T13:21:28+00:00	build(python): enforce compatible runtime pair
+0668154b48434ed678a84d47a273f3c3271d2882	2026-08-01T13:27:44+00:00	fix(python): publish mutations atomically
+28a63c54c0cafdf40c752315b4c5c95cb93229f7	2026-08-01T13:32:12+00:00	fix(python): support Windows atomic publication
+f27e16fe0721bb052e62feeadbd0c8222cb1c133	2026-08-01T13:36:16+00:00	fix(python): flush staged files on Windows
+871429b6d2c70244efcc040faa5ac6321f5aa724	2026-08-01T13:52:01+00:00	feat(python): prefer bundled runtime
+5a457b10fbfadae6bd1339ebe45a10e7b8298148	2026-08-01T14:00:33+00:00	feat(python): enforce runtime manifest
+ef280485b5ee19c46e3206f61fffab838fa68675	2026-08-01T14:04:43+00:00	fix(ci): run Python tests cross-platform
+fda2100401aea35856bf43d30fa2b4dd706f580b	2026-08-01T14:14:54+00:00	refactor(python): remove embedded interpreter
+bb81b3fe67d2d9dbc1706cbc0d21e3d2d3ae9fd0	2026-08-01T14:20:20+00:00	test(python): verify offline bundle layout
+7f439165322e9dcb0edcda21037ec195e0b19c91	2026-08-01T14:25:39+00:00	test(python): stress real PDF lifetimes
+09cfc1016b1a12a4e4683d583de9834c7cfd8d36	2026-08-01T14:44:32+00:00	fix(python): keep core text extraction Pro-free
+b8c5f5334a7d05aa849ad8148e8fa7a812b71561	2026-08-01T15:34:53+00:00	fix(python): quarantine protocol stdout
+85e15fca5574068035eccab9e3a700958ee94b92	2026-08-01T16:02:40+00:00	ci: run Pro worker contract under bash

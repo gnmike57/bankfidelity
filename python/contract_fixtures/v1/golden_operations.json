@@ -1,0 +1,608 @@
+{
+  "cases": [
+    {
+      "request": {
+        "deadline_unix_ms": 61000,
+        "input_sha256": null,
+        "operation": "ping",
+        "operation_id": "00000000-0000-4000-8000-000000000001",
+        "payload": {},
+        "protocol_version": "1.0.0",
+        "submitted_at_unix_ms": 1000
+      },
+      "response": {
+        "applied_count": null,
+        "capability_tier": "core",
+        "disposition": "succeeded",
+        "failure": null,
+        "input_sha256": null,
+        "metrics": {
+          "duration_ms": 1,
+          "gc_collections": 0,
+          "open_handles_after": 4,
+          "open_handles_before": 4,
+          "rss_after_bytes": 1000000,
+          "rss_before_bytes": 1000000
+        },
+        "operation": "ping",
+        "operation_id": "00000000-0000-4000-8000-000000000001",
+        "output_sha256": null,
+        "payload": {
+          "fixture": "ok"
+        },
+        "protocol_version": "1.0.0",
+        "requested_count": null,
+        "warnings": []
+      }
+    },
+    {
+      "request": {
+        "deadline_unix_ms": 61000,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "operation": "get_text_blocks",
+        "operation_id": "00000000-0000-4000-8000-000000000002",
+        "payload": {
+          "page_num": 0,
+          "pdf_path": "fixtures/input.pdf"
+        },
+        "protocol_version": "1.0.0",
+        "submitted_at_unix_ms": 1000
+      },
+      "response": {
+        "applied_count": null,
+        "capability_tier": "core",
+        "disposition": "succeeded",
+        "failure": null,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "metrics": {
+          "duration_ms": 2,
+          "gc_collections": 0,
+          "open_handles_after": 4,
+          "open_handles_before": 4,
+          "rss_after_bytes": 1000000,
+          "rss_before_bytes": 1000000
+        },
+        "operation": "get_text_blocks",
+        "operation_id": "00000000-0000-4000-8000-000000000002",
+        "output_sha256": null,
+        "payload": {
+          "fixture": "ok"
+        },
+        "protocol_version": "1.0.0",
+        "requested_count": null,
+        "warnings": []
+      }
+    },
+    {
+      "request": {
+        "deadline_unix_ms": 61000,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "operation": "replace_text_in_rect",
+        "operation_id": "00000000-0000-4000-8000-000000000003",
+        "payload": {
+          "font_path": null,
+          "new_text": "replacement",
+          "old_text": "original",
+          "output_path": "scratch/output.pdf",
+          "page_num": 0,
+          "pdf_path": "fixtures/input.pdf",
+          "rect": [
+            10.0,
+            20.0,
+            110.0,
+            40.0
+          ]
+        },
+        "protocol_version": "1.0.0",
+        "submitted_at_unix_ms": 1000
+      },
+      "response": {
+        "applied_count": 1,
+        "capability_tier": "pro",
+        "disposition": "succeeded",
+        "failure": null,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "metrics": {
+          "duration_ms": 3,
+          "gc_collections": 0,
+          "open_handles_after": 4,
+          "open_handles_before": 4,
+          "rss_after_bytes": 1000000,
+          "rss_before_bytes": 1000000
+        },
+        "operation": "replace_text_in_rect",
+        "operation_id": "00000000-0000-4000-8000-000000000003",
+        "output_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "payload": {
+          "fixture": "ok"
+        },
+        "protocol_version": "1.0.0",
+        "requested_count": 1,
+        "warnings": []
+      }
+    },
+    {
+      "request": {
+        "deadline_unix_ms": 61000,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "operation": "find_text_block_at_click",
+        "operation_id": "00000000-0000-4000-8000-000000000004",
+        "payload": {
+          "page_num": 0,
+          "pdf_path": "fixtures/input.pdf",
+          "x": 50.0,
+          "y": 30.0
+        },
+        "protocol_version": "1.0.0",
+        "submitted_at_unix_ms": 1000
+      },
+      "response": {
+        "applied_count": null,
+        "capability_tier": "core",
+        "disposition": "succeeded",
+        "failure": null,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "metrics": {
+          "duration_ms": 4,
+          "gc_collections": 0,
+          "open_handles_after": 4,
+          "open_handles_before": 4,
+          "rss_after_bytes": 1000000,
+          "rss_before_bytes": 1000000
+        },
+        "operation": "find_text_block_at_click",
+        "operation_id": "00000000-0000-4000-8000-000000000004",
+        "output_sha256": null,
+        "payload": {
+          "fixture": "ok"
+        },
+        "protocol_version": "1.0.0",
+        "requested_count": null,
+        "warnings": []
+      }
+    },
+    {
+      "request": {
+        "deadline_unix_ms": 61000,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "operation": "get_all_transactions",
+        "operation_id": "00000000-0000-4000-8000-000000000005",
+        "payload": {
+          "pdf_path": "fixtures/input.pdf"
+        },
+        "protocol_version": "1.0.0",
+        "submitted_at_unix_ms": 1000
+      },
+      "response": {
+        "applied_count": null,
+        "capability_tier": "core",
+        "disposition": "succeeded",
+        "failure": null,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "metrics": {
+          "duration_ms": 5,
+          "gc_collections": 0,
+          "open_handles_after": 4,
+          "open_handles_before": 4,
+          "rss_after_bytes": 1000000,
+          "rss_before_bytes": 1000000
+        },
+        "operation": "get_all_transactions",
+        "operation_id": "00000000-0000-4000-8000-000000000005",
+        "output_sha256": null,
+        "payload": {
+          "fixture": "ok"
+        },
+        "protocol_version": "1.0.0",
+        "requested_count": null,
+        "warnings": []
+      }
+    },
+    {
+      "request": {
+        "deadline_unix_ms": 61000,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "operation": "analyze_document_layout",
+        "operation_id": "00000000-0000-4000-8000-000000000006",
+        "payload": {
+          "pdf_path": "fixtures/input.pdf"
+        },
+        "protocol_version": "1.0.0",
+        "submitted_at_unix_ms": 1000
+      },
+      "response": {
+        "applied_count": null,
+        "capability_tier": "core",
+        "disposition": "succeeded",
+        "failure": null,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "metrics": {
+          "duration_ms": 6,
+          "gc_collections": 0,
+          "open_handles_after": 4,
+          "open_handles_before": 4,
+          "rss_after_bytes": 1000000,
+          "rss_before_bytes": 1000000
+        },
+        "operation": "analyze_document_layout",
+        "operation_id": "00000000-0000-4000-8000-000000000006",
+        "output_sha256": null,
+        "payload": {
+          "fixture": "ok"
+        },
+        "protocol_version": "1.0.0",
+        "requested_count": null,
+        "warnings": []
+      }
+    },
+    {
+      "request": {
+        "deadline_unix_ms": 61000,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "operation": "complete_font_with_adaption",
+        "operation_id": "00000000-0000-4000-8000-000000000007",
+        "payload": {
+          "font_name": "FixtureFont",
+          "pdf_path": "fixtures/input.pdf"
+        },
+        "protocol_version": "1.0.0",
+        "submitted_at_unix_ms": 1000
+      },
+      "response": {
+        "applied_count": null,
+        "capability_tier": "pro",
+        "disposition": "succeeded",
+        "failure": null,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "metrics": {
+          "duration_ms": 7,
+          "gc_collections": 0,
+          "open_handles_after": 4,
+          "open_handles_before": 4,
+          "rss_after_bytes": 1000000,
+          "rss_before_bytes": 1000000
+        },
+        "operation": "complete_font_with_adaption",
+        "operation_id": "00000000-0000-4000-8000-000000000007",
+        "output_sha256": null,
+        "payload": {
+          "fixture": "ok"
+        },
+        "protocol_version": "1.0.0",
+        "requested_count": null,
+        "warnings": []
+      }
+    },
+    {
+      "request": {
+        "deadline_unix_ms": 61000,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "operation": "deep_font_replication",
+        "operation_id": "00000000-0000-4000-8000-000000000008",
+        "payload": {
+          "font_name": "FixtureFont",
+          "output_dir": "scratch/fonts",
+          "pdf_path": "fixtures/input.pdf"
+        },
+        "protocol_version": "1.0.0",
+        "submitted_at_unix_ms": 1000
+      },
+      "response": {
+        "applied_count": null,
+        "capability_tier": "pro",
+        "disposition": "succeeded",
+        "failure": null,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "metrics": {
+          "duration_ms": 8,
+          "gc_collections": 0,
+          "open_handles_after": 4,
+          "open_handles_before": 4,
+          "rss_after_bytes": 1000000,
+          "rss_before_bytes": 1000000
+        },
+        "operation": "deep_font_replication",
+        "operation_id": "00000000-0000-4000-8000-000000000008",
+        "output_sha256": null,
+        "payload": {
+          "fixture": "ok"
+        },
+        "protocol_version": "1.0.0",
+        "requested_count": null,
+        "warnings": []
+      }
+    },
+    {
+      "request": {
+        "deadline_unix_ms": 61000,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "operation": "apply_many_edits",
+        "operation_id": "00000000-0000-4000-8000-000000000009",
+        "payload": {
+          "edits": [
+            {
+              "new_text": "replacement",
+              "old_text": "original",
+              "page": 0,
+              "rect": [
+                10.0,
+                20.0,
+                110.0,
+                40.0
+              ]
+            }
+          ],
+          "font_path": null,
+          "output_path": "scratch/output.pdf",
+          "pdf_path": "fixtures/input.pdf"
+        },
+        "protocol_version": "1.0.0",
+        "submitted_at_unix_ms": 1000
+      },
+      "response": {
+        "applied_count": 1,
+        "capability_tier": "pro",
+        "disposition": "succeeded",
+        "failure": null,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "metrics": {
+          "duration_ms": 9,
+          "gc_collections": 0,
+          "open_handles_after": 4,
+          "open_handles_before": 4,
+          "rss_after_bytes": 1000000,
+          "rss_before_bytes": 1000000
+        },
+        "operation": "apply_many_edits",
+        "operation_id": "00000000-0000-4000-8000-000000000009",
+        "output_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "payload": {
+          "fixture": "ok"
+        },
+        "protocol_version": "1.0.0",
+        "requested_count": 1,
+        "warnings": []
+      }
+    },
+    {
+      "request": {
+        "deadline_unix_ms": 61000,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "operation": "chunk_pdf_for_docai",
+        "operation_id": "00000000-0000-4000-8000-000000000010",
+        "payload": {
+          "max_pages_per_chunk": 30,
+          "output_dir": "scratch/chunks",
+          "pdf_path": "fixtures/input.pdf"
+        },
+        "protocol_version": "1.0.0",
+        "submitted_at_unix_ms": 1000
+      },
+      "response": {
+        "applied_count": null,
+        "capability_tier": "core",
+        "disposition": "succeeded",
+        "failure": null,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "metrics": {
+          "duration_ms": 10,
+          "gc_collections": 0,
+          "open_handles_after": 4,
+          "open_handles_before": 4,
+          "rss_after_bytes": 1000000,
+          "rss_before_bytes": 1000000
+        },
+        "operation": "chunk_pdf_for_docai",
+        "operation_id": "00000000-0000-4000-8000-000000000010",
+        "output_sha256": null,
+        "payload": {
+          "fixture": "ok"
+        },
+        "protocol_version": "1.0.0",
+        "requested_count": null,
+        "warnings": []
+      }
+    },
+    {
+      "request": {
+        "deadline_unix_ms": 61000,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "operation": "analyze_fonts",
+        "operation_id": "00000000-0000-4000-8000-000000000011",
+        "payload": {
+          "pdf_path": "fixtures/input.pdf"
+        },
+        "protocol_version": "1.0.0",
+        "submitted_at_unix_ms": 1000
+      },
+      "response": {
+        "applied_count": null,
+        "capability_tier": "core",
+        "disposition": "succeeded",
+        "failure": null,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "metrics": {
+          "duration_ms": 11,
+          "gc_collections": 0,
+          "open_handles_after": 4,
+          "open_handles_before": 4,
+          "rss_after_bytes": 1000000,
+          "rss_before_bytes": 1000000
+        },
+        "operation": "analyze_fonts",
+        "operation_id": "00000000-0000-4000-8000-000000000011",
+        "output_sha256": null,
+        "payload": {
+          "fixture": "ok"
+        },
+        "protocol_version": "1.0.0",
+        "requested_count": null,
+        "warnings": []
+      }
+    },
+    {
+      "request": {
+        "deadline_unix_ms": 61000,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "operation": "replicate_font_for_missing_chars",
+        "operation_id": "00000000-0000-4000-8000-000000000012",
+        "payload": {
+          "font_name": "FixtureFont",
+          "missing_chars": [
+            "€"
+          ],
+          "output_dir": "scratch/fonts",
+          "pdf_path": "fixtures/input.pdf"
+        },
+        "protocol_version": "1.0.0",
+        "submitted_at_unix_ms": 1000
+      },
+      "response": {
+        "applied_count": null,
+        "capability_tier": "pro",
+        "disposition": "succeeded",
+        "failure": null,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "metrics": {
+          "duration_ms": 12,
+          "gc_collections": 0,
+          "open_handles_after": 4,
+          "open_handles_before": 4,
+          "rss_after_bytes": 1000000,
+          "rss_before_bytes": 1000000
+        },
+        "operation": "replicate_font_for_missing_chars",
+        "operation_id": "00000000-0000-4000-8000-000000000012",
+        "output_sha256": null,
+        "payload": {
+          "fixture": "ok"
+        },
+        "protocol_version": "1.0.0",
+        "requested_count": null,
+        "warnings": []
+      }
+    },
+    {
+      "request": {
+        "deadline_unix_ms": 61000,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "operation": "clone_pages",
+        "operation_id": "00000000-0000-4000-8000-000000000013",
+        "payload": {
+          "output_path": "scratch/output.pdf",
+          "page_indices": [
+            0
+          ],
+          "pdf_path": "fixtures/input.pdf"
+        },
+        "protocol_version": "1.0.0",
+        "submitted_at_unix_ms": 1000
+      },
+      "response": {
+        "applied_count": 1,
+        "capability_tier": "core",
+        "disposition": "succeeded",
+        "failure": null,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "metrics": {
+          "duration_ms": 13,
+          "gc_collections": 0,
+          "open_handles_after": 4,
+          "open_handles_before": 4,
+          "rss_after_bytes": 1000000,
+          "rss_before_bytes": 1000000
+        },
+        "operation": "clone_pages",
+        "operation_id": "00000000-0000-4000-8000-000000000013",
+        "output_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "payload": {
+          "fixture": "ok"
+        },
+        "protocol_version": "1.0.0",
+        "requested_count": 1,
+        "warnings": []
+      }
+    },
+    {
+      "request": {
+        "deadline_unix_ms": 61000,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "operation": "remove_pages",
+        "operation_id": "00000000-0000-4000-8000-000000000014",
+        "payload": {
+          "output_path": "scratch/output.pdf",
+          "page_indices": [
+            1
+          ],
+          "pdf_path": "fixtures/input.pdf"
+        },
+        "protocol_version": "1.0.0",
+        "submitted_at_unix_ms": 1000
+      },
+      "response": {
+        "applied_count": 1,
+        "capability_tier": "core",
+        "disposition": "succeeded",
+        "failure": null,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "metrics": {
+          "duration_ms": 14,
+          "gc_collections": 0,
+          "open_handles_after": 4,
+          "open_handles_before": 4,
+          "rss_after_bytes": 1000000,
+          "rss_before_bytes": 1000000
+        },
+        "operation": "remove_pages",
+        "operation_id": "00000000-0000-4000-8000-000000000014",
+        "output_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "payload": {
+          "fixture": "ok"
+        },
+        "protocol_version": "1.0.0",
+        "requested_count": 1,
+        "warnings": []
+      }
+    },
+    {
+      "request": {
+        "deadline_unix_ms": 61000,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "operation": "render_page_to_png",
+        "operation_id": "00000000-0000-4000-8000-000000000015",
+        "payload": {
+          "dpi": 144.0,
+          "page_num": 0,
+          "pdf_path": "fixtures/input.pdf"
+        },
+        "protocol_version": "1.0.0",
+        "submitted_at_unix_ms": 1000
+      },
+      "response": {
+        "applied_count": null,
+        "capability_tier": "core",
+        "disposition": "succeeded",
+        "failure": null,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "metrics": {
+          "duration_ms": 15,
+          "gc_collections": 0,
+          "open_handles_after": 4,
+          "open_handles_before": 4,
+          "rss_after_bytes": 1000000,
+          "rss_before_bytes": 1000000
+        },
+        "operation": "render_page_to_png",
+        "operation_id": "00000000-0000-4000-8000-000000000015",
+        "output_sha256": null,
+        "payload": {
+          "fixture": "ok"
+        },
+        "protocol_version": "1.0.0",
+        "requested_count": null,
+        "warnings": []
+      }
+    }
+  ],
+  "protocol_version": "1.0.0"
+}

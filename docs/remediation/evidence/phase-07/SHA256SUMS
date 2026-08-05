@@ -1,0 +1,10 @@
+0df22e46c09ad67b1226b154130c30b078e7707f69eb64f131b54a97fb75a529  docs/remediation/evidence/phase-07/candidate.tsv
+f0f0d83b234f29cadb0d59272017fc2a15f645ea9b7746d45f28ca07ca937d72  docs/remediation/evidence/phase-07/change-stat.txt
+0476f53f897a635f6432eb88a41a31519d3d2240035066bc395c92d7195a841a  docs/remediation/evidence/phase-07/changed-paths.tsv
+90faba7d18fbaa1789a03386e55d4d3106a2790b25bb8213fa2a274ecb335095  docs/remediation/evidence/phase-07/ci-jobs.json
+a7faf0e8f156e1f25bfd097d4585979aaf28ef6f0d43fbe5a067e8a714716e08  docs/remediation/evidence/phase-07/ci-run.json
+c233ace53d0367dd807987165f15853d44a777093139f8346e788c14563824c5  docs/remediation/evidence/phase-07/ci-summary.tsv
+ddef74bbfeb23e5ce98efe22386e501bfedc2722047212ed4d7453afdee9b0d8  docs/remediation/evidence/phase-07/commits.tsv
+d731d810ae1313cd0bb7d6af5341ed71b3dfedb317c90d605b96ee2779128c96  docs/remediation/evidence/phase-07/critical-files-sha256.txt
+3dfb8f7b09e39f883822701df92fde2c25c92582a43c2073dbb504d9da43e7c9  docs/remediation/evidence/phase-07/local-summary.tsv
+4f00c65f9d3e3ed2bb2917fbaa5ac61c86c9f22724c23a2a3816128af01bfe7a  docs/remediation/evidence/phase-07/manifest.md

@@ -1,0 +1,12 @@
+93d6c6f54e81929279fe6aaa7cd01ce459c67033	2026-08-01T19:00:33+00:00	fix(pdf): remove lossy fidelity fallbacks
+1f390689f03b9fa5bd7ecb13adb396b7d9459ea4	2026-08-01T19:13:15+00:00	fix(pdf): require exact native target identity
+49646c365136ad6e1bfdce7beb1abf666c66eb73	2026-08-01T19:23:59+00:00	fix(pdf): enforce stable batch target identity
+17d722ef6840324d31c4051ee8e74130c0a40681	2026-08-01T19:34:52+00:00	fix(pdf): unify single edits with exact contract
+9a3a6a942e7d521a12b9f4753107ac29dc05c2e8	2026-08-01T19:42:10+00:00	fix(pdf): map rotated and cropped native targets
+09661a439bbd513bc24ff1d39cae6daf7303f54a	2026-08-01T19:48:39+00:00	fix(pdf): make page surgery exact and atomic
+8934d88f6605db879dc3a7996b9665856848f64f	2026-08-01T19:57:39+00:00	fix(pdf): pin and verify Pdfium runtime
+6f49470d0c645903ab2b5bea8745702877b99d49	2026-08-01T20:16:54+00:00	fix(pdf): fail closed on font substitution
+757672591b0049c8c5acf32b34bf73ac40ef128e	2026-08-01T21:21:18+00:00	fix(pdf): make segmented publication atomic and fail closed
+d38284b6248e2292506acf9a1caf123dadc4a513	2026-08-01T21:42:23+00:00	test(pdf): align full suite with strict publication contracts
+652278a36995806233c6ebfc6ac9b14812157679	2026-08-01T21:50:28+00:00	test(cli): isolate optional credential state
+913672163fb5eee329a3b2b63e8ae601958fda63	2026-08-01T21:59:26+00:00	fix(protocol): generate stable edit identities

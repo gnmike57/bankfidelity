@@ -1,0 +1,12 @@
+job_id	job	conclusion
+91450137725	deferred hardening inventory	failure
+91450137735	optional PyMuPDF Pro import (windows-latest)	success
+91450137738	base state (macos-14)	success
+91450137739	base state (windows-latest)	success
+91450137742	rustfmt	success
+91450137747	clippy production surfaces	success
+91450137751	base state (ubuntu-latest)	success
+91450137754	optional PyMuPDF Pro import (macos-14)	success
+91450535515	P0 integrity regressions (macos-14)	success
+91450535516	P0 integrity regressions (ubuntu-latest)	success
+91450535517	P0 integrity regressions (windows-latest)	success

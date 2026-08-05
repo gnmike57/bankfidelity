@@ -1,0 +1,4 @@
+base_sha=8688ebb6281d8bf0c8a286d3a1f0a9991e5da20e
+candidate_sha=c84c631e62590a366608b9dd2d9c20c476568f78
+workflow_run=30698338534
+workflow_url=https://github.com/rogertqq-code/bank-statement-fidelity-editor/actions/runs/30698338534

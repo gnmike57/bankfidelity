@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "profiles": {
+    "9ed4d2ca2424d96d2c04cae7ef6d2577d18623672e131f66c22a7fadb3a588d9": {
+      "name": "ANZ Aeonik2.0 Regular money subset",
+      "font_program_sha256": "9ed4d2ca2424d96d2c04cae7ef6d2577d18623672e131f66c22a7fadb3a588d9",
+      "font_base_name": "AAAAAB+Aeonik2.0-Regular",
+      "font_trace_name": "Aeonik2.0-Regular",
+      "pdf_subtype": "Type0",
+      "encoding": "Identity-H",
+      "character_to_cid": {
+        "$": 58,
+        ",": 59,
+        ".": 51,
+        "0": 15,
+        "1": 19,
+        "2": 12,
+        "3": 18,
+        "4": 16,
+        "5": 22,
+        "6": 35,
+        "7": 50,
+        "8": 57,
+        "9": 13
+      },
+      "cid_advance_em": {
+        "12": 0.535,
+        "13": 0.592,
+        "15": 0.617,
+        "16": 0.587,
+        "18": 0.57,
+        "19": 0.318,
+        "22": 0.568,
+        "35": 0.592,
+        "50": 0.512,
+        "51": 0.206,
+        "57": 0.59,
+        "58": 0.607,
+        "59": 0.206
+      },
+      "evidence": {
+        "authorized_fixture": "AU Bank Statements/anz_example.pdf",
+        "alignment_count": 14,
+        "minimum_ocr_native_overlap": 0.9891130004640787,
+        "mapping_conflicts": 0,
+        "required_money_characters_missing": 0
+      }
+    },
+    "4d96294fbff43c3b4ec43d62857423ccd9ad3086efd0fe5294927beae6a3621e": {
+      "name": "Bankwest Arial-BoldMT verified amount subset",
+      "font_program_sha256": "4d96294fbff43c3b4ec43d62857423ccd9ad3086efd0fe5294927beae6a3621e",
+      "font_base_name": "EAAAAD+Arial-BoldMT",
+      "font_trace_name": "Arial-BoldMT",
+      "pdf_subtype": "Type0",
+      "encoding": "Identity-H",
+      "character_to_cid": {
+        "$": 46,
+        ".": 47,
+        "0": 13,
+        "1": 17,
+        "2": 21,
+        "3": 12,
+        "4": 18,
+        "5": 15,
+        "7": 16,
+        "8": 22,
+        "9": 48
+      },
+      "cid_advance_em": {
+        "12": 0.55615234375,
+        "13": 0.55615234375,
+        "15": 0.55615234375,
+        "16": 0.55615234375,
+        "17": 0.55615234375,
+        "18": 0.55615234375,
+        "21": 0.55615234375,
+        "22": 0.55615234375,
+        "46": 0.55615234375,
+        "47": 0.27783203125,
+        "48": 0.55615234375
+      },
+      "evidence": {
+        "authorized_fixture": "AU Bank Statements/bankwest_example.pdf",
+        "native_trace_sample_count": 14,
+        "mapping_conflicts": 0,
+        "unsupported_characters": [",", "6"],
+        "coverage_policy": "fail-closed outside the listed character_to_cid map"
+      }
+    }
+  }
+}

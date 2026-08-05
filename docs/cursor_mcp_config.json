@@ -1,0 +1,13 @@
+{
+    "mcpServers":  {
+                       "bankfidelity":  {
+                                            "args":  [
+                                                         "C:\\bankfidelity\\bankfidelity\\scripts\\mcp_server.py"
+                                                     ],
+                                            "env":  {
+                                                        "BANKFIDELITY_ENV":  "C:\\bankfidelity\\bankfidelity\\.env"
+                                                    },
+                                            "command":  "python3"
+                                        }
+                   }
+}

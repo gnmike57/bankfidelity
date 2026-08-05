@@ -1,0 +1,171 @@
+[package]
+name = "dual-core-pdf-pipeline"
+version = "1.1.1"
+edition = "2021"
+description = "Deterministic bank-statement extraction, exact-target PDF editing, and evidence-gated fidelity verification"
+authors = ["gnmike57 and contributors"]
+repository = "https://github.com/gnmike57/bankfidelity"
+homepage = "https://github.com/gnmike57/bankfidelity"
+documentation = "https://github.com/gnmike57/bankfidelity/blob/master/docs/ARCHITECTURE.md"
+keywords = ["pdf", "bank-statement", "fidelity", "egui", "finance"]
+categories = ["command-line-utilities", "gui"]
+license = "MIT OR Apache-2.0"
+rust-version = "1.89.0"
+default-run = "dual-core-pdf-pipeline"
+
+[features]
+default = ["otel"]
+dev = []
+# Recommendation #8: OTLP/OpenTelemetry export is opt-in. Enabled by default
+# for parity with previous behaviour, but can be disabled (e.g. for the
+# desktop GUI) to skip exporter init cost when no collector is configured:
+#   cargo build --no-default-features --features <...>
+otel = ["dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp", "dep:tracing-opentelemetry"]
+# Recommendation #4: pure-Rust OCR (ocrs + rten). Off by default because the
+# rten/ocrs crates add significant compile time and the OCR model files in
+# models/ are not shipped with the repository. Enable explicitly when models
+# are present:
+#   cargo build --features ocr
+ocr = ["dep:ocrs", "dep:rten", "dep:rten-imageproc", "dep:rten-tensor"]
+# Local LLM support for air-gapped deployments (ADR-0004)
+local-llm = []
+
+[dependencies]
+pdfium-render = "0.8"
+
+clap = { version = "4.5", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+reqwest = { version = "0.12", features = ["json", "rustls-tls", "multipart", "blocking", "stream"] }
+urlencoding = "2.1"
+reqwest-middleware = { version = "0.3", features = ["json", "multipart"] }
+reqwest-retry = "0.6"
+chacha20poly1305 = "0.10"
+lopdf = "0.42"
+pdf-writer = "0.12"
+dotenvy = "0.15"
+egui = "0.30"                    # Simple, fast, pure-Rust GUI (best for 2026 alpha)
+eframe = "0.30"                  # egui backend for native window
+thiserror = "1.0"                  # Excellent error handling (used in balance_engine + text_editor)
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "fs", "signal"] }
+tokio-util = "0.7"
+futures-util = "0.3"
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde"] }
+anyhow = "1"
+uuid = { version = "1.0", features = ["v4", "serde"] }
+image = "0.25"
+image_hasher = "3"
+tracing-appender = "0.2.5"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt"] }
+# Recommendation #8: OpenTelemetry export is gated behind the `otel` feature
+# so builds that don't need a collector can drop the exporter entirely.
+opentelemetry = { version = "0.27", optional = true }
+opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"], optional = true }
+opentelemetry-otlp = { version = "0.27", features = ["grpc-tonic"], optional = true }
+tracing-opentelemetry = { version = "0.28", optional = true }
+jsonwebtoken = { version = "10", features = ["rust_crypto"] }
+serde_yaml = "0.9.0"
+regex = "1.12.3"
+sha2 = "0.10"
+rfd = "0.14"
+tempfile = "3.27.0"
+egui_extras = { version = "0.30", features = ["svg", "image", "all_loaders"] }
+egui_plot = "0.30"
+confy = "0.6"
+rust_xlsxwriter = "0.64"
+rust_decimal = { version = "1.36", features = ["serde-with-str"] }
+rust_decimal_macros = "1.36"
+dark-light = "2.0.0"
+
+# Pure Rust Stack (Phase 0)
+# PDF Core
+oxidize-pdf = "3.1"
+# pdf-writer already present above
+
+# Typography & Shaping
+skrifa = "0.26"
+write-fonts = "0.35"
+
+ttf-parser = "0.25"
+
+# Data & Math
+polars = { version = "0.46", features = ["lazy", "strings", "regex", "dtype-decimal", "temporal", "cum_agg"] }
+winnow = "0.7"
+
+# Vision & OCR (future phases)
+imageproc = "0.25"
+zeroize = "1.9.0"
+flate2 = "1.1"
+tar = "0.4"
+
+# Recommendation #2/#7: small LRU cache for rendered pages + text blocks.
+lru = "0.18"
+# Recommendation #3: data-parallel CPU loops (already transitively present via
+# polars; declared directly so we can use it explicitly).
+rayon = "1"
+crc32fast = "1.4"
+
+# Recommendation #4: pure-Rust OCR engine (optional, see `ocr` feature).
+ocrs = { version = "0.12", optional = true }
+rten = { version = "0.24", default-features = false, features = ["rten_format"], optional = true }
+rten-imageproc = { version = "0.24", optional = true }
+rten-tensor = { version = "0.24", optional = true }
+typst = "0.14.0"
+subsetter = "0.2.6"
+image-compare = "0.5.0"
+rustybuzz = "0.20.1"
+sysinfo = "0.38.4"
+sentry = { version = "0.48.4", features = ["tracing"] }
+sentry-log = "0.48.4"
+typst-pdf = "0.14.2"
+dirs = "6.0.0"
+rusqlite = { version = "0.31.0", features = ["bundled"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tempfile = "3.27.0"
+rand_core = "0.6"
+rand = "0.8"
+proptest = "1.0"
+assert_cmd = "2.0"
+predicates = "3.1"
+wiremock = "0.6.5"
+egui_kittest = "0.30"
+enigo = "0.2"
+mockito = "1.7.2"
+
+[target.'cfg(windows)'.dev-dependencies]
+# Used only by tests/e2e_rust_uiautomation.rs, which is itself cfg(windows).
+uiautomation = "0.13"
+
+# Profile tweaks
+#
+# The dependency graph (egui + ravif + opentelemetry + reqwest + polars + image)
+# produces a debug PDB > 4 GB on Windows MSVC, which overflows LNK1140.
+# Switching dev profile to packed debug info keeps stack traces but avoids
+# the per-DLL PDB explosion.
+[profile.dev]
+debug = false
+split-debuginfo = "off"
+incremental = true
+
+[profile.test]
+# Match the development profile so dependencies compiled by `cargo check` and
+# `cargo build` can be reused by the base-state tests on every CI host.
+debug = false
+split-debuginfo = "off"
+opt-level = 0
+incremental = true
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+# Recommendation #6: use unwinding (not abort) so the many existing
+# catch_unwind guards (Python actor, render_page, job workers) actually
+# isolate panics in release builds instead of taking down the whole GUI.
+panic = "unwind"
+strip = true
+debug = false

@@ -1,0 +1,33 @@
+# Build artifacts — rebuilt inside the image.
+target/
+**/target/
+
+# Local env / secrets — supply via deploy-time variables instead.
+.env
+.pipeline_key
+
+# VCS + tooling noise.
+.git/
+.github/
+.vscode/
+.traycer/
+.codebuddy/
+.kiro/
+
+# Local data that shouldn't bloat the build context.
+AU Bank Statements/
+output/
+logs/
+logs_test/
+cache/
+audit/
+docs/
+examples/
+*.pdf
+output_test.pdf
+
+# Windows-only native lib; the image installs the Linux libpdfium.so itself.
+pdfium.dll
+
+# Node tooling, if present.
+node_modules/

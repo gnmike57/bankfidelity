@@ -1,0 +1,7 @@
+check	result	evidence
+python_full	PASS	28 passed, 0 failed
+rust_library	PASS	289 passed, 0 failed
+rust_integrations	PASS	complete cargo test --tests surface
+clippy	PASS	-D warnings
+format	PASS	cargo fmt --check
+protocol_parity	PASS	15 generated operations; 18 CI-parity tests

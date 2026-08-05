@@ -1,0 +1,14 @@
+M	.env.example
+M	README.md
+M	docs/TECH_STACK.md
+M	package.json
+M	python/pymupdf_pro_integration.py
+M	python/runtime-manifest.json
+M	src/ai/pdfrest.rs
+M	src/app/config.rs
+M	src/app/error.rs
+M	src/app/gui.rs
+M	src/app/modals.rs
+M	src/engine/verification.rs
+M	src/engine/verification_v2.rs
+M	tests/run_stress_benchmark.py

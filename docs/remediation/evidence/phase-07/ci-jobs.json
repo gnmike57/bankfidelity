@@ -1,0 +1,1625 @@
+{
+  "total_count": 11,
+  "jobs": [
+    {
+      "id": 91450137725,
+      "run_id": 30730576656,
+      "workflow_name": "CI",
+      "head_branch": "master",
+      "run_url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/actions/runs/30730576656",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTqlUYs8AAAAVStpcfQ",
+      "head_sha": "c354094b83e31ca7e026e7749c567931a97a43f4",
+      "url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/actions/jobs/91450137725",
+      "html_url": "https://github.com/flak3dd/bank-statement-fidelity-editor-remediated/actions/runs/30730576656/job/91450137725",
+      "status": "completed",
+      "conclusion": "failure",
+      "created_at": "2026-08-02T03:24:50Z",
+      "started_at": "2026-08-02T03:24:52Z",
+      "completed_at": "2026-08-02T03:31:53Z",
+      "name": "deferred hardening inventory",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-08-02T03:24:53Z",
+          "completed_at": "2026-08-02T03:24:54Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-08-02T03:24:54Z",
+          "completed_at": "2026-08-02T03:24:55Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@master",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-08-02T03:24:55Z",
+          "completed_at": "2026-08-02T03:25:06Z"
+        },
+        {
+          "name": "Install advisory and policy tools",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-08-02T03:25:06Z",
+          "completed_at": "2026-08-02T03:31:48Z"
+        },
+        {
+          "name": "Record dependency advisories",
+          "status": "completed",
+          "conclusion": "failure",
+          "number": 5,
+          "started_at": "2026-08-02T03:31:48Z",
+          "completed_at": "2026-08-02T03:31:52Z"
+        },
+        {
+          "name": "Record dependency policy findings",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 6,
+          "started_at": "2026-08-02T03:31:52Z",
+          "completed_at": "2026-08-02T03:31:52Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-08-02T03:31:52Z",
+          "completed_at": "2026-08-02T03:31:52Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-08-02T03:31:52Z",
+          "completed_at": "2026-08-02T03:31:52Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/check-runs/91450137725",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000000497,
+      "runner_name": "GitHub Actions 1000000497",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 91450137735,
+      "run_id": 30730576656,
+      "workflow_name": "CI",
+      "head_branch": "master",
+      "run_url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/actions/runs/30730576656",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTqlUYs8AAAAVStpchw",
+      "head_sha": "c354094b83e31ca7e026e7749c567931a97a43f4",
+      "url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/actions/jobs/91450137735",
+      "html_url": "https://github.com/flak3dd/bank-statement-fidelity-editor-remediated/actions/runs/30730576656/job/91450137735",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-08-02T03:24:50Z",
+      "started_at": "2026-08-02T03:24:52Z",
+      "completed_at": "2026-08-02T03:25:20Z",
+      "name": "optional PyMuPDF Pro import (windows-latest)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-08-02T03:24:53Z",
+          "completed_at": "2026-08-02T03:24:54Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-08-02T03:24:54Z",
+          "completed_at": "2026-08-02T03:25:00Z"
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-08-02T03:25:00Z",
+          "completed_at": "2026-08-02T03:25:05Z"
+        },
+        {
+          "name": "Install pinned base and Pro packages",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-08-02T03:25:05Z",
+          "completed_at": "2026-08-02T03:25:11Z"
+        },
+        {
+          "name": "Verify exact core, Pro, manifest, and bridge runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-08-02T03:25:11Z",
+          "completed_at": "2026-08-02T03:25:15Z"
+        },
+        {
+          "name": "Run production-bridge smoke with Pro package present",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-08-02T03:25:15Z",
+          "completed_at": "2026-08-02T03:25:16Z"
+        },
+        {
+          "name": "Post Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-08-02T03:25:16Z",
+          "completed_at": "2026-08-02T03:25:16Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-08-02T03:25:16Z",
+          "completed_at": "2026-08-02T03:25:18Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-08-02T03:25:18Z",
+          "completed_at": "2026-08-02T03:25:18Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/check-runs/91450137735",
+      "labels": [
+        "windows-latest"
+      ],
+      "runner_id": 1000000502,
+      "runner_name": "GitHub Actions 1000000502",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 91450137738,
+      "run_id": 30730576656,
+      "workflow_name": "CI",
+      "head_branch": "master",
+      "run_url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/actions/runs/30730576656",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTqlUYs8AAAAVStpcig",
+      "head_sha": "c354094b83e31ca7e026e7749c567931a97a43f4",
+      "url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/actions/jobs/91450137738",
+      "html_url": "https://github.com/flak3dd/bank-statement-fidelity-editor-remediated/actions/runs/30730576656/job/91450137738",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-08-02T03:24:50Z",
+      "started_at": "2026-08-02T03:24:52Z",
+      "completed_at": "2026-08-02T03:27:00Z",
+      "name": "base state (macos-14)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-08-02T03:24:52Z",
+          "completed_at": "2026-08-02T03:24:55Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-08-02T03:24:55Z",
+          "completed_at": "2026-08-02T03:24:57Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@master",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-08-02T03:24:57Z",
+          "completed_at": "2026-08-02T03:25:04Z"
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-08-02T03:25:04Z",
+          "completed_at": "2026-08-02T03:25:05Z"
+        },
+        {
+          "name": "Install Python base runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-08-02T03:25:05Z",
+          "completed_at": "2026-08-02T03:25:06Z"
+        },
+        {
+          "name": "Select Python for PyO3",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-08-02T03:25:06Z",
+          "completed_at": "2026-08-02T03:25:06Z"
+        },
+        {
+          "name": "Install Linux build dependencies",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 7,
+          "started_at": "2026-08-02T03:25:06Z",
+          "completed_at": "2026-08-02T03:25:06Z"
+        },
+        {
+          "name": "Install macOS build dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-08-02T03:25:06Z",
+          "completed_at": "2026-08-02T03:25:08Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-08-02T03:25:08Z",
+          "completed_at": "2026-08-02T03:25:23Z"
+        },
+        {
+          "name": "Python production-bridge smoke",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-08-02T03:25:23Z",
+          "completed_at": "2026-08-02T03:25:24Z"
+        },
+        {
+          "name": "Python runtime manifest, protocol contract, and fixture parity",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-08-02T03:25:24Z",
+          "completed_at": "2026-08-02T03:25:25Z"
+        },
+        {
+          "name": "Offline bundled Python runtime smoke",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-08-02T03:25:25Z",
+          "completed_at": "2026-08-02T03:25:29Z"
+        },
+        {
+          "name": "Compile every host target",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-08-02T03:25:29Z",
+          "completed_at": "2026-08-02T03:25:51Z"
+        },
+        {
+          "name": "Build production executable",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-08-02T03:25:51Z",
+          "completed_at": "2026-08-02T03:26:14Z"
+        },
+        {
+          "name": "Run library tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-08-02T03:26:14Z",
+          "completed_at": "2026-08-02T03:26:33Z"
+        },
+        {
+          "name": "Run portable runtime smoke",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-08-02T03:26:33Z",
+          "completed_at": "2026-08-02T03:26:57Z"
+        },
+        {
+          "name": "Verify executable startup contracts",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-08-02T03:26:57Z",
+          "completed_at": "2026-08-02T03:26:57Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 32,
+          "started_at": "2026-08-02T03:26:57Z",
+          "completed_at": "2026-08-02T03:26:57Z"
+        },
+        {
+          "name": "Post Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 33,
+          "started_at": "2026-08-02T03:26:57Z",
+          "completed_at": "2026-08-02T03:26:57Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 34,
+          "started_at": "2026-08-02T03:26:57Z",
+          "completed_at": "2026-08-02T03:26:58Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 35,
+          "started_at": "2026-08-02T03:26:58Z",
+          "completed_at": "2026-08-02T03:26:58Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/check-runs/91450137738",
+      "labels": [
+        "macos-14"
+      ],
+      "runner_id": 1000000495,
+      "runner_name": "GitHub Actions 1000000495",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 91450137739,
+      "run_id": 30730576656,
+      "workflow_name": "CI",
+      "head_branch": "master",
+      "run_url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/actions/runs/30730576656",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTqlUYs8AAAAVStpciw",
+      "head_sha": "c354094b83e31ca7e026e7749c567931a97a43f4",
+      "url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/actions/jobs/91450137739",
+      "html_url": "https://github.com/flak3dd/bank-statement-fidelity-editor-remediated/actions/runs/30730576656/job/91450137739",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-08-02T03:24:50Z",
+      "started_at": "2026-08-02T03:24:52Z",
+      "completed_at": "2026-08-02T03:29:36Z",
+      "name": "base state (windows-latest)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-08-02T03:24:53Z",
+          "completed_at": "2026-08-02T03:24:55Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-08-02T03:24:55Z",
+          "completed_at": "2026-08-02T03:25:00Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@master",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-08-02T03:25:00Z",
+          "completed_at": "2026-08-02T03:25:12Z"
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-08-02T03:25:12Z",
+          "completed_at": "2026-08-02T03:25:17Z"
+        },
+        {
+          "name": "Install Python base runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-08-02T03:25:17Z",
+          "completed_at": "2026-08-02T03:25:22Z"
+        },
+        {
+          "name": "Select Python for PyO3",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-08-02T03:25:22Z",
+          "completed_at": "2026-08-02T03:25:22Z"
+        },
+        {
+          "name": "Install Linux build dependencies",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 7,
+          "started_at": "2026-08-02T03:25:22Z",
+          "completed_at": "2026-08-02T03:25:22Z"
+        },
+        {
+          "name": "Install macOS build dependencies",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 8,
+          "started_at": "2026-08-02T03:25:22Z",
+          "completed_at": "2026-08-02T03:25:22Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-08-02T03:25:22Z",
+          "completed_at": "2026-08-02T03:26:09Z"
+        },
+        {
+          "name": "Python production-bridge smoke",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-08-02T03:26:09Z",
+          "completed_at": "2026-08-02T03:26:10Z"
+        },
+        {
+          "name": "Python runtime manifest, protocol contract, and fixture parity",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-08-02T03:26:10Z",
+          "completed_at": "2026-08-02T03:26:13Z"
+        },
+        {
+          "name": "Offline bundled Python runtime smoke",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-08-02T03:26:13Z",
+          "completed_at": "2026-08-02T03:26:22Z"
+        },
+        {
+          "name": "Compile every host target",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-08-02T03:26:22Z",
+          "completed_at": "2026-08-02T03:27:39Z"
+        },
+        {
+          "name": "Build production executable",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-08-02T03:27:39Z",
+          "completed_at": "2026-08-02T03:28:16Z"
+        },
+        {
+          "name": "Run library tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-08-02T03:28:16Z",
+          "completed_at": "2026-08-02T03:28:49Z"
+        },
+        {
+          "name": "Run portable runtime smoke",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-08-02T03:28:49Z",
+          "completed_at": "2026-08-02T03:29:31Z"
+        },
+        {
+          "name": "Verify executable startup contracts",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-08-02T03:29:31Z",
+          "completed_at": "2026-08-02T03:29:32Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 32,
+          "started_at": "2026-08-02T03:29:32Z",
+          "completed_at": "2026-08-02T03:29:32Z"
+        },
+        {
+          "name": "Post Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 33,
+          "started_at": "2026-08-02T03:29:32Z",
+          "completed_at": "2026-08-02T03:29:32Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 34,
+          "started_at": "2026-08-02T03:29:32Z",
+          "completed_at": "2026-08-02T03:29:34Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 35,
+          "started_at": "2026-08-02T03:29:34Z",
+          "completed_at": "2026-08-02T03:29:34Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/check-runs/91450137739",
+      "labels": [
+        "windows-latest"
+      ],
+      "runner_id": 1000000501,
+      "runner_name": "GitHub Actions 1000000501",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 91450137742,
+      "run_id": 30730576656,
+      "workflow_name": "CI",
+      "head_branch": "master",
+      "run_url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/actions/runs/30730576656",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTqlUYs8AAAAVStpcjg",
+      "head_sha": "c354094b83e31ca7e026e7749c567931a97a43f4",
+      "url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/actions/jobs/91450137742",
+      "html_url": "https://github.com/flak3dd/bank-statement-fidelity-editor-remediated/actions/runs/30730576656/job/91450137742",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-08-02T03:24:50Z",
+      "started_at": "2026-08-02T03:24:52Z",
+      "completed_at": "2026-08-02T03:25:10Z",
+      "name": "rustfmt",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-08-02T03:24:53Z",
+          "completed_at": "2026-08-02T03:24:54Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-08-02T03:24:54Z",
+          "completed_at": "2026-08-02T03:24:56Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@master",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-08-02T03:24:56Z",
+          "completed_at": "2026-08-02T03:25:05Z"
+        },
+        {
+          "name": "Check formatting",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-08-02T03:25:05Z",
+          "completed_at": "2026-08-02T03:25:08Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-08-02T03:25:08Z",
+          "completed_at": "2026-08-02T03:25:08Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-08-02T03:25:08Z",
+          "completed_at": "2026-08-02T03:25:08Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/check-runs/91450137742",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000000498,
+      "runner_name": "GitHub Actions 1000000498",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 91450137747,
+      "run_id": 30730576656,
+      "workflow_name": "CI",
+      "head_branch": "master",
+      "run_url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/actions/runs/30730576656",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTqlUYs8AAAAVStpckw",
+      "head_sha": "c354094b83e31ca7e026e7749c567931a97a43f4",
+      "url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/actions/jobs/91450137747",
+      "html_url": "https://github.com/flak3dd/bank-statement-fidelity-editor-remediated/actions/runs/30730576656/job/91450137747",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-08-02T03:24:50Z",
+      "started_at": "2026-08-02T03:24:54Z",
+      "completed_at": "2026-08-02T03:25:54Z",
+      "name": "clippy production surfaces",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-08-02T03:24:55Z",
+          "completed_at": "2026-08-02T03:24:57Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-08-02T03:24:57Z",
+          "completed_at": "2026-08-02T03:24:58Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@master",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-08-02T03:24:58Z",
+          "completed_at": "2026-08-02T03:25:07Z"
+        },
+        {
+          "name": "Install Linux build dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-08-02T03:25:07Z",
+          "completed_at": "2026-08-02T03:25:19Z"
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-08-02T03:25:19Z",
+          "completed_at": "2026-08-02T03:25:21Z"
+        },
+        {
+          "name": "Install Python base runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-08-02T03:25:21Z",
+          "completed_at": "2026-08-02T03:25:23Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-08-02T03:25:23Z",
+          "completed_at": "2026-08-02T03:25:32Z"
+        },
+        {
+          "name": "Lint production library and binaries",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-08-02T03:25:32Z",
+          "completed_at": "2026-08-02T03:25:51Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-08-02T03:25:51Z",
+          "completed_at": "2026-08-02T03:25:51Z"
+        },
+        {
+          "name": "Post Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-08-02T03:25:51Z",
+          "completed_at": "2026-08-02T03:25:51Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-08-02T03:25:51Z",
+          "completed_at": "2026-08-02T03:25:51Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-08-02T03:25:51Z",
+          "completed_at": "2026-08-02T03:25:51Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/check-runs/91450137747",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000000499,
+      "runner_name": "GitHub Actions 1000000499",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 91450137751,
+      "run_id": 30730576656,
+      "workflow_name": "CI",
+      "head_branch": "master",
+      "run_url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/actions/runs/30730576656",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTqlUYs8AAAAVStpclw",
+      "head_sha": "c354094b83e31ca7e026e7749c567931a97a43f4",
+      "url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/actions/jobs/91450137751",
+      "html_url": "https://github.com/flak3dd/bank-statement-fidelity-editor-remediated/actions/runs/30730576656/job/91450137751",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-08-02T03:24:50Z",
+      "started_at": "2026-08-02T03:24:52Z",
+      "completed_at": "2026-08-02T03:28:14Z",
+      "name": "base state (ubuntu-latest)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-08-02T03:24:53Z",
+          "completed_at": "2026-08-02T03:24:56Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-08-02T03:24:56Z",
+          "completed_at": "2026-08-02T03:24:58Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@master",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-08-02T03:24:58Z",
+          "completed_at": "2026-08-02T03:25:07Z"
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-08-02T03:25:07Z",
+          "completed_at": "2026-08-02T03:25:10Z"
+        },
+        {
+          "name": "Install Python base runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-08-02T03:25:10Z",
+          "completed_at": "2026-08-02T03:25:12Z"
+        },
+        {
+          "name": "Select Python for PyO3",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-08-02T03:25:12Z",
+          "completed_at": "2026-08-02T03:25:12Z"
+        },
+        {
+          "name": "Install Linux build dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-08-02T03:25:12Z",
+          "completed_at": "2026-08-02T03:25:40Z"
+        },
+        {
+          "name": "Install macOS build dependencies",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 8,
+          "started_at": "2026-08-02T03:25:40Z",
+          "completed_at": "2026-08-02T03:25:40Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-08-02T03:25:40Z",
+          "completed_at": "2026-08-02T03:26:12Z"
+        },
+        {
+          "name": "Python production-bridge smoke",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-08-02T03:26:12Z",
+          "completed_at": "2026-08-02T03:26:12Z"
+        },
+        {
+          "name": "Python runtime manifest, protocol contract, and fixture parity",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-08-02T03:26:12Z",
+          "completed_at": "2026-08-02T03:26:14Z"
+        },
+        {
+          "name": "Offline bundled Python runtime smoke",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-08-02T03:26:14Z",
+          "completed_at": "2026-08-02T03:26:19Z"
+        },
+        {
+          "name": "Compile every host target",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-08-02T03:26:19Z",
+          "completed_at": "2026-08-02T03:26:37Z"
+        },
+        {
+          "name": "Build production executable",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-08-02T03:26:37Z",
+          "completed_at": "2026-08-02T03:27:05Z"
+        },
+        {
+          "name": "Run library tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-08-02T03:27:05Z",
+          "completed_at": "2026-08-02T03:27:33Z"
+        },
+        {
+          "name": "Run portable runtime smoke",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-08-02T03:27:33Z",
+          "completed_at": "2026-08-02T03:28:11Z"
+        },
+        {
+          "name": "Verify executable startup contracts",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-08-02T03:28:11Z",
+          "completed_at": "2026-08-02T03:28:11Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 32,
+          "started_at": "2026-08-02T03:28:11Z",
+          "completed_at": "2026-08-02T03:28:11Z"
+        },
+        {
+          "name": "Post Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 33,
+          "started_at": "2026-08-02T03:28:11Z",
+          "completed_at": "2026-08-02T03:28:11Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 34,
+          "started_at": "2026-08-02T03:28:11Z",
+          "completed_at": "2026-08-02T03:28:11Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 35,
+          "started_at": "2026-08-02T03:28:11Z",
+          "completed_at": "2026-08-02T03:28:11Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/check-runs/91450137751",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000000500,
+      "runner_name": "GitHub Actions 1000000500",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 91450137754,
+      "run_id": 30730576656,
+      "workflow_name": "CI",
+      "head_branch": "master",
+      "run_url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/actions/runs/30730576656",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTqlUYs8AAAAVStpcmg",
+      "head_sha": "c354094b83e31ca7e026e7749c567931a97a43f4",
+      "url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/actions/jobs/91450137754",
+      "html_url": "https://github.com/flak3dd/bank-statement-fidelity-editor-remediated/actions/runs/30730576656/job/91450137754",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-08-02T03:24:50Z",
+      "started_at": "2026-08-02T03:24:52Z",
+      "completed_at": "2026-08-02T03:25:05Z",
+      "name": "optional PyMuPDF Pro import (macos-14)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-08-02T03:24:53Z",
+          "completed_at": "2026-08-02T03:24:54Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-08-02T03:24:54Z",
+          "completed_at": "2026-08-02T03:24:56Z"
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-08-02T03:24:56Z",
+          "completed_at": "2026-08-02T03:24:58Z"
+        },
+        {
+          "name": "Install pinned base and Pro packages",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-08-02T03:24:58Z",
+          "completed_at": "2026-08-02T03:25:01Z"
+        },
+        {
+          "name": "Verify exact core, Pro, manifest, and bridge runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-08-02T03:25:01Z",
+          "completed_at": "2026-08-02T03:25:02Z"
+        },
+        {
+          "name": "Run production-bridge smoke with Pro package present",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-08-02T03:25:02Z",
+          "completed_at": "2026-08-02T03:25:02Z"
+        },
+        {
+          "name": "Post Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-08-02T03:25:02Z",
+          "completed_at": "2026-08-02T03:25:02Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-08-02T03:25:02Z",
+          "completed_at": "2026-08-02T03:25:03Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-08-02T03:25:03Z",
+          "completed_at": "2026-08-02T03:25:03Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/check-runs/91450137754",
+      "labels": [
+        "macos-14"
+      ],
+      "runner_id": 1000000496,
+      "runner_name": "GitHub Actions 1000000496",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 91450535515,
+      "run_id": 30730576656,
+      "workflow_name": "CI",
+      "head_branch": "master",
+      "run_url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/actions/runs/30730576656",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTqlUYs8AAAAVSuBuWw",
+      "head_sha": "c354094b83e31ca7e026e7749c567931a97a43f4",
+      "url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/actions/jobs/91450535515",
+      "html_url": "https://github.com/flak3dd/bank-statement-fidelity-editor-remediated/actions/runs/30730576656/job/91450535515",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-08-02T03:29:37Z",
+      "started_at": "2026-08-02T03:29:40Z",
+      "completed_at": "2026-08-02T03:32:15Z",
+      "name": "P0 integrity regressions (macos-14)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-08-02T03:29:41Z",
+          "completed_at": "2026-08-02T03:29:43Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-08-02T03:29:43Z",
+          "completed_at": "2026-08-02T03:29:45Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@master",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-08-02T03:29:45Z",
+          "completed_at": "2026-08-02T03:29:55Z"
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-08-02T03:29:55Z",
+          "completed_at": "2026-08-02T03:29:58Z"
+        },
+        {
+          "name": "Install pinned Python and PyMuPDF Pro runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-08-02T03:29:58Z",
+          "completed_at": "2026-08-02T03:30:01Z"
+        },
+        {
+          "name": "Verify exact core, Pro, manifest, and bridge runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-08-02T03:30:01Z",
+          "completed_at": "2026-08-02T03:30:02Z"
+        },
+        {
+          "name": "Select Python for PyO3",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-08-02T03:30:02Z",
+          "completed_at": "2026-08-02T03:30:02Z"
+        },
+        {
+          "name": "Install Linux build dependencies",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 8,
+          "started_at": "2026-08-02T03:30:02Z",
+          "completed_at": "2026-08-02T03:30:02Z"
+        },
+        {
+          "name": "Install macOS build dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-08-02T03:30:02Z",
+          "completed_at": "2026-08-02T03:30:05Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-08-02T03:30:05Z",
+          "completed_at": "2026-08-02T03:30:35Z"
+        },
+        {
+          "name": "Pro-installed worker protocol and exact-count contract",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-08-02T03:30:35Z",
+          "completed_at": "2026-08-02T03:30:37Z"
+        },
+        {
+          "name": "Python exact-application regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-08-02T03:30:37Z",
+          "completed_at": "2026-08-02T03:30:38Z"
+        },
+        {
+          "name": "Audit snapshot and tamper regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-08-02T03:30:38Z",
+          "completed_at": "2026-08-02T03:31:27Z"
+        },
+        {
+          "name": "Commit-barrier rollback regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-08-02T03:31:27Z",
+          "completed_at": "2026-08-02T03:31:31Z"
+        },
+        {
+          "name": "Real runtime integrity regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-08-02T03:31:31Z",
+          "completed_at": "2026-08-02T03:32:10Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 28,
+          "started_at": "2026-08-02T03:32:10Z",
+          "completed_at": "2026-08-02T03:32:11Z"
+        },
+        {
+          "name": "Post Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 29,
+          "started_at": "2026-08-02T03:32:11Z",
+          "completed_at": "2026-08-02T03:32:11Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 30,
+          "started_at": "2026-08-02T03:32:11Z",
+          "completed_at": "2026-08-02T03:32:12Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 31,
+          "started_at": "2026-08-02T03:32:12Z",
+          "completed_at": "2026-08-02T03:32:13Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/check-runs/91450535515",
+      "labels": [
+        "macos-14"
+      ],
+      "runner_id": 1000000504,
+      "runner_name": "GitHub Actions 1000000504",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 91450535516,
+      "run_id": 30730576656,
+      "workflow_name": "CI",
+      "head_branch": "master",
+      "run_url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/actions/runs/30730576656",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTqlUYs8AAAAVSuBuXA",
+      "head_sha": "c354094b83e31ca7e026e7749c567931a97a43f4",
+      "url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/actions/jobs/91450535516",
+      "html_url": "https://github.com/flak3dd/bank-statement-fidelity-editor-remediated/actions/runs/30730576656/job/91450535516",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-08-02T03:29:37Z",
+      "started_at": "2026-08-02T03:29:45Z",
+      "completed_at": "2026-08-02T03:31:47Z",
+      "name": "P0 integrity regressions (ubuntu-latest)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-08-02T03:29:46Z",
+          "completed_at": "2026-08-02T03:29:47Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-08-02T03:29:47Z",
+          "completed_at": "2026-08-02T03:29:48Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@master",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-08-02T03:29:48Z",
+          "completed_at": "2026-08-02T03:29:57Z"
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-08-02T03:29:57Z",
+          "completed_at": "2026-08-02T03:29:58Z"
+        },
+        {
+          "name": "Install pinned Python and PyMuPDF Pro runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-08-02T03:29:58Z",
+          "completed_at": "2026-08-02T03:30:01Z"
+        },
+        {
+          "name": "Verify exact core, Pro, manifest, and bridge runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-08-02T03:30:01Z",
+          "completed_at": "2026-08-02T03:30:02Z"
+        },
+        {
+          "name": "Select Python for PyO3",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-08-02T03:30:02Z",
+          "completed_at": "2026-08-02T03:30:02Z"
+        },
+        {
+          "name": "Install Linux build dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-08-02T03:30:02Z",
+          "completed_at": "2026-08-02T03:30:18Z"
+        },
+        {
+          "name": "Install macOS build dependencies",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 9,
+          "started_at": "2026-08-02T03:30:18Z",
+          "completed_at": "2026-08-02T03:30:18Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-08-02T03:30:18Z",
+          "completed_at": "2026-08-02T03:30:32Z"
+        },
+        {
+          "name": "Pro-installed worker protocol and exact-count contract",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-08-02T03:30:32Z",
+          "completed_at": "2026-08-02T03:30:34Z"
+        },
+        {
+          "name": "Python exact-application regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-08-02T03:30:34Z",
+          "completed_at": "2026-08-02T03:30:35Z"
+        },
+        {
+          "name": "Audit snapshot and tamper regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-08-02T03:30:35Z",
+          "completed_at": "2026-08-02T03:31:06Z"
+        },
+        {
+          "name": "Commit-barrier rollback regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-08-02T03:31:06Z",
+          "completed_at": "2026-08-02T03:31:06Z"
+        },
+        {
+          "name": "Real runtime integrity regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-08-02T03:31:06Z",
+          "completed_at": "2026-08-02T03:31:46Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 28,
+          "started_at": "2026-08-02T03:31:46Z",
+          "completed_at": "2026-08-02T03:31:46Z"
+        },
+        {
+          "name": "Post Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 29,
+          "started_at": "2026-08-02T03:31:46Z",
+          "completed_at": "2026-08-02T03:31:46Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 30,
+          "started_at": "2026-08-02T03:31:46Z",
+          "completed_at": "2026-08-02T03:31:47Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 31,
+          "started_at": "2026-08-02T03:31:47Z",
+          "completed_at": "2026-08-02T03:31:47Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/check-runs/91450535516",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000000505,
+      "runner_name": "GitHub Actions 1000000505",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 91450535517,
+      "run_id": 30730576656,
+      "workflow_name": "CI",
+      "head_branch": "master",
+      "run_url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/actions/runs/30730576656",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTqlUYs8AAAAVSuBuXQ",
+      "head_sha": "c354094b83e31ca7e026e7749c567931a97a43f4",
+      "url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/actions/jobs/91450535517",
+      "html_url": "https://github.com/flak3dd/bank-statement-fidelity-editor-remediated/actions/runs/30730576656/job/91450535517",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-08-02T03:29:37Z",
+      "started_at": "2026-08-02T03:29:39Z",
+      "completed_at": "2026-08-02T03:41:51Z",
+      "name": "P0 integrity regressions (windows-latest)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-08-02T03:29:40Z",
+          "completed_at": "2026-08-02T03:29:42Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-08-02T03:29:42Z",
+          "completed_at": "2026-08-02T03:29:46Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@master",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-08-02T03:29:46Z",
+          "completed_at": "2026-08-02T03:29:57Z"
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-08-02T03:29:57Z",
+          "completed_at": "2026-08-02T03:30:00Z"
+        },
+        {
+          "name": "Install pinned Python and PyMuPDF Pro runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-08-02T03:30:00Z",
+          "completed_at": "2026-08-02T03:30:05Z"
+        },
+        {
+          "name": "Verify exact core, Pro, manifest, and bridge runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-08-02T03:30:05Z",
+          "completed_at": "2026-08-02T03:30:08Z"
+        },
+        {
+          "name": "Select Python for PyO3",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-08-02T03:30:08Z",
+          "completed_at": "2026-08-02T03:30:08Z"
+        },
+        {
+          "name": "Install Linux build dependencies",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 8,
+          "started_at": "2026-08-02T03:30:08Z",
+          "completed_at": "2026-08-02T03:30:08Z"
+        },
+        {
+          "name": "Install macOS build dependencies",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 9,
+          "started_at": "2026-08-02T03:30:08Z",
+          "completed_at": "2026-08-02T03:30:08Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-08-02T03:30:08Z",
+          "completed_at": "2026-08-02T03:30:12Z"
+        },
+        {
+          "name": "Pro-installed worker protocol and exact-count contract",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-08-02T03:30:12Z",
+          "completed_at": "2026-08-02T03:30:13Z"
+        },
+        {
+          "name": "Python exact-application regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-08-02T03:30:13Z",
+          "completed_at": "2026-08-02T03:30:14Z"
+        },
+        {
+          "name": "Audit snapshot and tamper regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-08-02T03:30:14Z",
+          "completed_at": "2026-08-02T03:38:30Z"
+        },
+        {
+          "name": "Commit-barrier rollback regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-08-02T03:38:30Z",
+          "completed_at": "2026-08-02T03:38:38Z"
+        },
+        {
+          "name": "Real runtime integrity regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-08-02T03:38:38Z",
+          "completed_at": "2026-08-02T03:39:15Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 28,
+          "started_at": "2026-08-02T03:39:15Z",
+          "completed_at": "2026-08-02T03:41:47Z"
+        },
+        {
+          "name": "Post Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 29,
+          "started_at": "2026-08-02T03:41:47Z",
+          "completed_at": "2026-08-02T03:41:47Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 30,
+          "started_at": "2026-08-02T03:41:47Z",
+          "completed_at": "2026-08-02T03:41:49Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 31,
+          "started_at": "2026-08-02T03:41:49Z",
+          "completed_at": "2026-08-02T03:41:49Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/flak3dd/bank-statement-fidelity-editor-remediated/check-runs/91450535517",
+      "labels": [
+        "windows-latest"
+      ],
+      "runner_id": 1000000503,
+      "runner_name": "GitHub Actions 1000000503",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    }
+  ]
+}

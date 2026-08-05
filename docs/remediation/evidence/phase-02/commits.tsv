@@ -1,0 +1,12 @@
+61f0d600702e2a9ea6e034976248fee5c531269c	fix(integrity): require exact batch edit transactions
+851ad5304a9383edcac8fdd87335dc4c21fe06ec	fix(integrity): make preview and render state identical
+7f34f248663500182be4cf0f825facc7e1ceb295	fix(integrity): make audit snapshots immutable copies
+028d968d6ceb47971bd28824f2ef0616b32f70d5	fix(runtime): enforce exactly-once terminal results
+56a2b6a54ab3ef474831eafc2db108491fbd1087	fix(integrity): reject empty statement success
+2a739490e7d74c520c2b458310ea1a8347b3f44c	fix(gui): remove per-keystroke PDF writes
+28555c6d479c2fb84abb5db724c5ba98c601e2cc	fix(audit): verify content-addressed snapshots
+072eda709a5d1ea07483623a83022ebdc53dc239	fix(integrity): add all-or-nothing commit barrier
+3ad8f9d47b68cbe0a876f1cc5727ad21929a2e7e	ci: require P0 integrity regressions
+9ab475ee1289feb9cfbe5fec784efa655b2e033b	fix(geometry): normalize engine bboxes
+6327b7385282a641ab68ff7fc4340a40ee567e66	test(integrity): accept valid span fragmentation
+500167b3caff3090d477c15e1f28f17e92073b57	ci: make P0 Rust setup deterministic

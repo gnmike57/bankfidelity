@@ -1,0 +1,14 @@
+id: macquarie_au
+header_signatures:
+  - "Macquarie"
+  - "Bank"
+  - "Limited"
+  - "AFSL"
+date_format: "%d/%m/%Y"
+amount_regex: "^-?\\$?[0-9,]+\\.\\d{2}$"
+column_x_ranges:
+  date: [40.0, 105.0]
+  description: [110.0, 320.0]
+  debit: [325.0, 405.0]
+  credit: [410.0, 490.0]
+  balance: [495.0, 580.0]

@@ -1,0 +1,32 @@
+020feb69ec2f5140834da40714faae1fa7dff4bf	refactor(runtime): unify workflow state model
+97af5a8b9f255769b7e36f78fb6543cf9c4c64a7	refactor(runtime): route jobs through typed tickets
+c051e257e6fe692c39e730d92fc2635f9322c956	fix(runtime): satisfy routed-job quality gates
+2ee963f81083ca427471d75b382194ec5f5e06ff	feat(runtime): enforce job deadlines and cancellation
+afeda9eb5b0bd52e80d30cb1ca1c0adef118c90d	fix(gui): cancel the exact active workflow job
+1bac81861ec8c92ad2f72b1a3a2426c033b329a3	feat(runtime): add bounded graceful shutdown
+ea1626df0e1ad8138e19cc9a34f7fb1d830918c4	fix(docai): bound batch processing lifecycle
+30429de1056c90663eb0b32188a34bb431aeb7d9	fix(runtime): bound interactive fallback waits
+c5da1786a17ba28271456ce23384cdd430ec63d8	feat(paths): add isolated platform workspaces
+0ee6d57af342fa72cad7c78093f29ded6b452442	fix(startup): use platform root and graceful exit
+eb10920a94f916c3796aa5fed7348520c9ad0cdb	fix(gui): isolate document workspace artifacts
+bc231d072f524e16acd04df0cb9097c912fd3c88	style: apply cross-platform formatter output
+3c870fe1b4902d5c652d8ce68610be903fe4abfb	feat(runtime): add truthful capability registry
+92b144b8bfee933186cef58d73e74528168ee785	fix(gui): gate backends by capability status
+bcb637f0243ed9dff3d13326921f824f0be7ff67	style: format capability registry
+82550fafb57008d24c817ef14c10e1af9bc0015d	refactor(config): own atomic config generations
+2d3fe134fd408d5da9551ff4aa9137b4eaee3c9a	test(config): prove atomic generation snapshots
+3994fd9b4f79a6f815d2440132bba6c823a02f6c	fix(config): migrate final selector test
+c877a93dc63831baabe807c1ac899764fc5fe3e7	fix(runtime): make provider fallback explicit
+9626e978f64d528239f5cee7b15379ab664a3cb7	fix(config): unify settings reload ownership
+e386a0601e18f55ea4cd623395e8c91b1cdfdef8	refactor(config): retire parallel config surface
+79ca0b45d7cf3de87f520249836a56129ea63c26	fix(runtime): honor offline fallback policy
+5c2416c28d785640173549d71a3c182b9dd621e0	fix(runtime): type terminal parser fallback
+116442da00f7de655f63db933a270676ff1219de	fix(test): import public config manager
+b970c9ede34c8e65aac7dcdab090e49c9d096af0	fix(test): migrate native selector config
+17560d7415d4a20b899c981452d74d6a4a29b1b4	refactor(runtime): remove legacy routed constructor
+23b895c8f9be8ae0c782a77edd195ffc1b4f3f4c	refactor(v1): remove remote engine claims
+ca5e5b2202c7cb06e9dfde906b0539a12be6b25b	fix(runtime): standardize operation dispositions
+1db8f88bf49306f9b1274a684f6ea7706038bc9a	feat(runtime): add bounded correlated diagnostics
+8f4637e346c6402860cb892905608c6460cfdc6f	fix(runtime): validate dispositions and diagnostics
+562d3aa67b0afd70640a241b3d1b7bc6631869bb	fix(ci): install complete lint toolchain
+c84c631e62590a366608b9dd2d9c20c476568f78	test(runtime): prove private correlated routing

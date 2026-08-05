@@ -1,0 +1,1849 @@
+﻿================================================================================
+FILE: README.md
+================================================================================
+# Bank Statement Fidelity Editor v0.5.0
+
+A high-fidelity PDF text editor focused on bank statements: replace text and numbers in-place with the original kerning, font, size, color, and position preserved, then keep all transactions and running balances mathematically consistent.
+
+## What it does
+
+- **Targeted edits.** Click any text on a rendered page to select the exact bounding box; type a new value; the engine performs a redaction-based replacement that re-uses the original glyph metrics.
+- **Multi-stage workflow.** Parse â†’ Edit â†’ Balance Preview â†’ Confirm & Render â†’ Visual Validate â†’ Final Math Check, with autosaved drafts so you can pause and resume mid-edit. See [Workflow](#workflow) below.
+- **Multi-backend pipeline with auto-fallback.** Every stage has a configurable primary backend and automatic fallback. If an API key is missing or a cloud service fails, the pipeline gracefully degrades to the next-best offline option. See [Backend Preferences](#backend-preferences).
+- **Boot-time API detection.** On startup the app probes every configured API key and displays availability status (âœ… / â›”) in the Backend Preferences panel. Unavailable backends are labelled with an explanation and signup URL.
+- **Batch Processing Dashboard.** Drag and drop a folder of PDFs to queue up asynchronous extraction or smart auto-balancing across dozens of statements at once.
+- **Progressive Disclosure.** Complex verification settings and forensic modes are tucked behind an "Advanced Mode" toggle, keeping the default UI clean and focused.
+- **Smart Balance Engine.** Parses the full PDF, detects mathematical imbalance, and asks Gemini for the minimum cascading adjustment plan. Only the *last* running balance is auto-corrected by default; everything else stays untouched. Falls back to local deterministic balance analysis when AI is unavailable.
+- **Hybrid extraction.** Multiple parsers (Mindee, LlamaParse, Document AI, PyMuPDF, Local OCR) plus geometry providers (per-bank YAML templates, PyMuPDF heuristics). Sources are merged with deterministic tiebreak rules.
+- **Multi-layer verification.** Renders original vs. edited at 300 DPI, computes per-pixel delta + perceptual hash + SSIM; optionally adds pdfRest cloud rendering and Applitools Eyes visual AI. Configurable thresholds and retry counts via sliders.
+- **Audit log + change history.** Every edit lands in an append-only log file with a snapshot PDF, plus an in-memory undo/redo stack and an autosaved `audit/history.json` so you can resume after a crash. The final step automatically merges the Audit JSON Report as a new page onto the final output PDF.
+- **CLI + GUI parity.** Both interfaces drive the same `Runtime` job loop, so anything you can do in the GUI you can script.
+
+## What it does not do
+
+- It cannot forge Adobe signatures, mimic a commercial MuPDF watermark, or defeat sophisticated forensic detection. Re-saved PDFs may still be flagged as "modified" by tools that read library fingerprints.
+- Without any API keys at all, only manual edit / verify / render with local offline parsing works. The more keys you configure, the more pipeline stages light up.
+- pdfRest, Applitools, and AI vision are additive verification layers â€” they enhance fidelity checking but are not required.
+
+## System dependencies
+
+| OS | Required |
+|---|---|
+| **Windows** | Visual Studio 2019 Build Tools (v142). Python 3.10+. Node.js 18+ (for Applitools). |
+| **macOS** | `brew install mupdf tesseract leptonica`. Python 3.10+. Node.js 18+. |
+| **Linux (Ubuntu)** | `apt-get install libmupdf-dev tesseract-ocr libleptonica-dev`. Python 3.10+. Node.js 18+. |
+
+Python packages: `pip install pymupdf pymupdfpro fonttools pillow`.  
+Node packages (optional): `npm install @applitools/eyes-images` (for visual AI verification).
+
+## Build
+
+```text
+cargo build --release
+```
+
+The release binary is `target/release/dual-core-pdf-pipeline`.
+
+## Configuration
+
+All configuration is via environment variables (or a `.env` file). Copy `.env.example` to `.env` to get started.
+
+### Required Keys
+
+| Variable | Description |
+|---|---|
+| `DUAL_CORE_PASSPHRASE` | Software root-of-trust passphrase (â‰¥16 chars). Alternatively, create a `.pipeline_key` file. |
+
+### AI & Parsing Keys
+
+| Variable | Used By | Fallback If Missing |
+|---|---|---|
+| `GEMINI_API_KEY` | Smart Balance, AI Completeness, Vision Validation | â†’ Manual-only mode (local balance engine) |
+| `GEMINI_AUTH_MODE` | Auth method: `api_key` (default) or `vertex` (enterprise SA/ADC) | Defaults to `api_key` |
+| `MINDEE_API_KEY` | **Default parser** â€” Mindee Financial Document API | â†’ offline parser (PyMuPDF built-in) |
+| `LLAMAPARSE_API_KEY` | LlamaParse LLM-based document parser | â†’ offline parser |
+| `DOCUMENT_AI_PROJECT_ID` | Google Document AI parser | â†’ offline parser |
+| `DOCUMENT_AI_LOCATION` | e.g. `us` | |
+| `DOCUMENT_AI_PROCESSOR_ID` | Processor ID | |
+| `DOCUMENT_AI_API_KEY` | Document AI v1beta3 API key (preferred auth) | â†’ SA/ADC auth |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Path to service-account JSON (legacy fallback) | â†’ ADC auto-detection |
+
+### PDF Engine & Verification Keys
+
+| Variable | Used By | Fallback If Missing |
+|---|---|---|
+| `PYMUPDF_PRO_KEY` | PyMuPDF Pro (enhanced font handling) | â†’ PyMuPDF free tier |
+| `PDFREST_API_KEY` | Adobe-tier cloud rendering for verification | â†’ local Pdfium |
+| `APPLITOOLS_API_KEY` | Applitools Eyes visual AI testing | â†’ graceful skip (SSIM-only) |
+
+### Optional / Telemetry
+
+| Variable | Description |
+|---|---|
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP gRPC endpoint (default: `http://localhost:4317`) |
+| `OTEL_SERVICE_NAME` | Defaults to `dual-core-pdf-pipeline` |
+| `RUST_LOG` | e.g. `info`, `debug` |
+| `LOG_DIR` | Defaults to `./logs` |
+
+Run `dual-core-pdf-pipeline doctor` to print a one-shot health check (env vars set, directories writable, runtime worker reachable).
+
+## Backend Preferences
+
+The **Backend Preferences** panel (Settings â†’ Backend Preferences) lets you choose which backend to use for each pipeline stage. Options that require a missing API key are marked with â›” and show a hover tooltip explaining what's needed.
+
+### PDF Engine
+| Mode | Description | Requires |
+|---|---|---|
+| **Auto** (default) | PyMuPDF first, falls back to Pdfium | Python + pymupdf |
+| Dual Concurrent | Both engines in parallel | Python + pymupdf |
+| Force Native (Pdfium) | Pdfium only | Always available |
+| Force PyMuPDF | PyMuPDF only | Python + pymupdf |
+| Reconstruct (Typst) | Rebuild from scratch via Typst | Always available |
+
+### AI Provider
+| Mode | Description | Requires |
+|---|---|---|
+| **Manual Only** (default) | No AI calls | Nothing |
+| Gemini (API Key) | AI Studio key | `GEMINI_API_KEY` |
+| Gemini (Vertex AI) | Enterprise SA/ADC | Service account + ADC |
+
+### Document Parser
+| Mode | Description | Requires | Fallback |
+|---|---|---|---|
+| **Mindee** (default) | Cloud ML parsing | `MINDEE_API_KEY` | â†’ offline parser |
+| LlamaParse | LLM-based parsing | `LLAMAPARSE_API_KEY` | â†’ offline parser |
+| PyMuPDF Built-in âœ… | Local text extraction | Always available | â€” |
+| Local OCR âœ… | Pure Rust OCR | `--features ocr` | â€” |
+| Document AI | Google ML parsing | GCP credentials | â†’ offline parser |
+
+### Verification Renderer
+| Mode | Description | Requires | Fallback |
+|---|---|---|---|
+| **Local Pdfium** âœ… (default) | Local rendering | Always available | â€” |
+| pdfRest (Cloud) | Adobe-tier rendering | `PDFREST_API_KEY` | â†’ Local Pdfium |
+
+### Visual Validation Thresholds
+| Setting | Default | Range | Description |
+|---|---|---|---|
+| Visual Diff Threshold | 0.02 | 0.005â€“0.10 | Tile-max diff ceiling. Lower = stricter. |
+| Max Visual Retries | 5 | 1â€“10 | Retry attempts with progressive mask widening. |
+
+## CLI
+
+```text
+dual-core-pdf-pipeline gui                                 # launch the GUI
+dual-core-pdf-pipeline serve                               # run headless server (binds 0.0.0.0:$PORT)
+dual-core-pdf-pipeline doctor                              # config health check
+dual-core-pdf-pipeline verify-api-keys                     # verify all API keys
+dual-core-pdf-pipeline text -i in.pdf -o out.pdf \
+    --old "100.00" --new "150.00" --page 0 --bbox 50,40,90,52
+dual-core-pdf-pipeline balance -i in.pdf -o out.pdf [--auto-approve]
+dual-core-pdf-pipeline auto-balance -i in.pdf -o out.pdf   # Smart balance with auto-approve
+dual-core-pdf-pipeline extract -i in.pdf -o data.json
+dual-core-pdf-pipeline verify --original a.pdf --edited b.pdf --output-dir audit/verify [--use-pdfrest]
+dual-core-pdf-pipeline render -i in.pdf -o pages -p 0 --dpi 300
+dual-core-pdf-pipeline font-complete -i in.pdf --font Helvetica
+dual-core-pdf-pipeline analyze-fonts -i in.pdf
+dual-core-pdf-pipeline ai-fix-visual -i in.pdf -p 0
+dual-core-pdf-pipeline docai-train                         # Train a new Document AI processor version
+dual-core-pdf-pipeline fontcache-init                      # Bootstrap font cache
+dual-core-pdf-pipeline transfer-transactions --source-pdf a.pdf --target-pdf b.pdf -o out.pdf
+dual-core-pdf-pipeline adjust-dates -i in.pdf -o out.pdf --mode shift-forward-1-month
+dual-core-pdf-pipeline run-transfer-tests --statements a.pdf,b.pdf
+dual-core-pdf-pipeline export-history --from-log audit/2026.log -o history.json
+```
+
+## GUI shortcuts
+
+- `Ctrl+O` open â€¢ `Ctrl+Z/Y` undo/redo â€¢ `Ctrl+S` export history
+- `+` / `-` zoom â€¢ `0` reset zoom â€¢ `â†/â†’` page nav
+- Middle-drag (or Shift+drag) to pan; Ctrl+wheel to zoom
+
+## Workflow
+
+The application supports two primary flows: **Single Statement** and **Batch Processing**.
+
+### Single Statement Flow
+The right-hand "Workflow" panel walks the user through six stages. Each
+stage is gated by an explicit button click â€” the app never silently
+moves to the next step.
+
+1. **â‘  Parse + AI validate.** The selected document parser extracts every transaction; if an AI provider is configured, Gemini double-checks for missed rows. If the cloud parser fails, the pipeline auto-falls back to the offline parser. Result: a `ParseValidation` with a completeness score (0..1) and a list of any rows the deterministic geometry extractor saw but the parser missed.
+2. **Edit.** The inline edit table (powered by `egui_extras::TableBuilder`) shows every parsed row with editable Date / Description / Debit / Credit / Balance columns. Numeric fields turn red when the typed text isn't parseable. Click "â†¶" on any row to revert every queued edit on that row at once.
+3. **â‘¡ Balance Out Preview.** Recomputes every running balance with the user's edits applied and shows the per-row diff plus the final imbalance. Translucent yellow boxes appear on the canvas over each `will_change` cell â€” hover for a `<old> â†’ <new>` tooltip.
+4. **â‘¢ Confirm and Render.** Applies edits to the PDF using the selected engine mode. If the primary engine fails, the pipeline falls back through Pdfium â†’ Typst Reconstruct as ultimate fail-safe. Drops any "redundant" edits whose typed value already matches what the cascade would produce.
+5. **Visual validate.** Renders the edited PDF, compares to the original page-by-page (only changed pages), retries up to `max_visual_attempts` with growing tolerance. If pdfRest is configured, adds a cloud rendering layer. If Applitools is configured, adds AI visual comparison. Both gracefully degrade if unavailable.
+6. **Final math check.** Re-parses the rendered PDF and verifies all running balances are still consistent.
+
+### Batch Processing Flow
+The **Batch Processing** tab allows for bulk operations across multiple PDFs:
+1. **Load Folder:** Drag and drop a folder containing multiple bank statements.
+2. **Bulk Extraction:** Click "Extract All to JSON" to concurrently extract transactional data from all files.
+3. **Bulk Auto-Balance:** Click "Auto-Balance All" to invoke the Smart Balance Engine on all files.
+
+### Drafts
+
+The whole session (parse, queued edits, stage) autosaves to
+`audit/workflow.json` every 1.5s as you edit. **File â†’ Resume workflow
+draft** restores it; **File â†’ Discard workflow draft** clears it. The
+draft is hashed against the source PDF so the GUI can warn you if you
+re-open the draft against a modified file. On a successful workflow
+completion the draft is automatically removed.
+
+## Architecture
+
+```text
+app/          CLI, GUI, runtime, audit log, telemetry, config, API availability detection
+engine/       Balance math, transaction model, verification (multi-layer), history, layout,
+              typst reconstruction, font analysis/replication/shaping, offline parser
+pdf/          Engine trait + selector (PyMuPDF primary, Pdfium fallback, OxidizePdf)
+extractors/   Geometry providers (per-bank templates, PyMuPDF heuristic) + hybrid merger
+ai/           Document AI, Gemini, Mindee, LlamaParse, pdfRest, Applitools bridge,
+              PyO3 Python bridge
+security/     Software root-of-trust, ChaCha20-Poly1305 encryption
+```
+
+All long-running work goes through the `Runtime` job loop. The GUI never blocks. Python work is funnelled into a single dedicated actor thread to avoid PyO3 cross-thread issues. Panics inside the actor are caught and surfaced as structured errors instead of crashing the process.
+
+### Fallback Hierarchy
+
+Every pipeline stage is designed with explicit fallback chains:
+
+```
+PDF Engine:    PyMuPDF â†’ Pdfium â†’ Typst Reconstruct (ultimate)
+Parsers:       Mindee/LlamaParse/DocAI â†’ offline_parser (PyMuPDF built-in)
+AI Balance:    Gemini â†’ local balance::process_and_reconcile()
+Verification:  pdfRest Cloud â†’ Local Pdfium (always available)
+Visual Check:  Applitools + SSIM + Tile-max + Perceptual Hash (additive layers)
+AI Vision:     Gemini Vision â†’ graceful skip (pass on local metrics only)
+```
+
+### Processing boundary
+
+Version 1 processes documents through the local application runtime. It does not expose or claim a remote document-processing engine. The optional headless server currently provides operational health/readiness endpoints only; any future remote processing service requires a separately designed, authenticated, versioned API and threat model.
+
+## Forensics & watermarking caveats
+
+This tool edits text perfectly but cannot achieve commercial-tool forensic identity. Public watermarking limits apply. See [the original disclaimer](#what-it-does-not-do).
+
+
+================================================================================
+FILE: QUICKSTART.md
+================================================================================
+# Quickstart Guide
+
+Get up and running with the Bank Statement Fidelity Editor v0.5.0 in 7 steps.
+
+## 1. Install System Dependencies
+
+You must install system-level binaries for rendering, OCR geometry extraction, and visual testing.
+
+**Windows:**
+- Visual Studio 2019 Build Tools (v142)
+- Python 3.10+ (`python --version` to confirm)
+- Node.js 18+ (`node --version` to confirm, needed for Applitools)
+
+**macOS:**
+```bash
+brew install mupdf tesseract leptonica
+```
+
+**Ubuntu:**
+```bash
+apt-get install libmupdf-dev tesseract-ocr libleptonica-dev
+```
+
+## 2. Clone and Install Python & Node Packages
+
+Clone the repository and install the Python bindings for PyMuPDF:
+
+```bash
+git clone <repository>
+cd bank-statement-modifier
+pip install pymupdf pymupdfpro fonttools pillow
+npm install @applitools/eyes-images   # optional: for Applitools visual AI
+```
+
+## 3. Configure Environment
+
+Copy the `.env.example` file to `.env` and fill in your API keys:
+
+```bash
+cp .env.example .env
+```
+
+### Required Keys
+| Variable | Where to Get It |
+|---|---|
+| `DUAL_CORE_PASSPHRASE` | Choose a strong passphrase (â‰¥16 chars) |
+| `GEMINI_API_KEY` | [Google AI Studio](https://aistudio.google.com/app/apikey) |
+
+### Recommended Keys (enable cloud pipelines)
+| Variable | Where to Get It | What It Enables |
+|---|---|---|
+| `MINDEE_API_KEY` | [Mindee Platform](https://platform.mindee.com/) | Default document parser (highest accuracy) |
+| `LLAMAPARSE_API_KEY` | [LlamaCloud](https://cloud.llamaindex.ai/) | LLM-based document parser (alternative) |
+| `DOCUMENT_AI_*` | [Google Cloud Console](https://console.cloud.google.com/) | Google Document AI parser + admin |
+| `PDFREST_API_KEY` | [pdfRest](https://pdfrest.com/) | Adobe-tier cloud rendering for verification |
+| `APPLITOOLS_API_KEY` | [Applitools Eyes](https://eyes.applitools.com/) | Visual AI diff testing (additive layer) |
+| `PYMUPDF_PRO_KEY` | [PyMuPDF Pro](https://pymupdf.io/try-pro/) | Enhanced font handling in edit engine |
+
+> **Note:** Every cloud backend has an automatic offline fallback. The app works with zero API keys â€” you just get fewer features. The Backend Preferences panel shows which backends are available (âœ…) or unavailable (â›”).
+
+## 4. Build the Project
+
+Build the Rust pipeline:
+
+```bash
+cargo build --release
+```
+
+For development with relaxed passphrase checks:
+
+```bash
+cargo build --release --features dev
+```
+
+## 5. Launch the GUI
+
+Start the graphical interface:
+
+```bash
+./target/release/dual-core-pdf-pipeline gui
+```
+
+On startup, the app will:
+1. Load your `.env` configuration
+2. Probe all API keys for availability
+3. Log which backends are available (check the console or Settings â†’ Backend Preferences)
+
+## 6. First Edit Walkthrough
+
+1. **Load a Document:** Enter the path to your PDF in the left panel and click "Load Entire Statement".
+2. **Select Text:** Click any text block directly on the rendered PDF canvas. The targeted edit panel will populate with the selected text.
+3. **Edit & Apply:** Modify the text in the "Modified" box and click "ðŸŽ¯ Apply Change". The editor ensures 100% visual fidelity.
+4. **Smart Balancing:** Click "âš–ï¸ Balance Statement" to run document-wide imbalance analysis. Review and apply the AI-proposed cascading adjustments (or local offline analysis if AI is not configured).
+5. **Verify:** Check the "ðŸ” Verify Edits" tool to confirm the integrity of the math and visual layout against the original document.
+6. **Backend Preferences:** Open Settings â†’ Backend Preferences to see all available backends, change parsers, adjust visual thresholds, or switch AI providers.
+7. **Advanced Mode:** Toggle "Advanced Mode" in the top menu bar to reveal deeper forensic tools (Deep Font Replication, pdfRest validation, Typst reconstruction).
+
+## 7. Batch Processing
+
+1. Switch to the **Batch Processing** tab in the top menu bar.
+2. Drag and drop a folder containing multiple PDFs onto the dashboard.
+3. Click **Extract All to JSON** or **Auto-Balance All** to process all statements concurrently in the background.
+
+### Using the CLI
+
+The application offers 100% CLI parity. You can perform the same flows from the terminal:
+
+```bash
+# Balance a statement automatically
+./target/release/dual-core-pdf-pipeline balance --input examples/sample.pdf --output output.pdf --auto-approve
+
+# Extract JSON data
+./target/release/dual-core-pdf-pipeline extract --input examples/sample.pdf --output data.json
+
+# Perform a targeted text edit
+./target/release/dual-core-pdf-pipeline text --input examples/sample.pdf --output output.pdf --old "1,000.00" --new "2,000.00" --bbox 10,20,50,40
+
+# Transfer transactions between PDFs
+./target/release/dual-core-pdf-pipeline transfer-transactions --source-pdf a.pdf --target-pdf b.pdf -o out.pdf
+
+# Run health check
+./target/release/dual-core-pdf-pipeline doctor
+
+# Verify all API keys
+./target/release/dual-core-pdf-pipeline verify-api-keys
+```
+
+
+================================================================================
+FILE: CHANGELOG.md
+================================================================================
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+## [v0.5.1] - 2026-07-05
+
+### Added
+- **Multi-Backend Pipeline Architecture:** Every pipeline stage now supports configurable primary backends with automatic fallback chains. If a cloud API fails or its key is missing, the pipeline gracefully degrades to the next-best offline option.
+- **Boot-Time API Availability Detection:** On startup, the app probes all configured API keys (Gemini, Document AI, Mindee, LlamaParse, pdfRest, Applitools, PyMuPDF Pro) and stores availability status in `ApiAvailability`. Logged to console on boot.
+- **Backend Preferences UI:** New settings panel (`Settings â†’ Backend Preferences`) with:
+  - Selectable backends for AI Provider, Document Parser, PDF Engine, and Verification Renderer.
+  - Unavailable backends marked with â›” and explanatory hover text with signup URLs.
+  - Unified warning banner when critical keys are missing.
+  - Visual diff threshold slider (0.005â€“0.10, default 0.02).
+  - Max visual retry attempts slider (1â€“10, default 5).
+- **Mindee Financial Document Parser:** Added as the default document parser (`DocumentParserMode::MindeeFinDoc`). Requires `MINDEE_API_KEY`.
+- **LlamaParse Integration:** Added as an alternative LLM-based document parser. Requires `LLAMAPARSE_API_KEY`.
+- **Applitools Eyes Integration:** Visual AI testing layer in the verification pipeline. Auto-runs when `APPLITOOLS_API_KEY` is set; gracefully skips otherwise. Node.js bridge at `src/ai/applitools_bridge.js`.
+- **pdfRest Cloud Rendering:** Adobe-tier PDF rendering for verification. Falls back to local Pdfium when `PDFREST_API_KEY` is missing.
+- **Typst Reconstruction Engine:** Ultimate fail-safe edit engine that rebuilds PDFs from scratch using Typst and font subsetting. Kicks in automatically when both PyMuPDF and Pdfium edit paths fail.
+- **Chaos Fallback Tests:** Integration test (`tests/chaos_fallback.rs`) verifying the engine selector gracefully handles complete engine failures.
+- **Transfer Transaction Engine:** Copy transactions between PDFs with font analysis and replication (`Job::TransferTransactions`).
+- **Date Period Adjustment:** Shift statement date ranges forward/backward (`Job::AdjustDatePeriods`).
+- **Document AI Admin:** Train, deploy, undeploy, and manage Document AI processor versions from within the app.
+
+### Changed
+- **Configuration Overhaul:** `AppConfig` now holds `AiProviderMode`, `DocumentParserMode`, `VerificationMode`, and `PdfEngineMode` enums, all persisted via `confy` and hot-reloadable via `Job::ReloadConfig`.
+- **Parser Fallback Logic:** All cloud parsers (Mindee, LlamaParse, Document AI) now auto-fallback to `offline_parser::parse_statement_offline()` when unconfigured or on API error.
+- **Balance Engine Fallback:** When AI is set to `ManualOnly`, balance analysis uses the local `balance::process_and_reconcile()` engine instead of failing.
+- **Verification Pipeline:** Refactored to a multi-layer system: Local SSIM + Tile-max + Perceptual Hash (always) â†’ pdfRest cloud rendering (optional) â†’ Applitools Eyes (optional) â†’ Gemini Vision AI (optional).
+- **README:** Complete rewrite with backend preference tables, fallback chains, and architecture diagrams.
+- **QUICKSTART:** Updated with all new API keys, backend preferences guide, and expanded CLI examples.
+- **.env.example:** Now includes all 11 configurable API keys with signup URLs and descriptions.
+- **Dependency Updates:** Full `cargo update` bringing all dependencies to latest compatible versions.
+
+### Fixed
+- **Clippy Lints:** Fixed `unnecessary-cast` in `typst_engine.rs`, `items-after-test-module` in `offline_parser.rs`, and `single-component-path-imports` in `tests/chaos_fallback.rs`.
+- **OCR Function Ordering:** Moved `extract_text_via_ocr` before test module to comply with Rust 2024 lint rules.
+- **Cargo Temp Cleanup:** Cleared orphaned cargo build artifacts and intermediary files.
+
+## [v0.5.0] - 2026-06-07
+
+### Changed
+- Bumped version to v0.5.0 and updated documentation.
+
+## [v0.4.0] - 2026-05-26
+
+### Added
+- **Smart Balance Engine**: Added the cloud-required Smart Balance Engine pipeline (Document AI -> Hybrid Merging -> Balance Math -> Gemini Proposals).
+- **Hybrid Extraction Layer**: Implemented three geometry providers (`Tesseract`, `PyMuPDF Heuristics`, `Bank Templates`) and a `HybridMerger` to map semantic transactions to spatial bounding boxes.
+- **PdfEngine Trait Abstraction**: Abstracted all PDF manipulation behind a `PdfEngine` trait with a primary `MuPdfEngine` and fallback `PyMuPdfEngine`.
+- **Document AI JWT**: Real RS256 JWT generation and token exchange for Google Cloud Document AI.
+- **Structured Telemetry**: Replaced print debugging with process-wide `tracing` macros, daily file rotation, and an optional OpenTelemetry (OTLP) gRPC exporter.
+- **CLI Parity**: Full feature parity for the CLI, including new `balance --auto-approve` and `extract` subcommands with typed JSON outputs.
+- **Verification Math**: Hardened verification tests to compute mathematical drift correctly against the original unmodified PDF's expected balance.
+- **5 Bank Templates**: Shipped default templates for Chase, Bank of America, Wells Fargo, Citibank, and Capital One.
+
+### Changed
+- **Unified Engine**: The `SmartDocumentEngine` now serves as the central unified engine for all operations, treating multi-page statements as one connected document.
+- **History Simplification**: Consolidated the `ChangeHistory` into a single process-wide source of truth orchestrated by the Tokio runtime. Fixed the auto-undo GUI bug.
+- **PyO3 Architecture**: The PyO3 bridge now relies on a non-panicking, dedicated actor thread to isolate Python interpreter state.
+- **Gemini Rest Client**: Updated to the stable `v1beta` Google Gemini REST API using exact `camelCase` fields and typed object schemas for `responseSchema`.
+- **Refactoring**: Moved from a three-layer architecture to a mature five-layer architecture (`app/`, `engine/`, `pdf/`, `extractors/`, `ai/`, `security/`).
+
+### Removed
+- **Legacy Stubs**: Removed placeholder parsing and fake manual heuristics in Python integration and text_editor components.
+
+<!-- link references -->
+[v0.5.1]: https://github.com/maryjpww-star/bank-statement-fidelity-editor/compare/v0.5.0...v0.5.1
+[v0.5.0]: https://github.com/maryjpww-star/bank-statement-fidelity-editor/compare/v0.4.0...v0.5.0
+[v0.4.0]: https://github.com/maryjpww-star/bank-statement-fidelity-editor/releases/tag/v0.4.0
+
+
+================================================================================
+FILE: CONTRIBUTING.md
+================================================================================
+# Contributing
+
+We welcome contributions to the Bank Statement Fidelity Editor!
+
+## Development Setup
+
+1. Follow the [QUICKSTART.md](QUICKSTART.md) guide to set up your environment.
+2. Copy `.env.example` to `.env` and configure at minimum `DUAL_CORE_PASSPHRASE` and `GEMINI_API_KEY`.
+3. Build and run tests:
+
+```bash
+cargo build
+cargo test
+```
+
+## Code Quality
+
+### Linting & Formatting
+
+All code must pass clippy and rustfmt before merge:
+
+```bash
+cargo fmt
+cargo clippy --all-targets --all-features -- -D warnings
+```
+
+### Mutation Testing
+
+To ensure high-quality code and robust logic, we highly recommend using mutation testing locally before submitting a PR:
+
+```bash
+cargo install cargo-mutants
+cargo mutants
+```
+
+This verifies that the test suite actually catches bugs in the business logic (especially in `src/engine/balance.rs`, `src/engine/verification.rs`, and `src/engine/offline_parser.rs`).
+
+### Full Validation
+
+Run the complete validation suite before submitting:
+
+```bash
+cargo fmt
+cargo check
+cargo test
+cargo clippy --all-targets --all-features -- -D warnings
+```
+
+## Architecture Guidelines
+
+- **Fallback chains:** Every new cloud integration must have an offline fallback. Never leave a pipeline stage with a single point of failure.
+- **API availability:** New API keys must be added to `ApiAvailability` in `src/app/config.rs` and checked at boot time.
+- **Backend preferences:** New backends should be added to the appropriate enum (`AiProviderMode`, `DocumentParserMode`, `VerificationMode`, `PdfEngineMode`) and surfaced in the Backend Preferences UI in `src/app/modals.rs`.
+- **Error handling:** Prefer typed errors with context. No silent failures or unchecked unwraps in production paths.
+- **Secrets:** Never log, print, or commit API key values. Use `.env.example` for templates.
+
+## Files
+
+- **`.env.example`** â€” Template with all configurable keys (safe to commit)
+- **`.env`** â€” Your local secrets (gitignored, never commit)
+- **`AGENTS.md`** â€” Agent development rules and autonomy boundaries
+- **`QUICKSTART.md`** â€” Setup guide for new developers
+- **`CHANGELOG.md`** â€” Release history
+
+
+================================================================================
+FILE: AGENTS.md
+================================================================================
+# AGENTS.md
+
+## Project type
+
+Rust desktop/CLI project using Cargo (v0.5.1).
+Includes GUI (egui), CLI, Python bridge (PyO3), Node.js bridge (Applitools), PDF processing,
+multi-backend AI integrations (Gemini, Document AI, Mindee, LlamaParse), tests, scripts, and CI.
+
+## Autonomy level
+
+The agent may operate with high autonomy for development, debugging, repair, and validation.
+
+The agent may:
+
+- inspect the repository
+- inspect build/test/runtime logs
+- modify source files, configuration, tests, scripts, and CI workflows
+- run terminal commands needed for diagnosis and validation
+- install or select the required Rust toolchain
+- run formatting, linting, build, and test commands
+- repeat the diagnose -> fix -> validate loop until resolved or blocked
+
+Prefer durable project-level fixes over local temporary workarounds.
+
+## Preferred Rust toolchain
+
+Use Rust 1.88.0 unless a task explicitly requires another version.
+
+If rust-toolchain.toml contains channel = "dev", replace it with:
+
+    [toolchain]
+    channel = "1.88.0"
+    components = ["rustfmt", "clippy"]
+
+If the toolchain is missing, run:
+
+    rustup install 1.88.0
+    rustup override unset
+
+Then retry the original command.
+
+## Files the agent may modify automatically
+
+- rust-toolchain.toml
+- rustfmt.toml
+- .cargo/config.toml
+- Cargo.toml
+- Cargo.lock
+- Rust source files under src/
+- Rust tests under tests/
+- examples under examples/
+- scripts under scripts/
+- Python support code under python/
+- Node.js support code (src/ai/applitools_bridge.js)
+- docs: README.md, QUICKSTART.md, CONTRIBUTING.md, CHANGELOG.md, AgentManagement.md, AgentDevelopmentGuide.md
+- CI files under .github/workflows/
+- Docker/deployment config when the task is about build/deploy repair
+- .env.example
+
+## Files requiring explicit confirmation
+
+- .env
+- private keys, tokens, credentials
+- production deployment secrets
+- private user PDFs
+- real customer or banking data
+- generated audit/history files
+- generated output PDFs
+- large generated output directories
+- Git history
+- remote repository state
+
+## Terminal permissions
+
+Allowed (non-destructive):
+
+    cargo check
+    cargo build
+    cargo build --release
+    cargo test
+    cargo clippy --all-targets --all-features -- -D warnings
+    cargo fmt
+    rustup install 1.88.0
+    rustup override unset
+    rustc --version
+    cargo --version
+    python --version
+    pip --version
+    node --version
+    npm --version
+    git status
+    git diff
+
+Health checks (only if they do not expose secrets):
+
+    cargo run -- doctor
+    cargo run -- verify-api-keys
+
+## Commands requiring confirmation
+
+    git reset --hard
+    git clean -fdx
+    git push
+    git commit
+    git rebase
+    cargo publish
+    docker push
+    railway up
+    railway deploy
+    rm -rf
+    Remove-Item -Recurse -Force
+
+Also requires confirmation:
+
+- uploading files
+- deleting generated PDFs, logs, or audit files
+- modifying real bank statements
+- commands that may spend significant API credits
+- commands that may expose secrets in logs
+
+## Secrets policy
+
+Never print, copy, rewrite, or commit secrets.
+May report whether a variable is set, but never its value.
+
+Allowed:
+
+    GEMINI_API_KEY is set
+    PDFREST_API_KEY is missing
+    MINDEE_API_KEY is set (46 chars)
+
+Forbidden:
+
+    GEMINI_API_KEY=actual-secret-value
+
+May read .env.example. Must not read or modify .env unless explicitly instructed.
+If a variable is missing, update .env.example or docs instead of inventing a value.
+
+## API keys and backends
+
+The project uses the following API keys (all optional except DUAL_CORE_PASSPHRASE):
+
+| Key | Backend | Fallback |
+|---|---|---|
+| DUAL_CORE_PASSPHRASE | Encryption (required) | None |
+| GEMINI_API_KEY | AI balance, vision, validation | Manual-only mode |
+| MINDEE_API_KEY | Default parser | offline_parser |
+| LLAMAPARSE_API_KEY | LLM parser | offline_parser |
+| DOCUMENT_AI_* | Google ML parser | offline_parser |
+| PDFREST_API_KEY | Cloud verification render | Local Pdfium |
+| APPLITOOLS_API_KEY | Visual AI testing | SSIM-only |
+| PYMUPDF_PRO_KEY | Enhanced font handling | PyMuPDF free tier |
+
+Boot-time availability detection lives in `src/app/config.rs` (`ApiAvailability`).
+Backend preferences UI lives in `src/app/modals.rs` (`draw_backend_preferences`).
+
+## Standard validation commands
+
+Run the narrowest useful check first.
+
+    cargo check
+    cargo test
+    cargo clippy --all-targets --all-features -- -D warnings
+    cargo fmt
+
+Full validation:
+
+    cargo fmt
+    cargo check
+    cargo test
+    cargo clippy --all-targets --all-features -- -D warnings
+
+If full validation is too slow, run targeted checks and report what was skipped.
+
+## Runtime debugging strategy
+
+1. Read the exact error text.
+2. Identify the failure category:
+   toolchain/setup, dependency, compile, test, runtime panic,
+   missing configuration, external API, filesystem permissions,
+   Python bridge, Node.js bridge, or PDF engine.
+3. Inspect only relevant files.
+4. Make the smallest durable fix.
+5. Re-run the failing command.
+6. Continue until fixed or blocked by secrets/external services/private files/confirmation.
+
+## Known setup issue: toolchain 'dev' is not installed
+
+Cause: project or local rustup override targets a toolchain named "dev".
+
+Fix:
+
+1. Open rust-toolchain.toml.
+2. Replace channel = "dev" with channel = "1.88.0".
+3. Run:
+
+   rustup install 1.88.0
+   rustup override unset
+   cargo check
+
+## Error-handling strategy
+
+Prefer typed errors, useful context, clear messages, validation before expensive work,
+and fail-safe behavior for documents/outputs.
+
+Avoid silent failures, swallowed errors, unchecked unwraps in production paths,
+and temporary duct-tape fixes.
+
+## Fallback chain rules
+
+Every pipeline stage must have at least one offline fallback:
+- Cloud parsers â†’ offline_parser
+- AI balance â†’ local balance engine
+- Cloud rendering â†’ local Pdfium
+- Visual AI â†’ SSIM-only metrics
+- PyMuPDF edit â†’ Pdfium â†’ Typst reconstruct (ultimate)
+
+New integrations must follow this pattern and register in ApiAvailability.
+
+## Reporting format
+
+At the end of each session, summarize:
+
+- root cause
+- files changed
+- commands run
+- validation result
+- remaining manual steps, if any
+
+
+================================================================================
+FILE: AgentManagement.md
+================================================================================
+# Agent Management Guide
+
+Comprehensive reference for AI agents working on the Bank Statement Fidelity Editor v0.5.1.
+
+## Project type
+
+Rust desktop/CLI project using Cargo.
+
+The project includes GUI (egui), CLI, Python bridge (PyO3), Node.js bridge (Applitools),
+PDF processing (PyMuPDF + Pdfium + Typst), multi-backend AI integrations
+(Gemini, Document AI, Mindee, LlamaParse, pdfRest, Applitools), tests, scripts, and CI configuration.
+
+## Autonomy level
+
+The agent is allowed to operate with high autonomy for development, debugging, repair, and validation tasks.
+
+The agent may:
+
+- inspect the repository
+- inspect build/test/runtime logs
+- modify source files
+- modify project configuration
+- modify tests
+- modify scripts
+- modify CI workflows
+- run terminal commands needed for diagnosis and validation
+- install or select the required Rust toolchain
+- run formatting, linting, build, and test commands
+- repeat the diagnose â†’ fix â†’ validate loop until the issue is resolved or blocked
+
+The agent should prefer durable project-level fixes over local temporary workarounds.
+
+## Preferred Rust toolchain
+
+Use Rust 1.88.0 unless a task explicitly requires another version.
+
+If `rust-toolchain.toml` contains:
+
+```toml
+channel = "dev"
+```
+
+replace it with:
+
+```toml
+[toolchain]
+channel = "1.88.0"
+components = ["rustfmt", "clippy"]
+```
+
+If the required toolchain is missing, run:
+
+```bash
+rustup install 1.88.0
+rustup override unset
+```
+
+Then retry the original command.
+
+## Files the agent may modify automatically
+
+The agent may automatically modify:
+
+- `rust-toolchain.toml`
+- `rustfmt.toml`
+- `.cargo/config.toml`
+- `Cargo.toml`
+- `Cargo.lock`
+- Rust source files under `src/`
+- Rust tests under `tests/`
+- examples under `examples/`
+- scripts under `scripts/`
+- Python support code under `python/`
+- Node.js support code (`src/ai/applitools_bridge.js`)
+- documentation files such as `README.md`, `QUICKSTART.md`, `CONTRIBUTING.md`, `CHANGELOG.md`
+- CI files under `.github/workflows/`
+- Docker and deployment configuration files, when the task is clearly about build/deployment repair
+- `.env.example`
+
+## Files requiring explicit confirmation
+
+The agent must ask before modifying:
+
+- `.env`
+- files containing private keys
+- files containing tokens or credentials
+- production deployment secrets
+- private user PDFs
+- real customer or banking data
+- generated audit/history files
+- generated output PDFs
+- large generated output directories
+- Git history
+- remote repository state
+
+## Terminal permissions
+
+The agent may run non-destructive terminal commands needed for development and validation.
+
+Allowed examples:
+
+```bash
+cargo check
+cargo build
+cargo build --release
+cargo test
+cargo clippy --all-targets --all-features -- -D warnings
+cargo fmt
+rustup install 1.88.0
+rustup override unset
+rustc --version
+cargo --version
+python --version
+pip --version
+node --version
+npm --version
+git status
+git diff
+```
+
+The agent may run project health checks such as:
+
+```bash
+cargo run -- doctor
+cargo run -- verify-api-keys
+```
+
+only when doing so does not expose secrets in output.
+
+## Commands requiring confirmation
+
+The agent must ask before running destructive, external, or production-impacting commands.
+
+Requires confirmation:
+
+```bash
+git reset --hard
+git clean -fdx
+git push
+git commit
+git rebase
+cargo publish
+docker push
+railway up
+railway deploy
+rm -rf
+Remove-Item -Recurse -Force
+```
+
+Also requires confirmation:
+
+- uploading files
+- deleting generated PDFs
+- deleting logs/audit files
+- modifying real bank statements
+- running commands that may spend API credits heavily
+- running commands that may expose secrets in logs
+
+## Secrets policy
+
+The agent must never print, copy, rewrite, or commit secrets.
+
+The agent may check whether an environment variable exists, but must not reveal its value.
+
+Allowed:
+
+```text
+GEMINI_API_KEY is set
+PDFREST_API_KEY is missing
+MINDEE_API_KEY is set (46 chars)
+```
+
+Forbidden:
+
+```text
+GEMINI_API_KEY=actual-secret-value
+```
+
+The agent may read `.env.example`.
+
+The agent must not read or modify `.env` unless explicitly instructed.
+
+If a required variable is missing, update `.env.example` or documentation instead of inventing a value.
+
+## API backends and fallback architecture
+
+The project uses a multi-backend architecture where every pipeline stage has automatic fallback:
+
+| Stage | Primary | Fallback Chain |
+|---|---|---|
+| Document Parsing | Mindee â†’ LlamaParse â†’ Document AI | â†’ offline_parser (PyMuPDF built-in) |
+| AI Validation | Gemini (API Key or Vertex) | â†’ graceful skip (score=0.7) |
+| Balance Analysis | Gemini AI | â†’ local balance::process_and_reconcile() |
+| PDF Editing | PyMuPDF (via PyO3) | â†’ Pdfium â†’ Typst Reconstruct |
+| Verification Render | pdfRest Cloud | â†’ Local Pdfium |
+| Visual AI Testing | Applitools Eyes | â†’ SSIM + Tile-max + Perceptual Hash |
+| AI Vision Check | Gemini Vision | â†’ graceful skip |
+
+Boot-time availability detection is in `src/app/config.rs` (`ApiAvailability`).
+Backend preferences UI is in `src/app/modals.rs` (`draw_backend_preferences`).
+
+New integrations must:
+1. Add the API key to `AppConfig` and `ApiAvailability`
+2. Register in the relevant mode enum
+3. Add UI in `draw_backend_preferences`
+4. Implement an offline/graceful fallback
+5. Add to `.env.example`
+
+## Standard validation commands
+
+After code or configuration changes, run the narrowest useful validation first.
+
+For Rust build fixes:
+
+```bash
+cargo check
+```
+
+For tests:
+
+```bash
+cargo test
+```
+
+For linting:
+
+```bash
+cargo clippy --all-targets --all-features -- -D warnings
+```
+
+For formatting:
+
+```bash
+cargo fmt
+```
+
+For full validation:
+
+```bash
+cargo fmt
+cargo check
+cargo test
+cargo clippy --all-targets --all-features -- -D warnings
+```
+
+If full validation is too slow, run targeted checks first and report what was skipped.
+
+## Runtime debugging strategy
+
+When given a console error, the agent should:
+
+1. Read the exact error text.
+2. Identify the failure category:
+   - Rust toolchain/setup
+   - Cargo dependency
+   - compile error
+   - test failure
+   - runtime panic
+   - missing configuration
+   - external API failure
+   - filesystem permission problem
+   - Python bridge problem
+   - Node.js bridge problem
+   - PDF engine problem
+3. Inspect only the files relevant to that category.
+4. Make the smallest durable fix.
+5. Re-run the failing command.
+6. Continue until:
+   - the issue is fixed, or
+   - the remaining problem requires secrets, external services, private files, or confirmation.
+
+## Known setup issue: toolchain `dev` is not installed
+
+Console error:
+
+```text
+error: toolchain 'dev' is not installed
+```
+
+Cause:
+
+The project or local Rustup override is trying to use a Rust toolchain named `dev`.
+
+Fix:
+
+1. Check `rust-toolchain.toml`.
+2. Replace `channel = "dev"` with `channel = "1.88.0"`.
+3. Run:
+
+```bash
+rustup install 1.88.0
+rustup override unset
+cargo check
+```
+
+## Dependency strategy
+
+The agent should avoid adding new dependencies unless necessary.
+
+Before adding a dependency, the agent should check whether the project already has a suitable dependency.
+
+If adding a dependency is necessary, prefer stable, widely used crates and explain why.
+
+## Error-handling strategy
+
+The agent should avoid hiding errors with broad fallbacks.
+
+Prefer:
+
+- typed errors
+- useful context with `anyhow` or project error types
+- clear user-facing messages
+- validation before expensive operations
+- fail-safe behavior for documents and generated outputs
+
+Avoid:
+
+- silent failures
+- swallowing errors
+- unchecked unwraps in production paths
+- temporary duct-tape fixes
+
+## Reporting format
+
+At the end of each autonomous fix session, summarize:
+
+- root cause
+- files changed
+- commands run
+- validation result
+- remaining manual steps, if any
+
+
+================================================================================
+FILE: AgentDevelopmentGuide.md
+================================================================================
+# Agent Development Guide
+
+Quick-reference for AI agents working on the Bank Statement Fidelity Editor v0.5.1.
+
+## Project type
+
+Rust desktop/CLI project using Cargo.
+
+The project includes GUI (egui), CLI, Python bridge (PyO3), Node.js bridge (Applitools),
+PDF processing, multi-backend AI integrations, tests, scripts, and CI configuration.
+
+## Autonomy level
+
+The agent is allowed to operate with high autonomy for development, debugging, repair, and validation tasks.
+
+The agent may:
+
+- inspect the repository
+- inspect build/test/runtime logs
+- modify source files
+- modify project configuration
+- modify tests
+- modify scripts
+- modify CI workflows
+- run terminal commands needed for diagnosis and validation
+- install or select the required Rust toolchain
+- run formatting, linting, build, and test commands
+- repeat the diagnose â†’ fix â†’ validate loop until the issue is resolved or blocked
+
+The agent should prefer durable project-level fixes over local temporary workarounds.
+
+## Preferred Rust toolchain
+
+Use Rust 1.88.0 unless a task explicitly requires another version.
+
+If `rust-toolchain.toml` contains:
+
+```toml
+channel = "dev"
+```
+
+replace it with:
+
+```toml
+[toolchain]
+channel = "1.88.0"
+components = ["rustfmt", "clippy"]
+```
+
+## Key source locations
+
+| Area | Path | Purpose |
+|---|---|---|
+| Config + API Availability | `src/app/config.rs` | `AppConfig`, `ApiAvailability`, mode enums |
+| Backend Preferences UI | `src/app/modals.rs` | `draw_backend_preferences()` |
+| Runtime Job Loop | `src/app/runtime.rs` | All `Job::*` handlers, fallback logic |
+| GUI State | `src/app/gui.rs` | `MyApp` struct, lifecycle |
+| Offline Parser | `src/engine/offline_parser.rs` | Local text extraction fallback |
+| Balance Engine | `src/engine/balance.rs` | `process_and_reconcile()` |
+| Verification | `src/engine/verification.rs` | Multi-layer visual verification |
+| Typst Reconstruct | `src/engine/typst_engine.rs` | Ultimate PDF rebuild fail-safe |
+| Gemini Client | `src/ai/gemini_client.rs` | AI validation, balance, vision |
+| Document AI | `src/ai/document_ai.rs` | Google ML parsing |
+| Mindee Parser | `src/ai/mindee.rs` | Mindee Financial Document API |
+| LlamaParse | `src/ai/llamaparse.rs` | LLM-based document parser |
+| pdfRest | `src/ai/pdfrest.rs` | Cloud PDF rendering |
+| Applitools Bridge | `src/ai/applitools_bridge.js` | Node.js visual AI bridge |
+| PyO3 Bridge | `src/ai/pyo3_bridge.rs` | Python actor thread |
+| PDF Engine Selector | `src/pdf/selector.rs` | Primary/fallback engine dispatch |
+
+## Adding a new backend
+
+1. Add the API key to `AppConfig` in `src/app/config.rs`
+2. Add availability check to `ApiAvailability`
+3. Add variant to the relevant mode enum
+4. Add UI toggle in `draw_backend_preferences()` in `src/app/modals.rs`
+5. Add handler logic in `src/app/runtime.rs` with offline fallback
+6. Add to `.env.example` with signup URL
+7. Update `README.md` and `CHANGELOG.md`
+
+## Validation commands
+
+```bash
+cargo fmt
+cargo check
+cargo test
+cargo clippy --all-targets --all-features -- -D warnings
+```
+
+
+================================================================================
+FILE: FINAL_SUPER_PROMPT.md
+================================================================================
+# FINAL SUPER PROMPT â€” Bank Statement Fidelity Editor v0.5.1
+
+**Copy everything below and use it with Claude 4 Opus / Sonnet or Cursor / Zed + Claude Code.**
+
+---
+
+You are an expert Rust + egui + PDF engineer in July 2026.
+
+I have a highly advanced bank statement PDF editing application. The current version (v0.5.1) includes:
+
+- **Multi-Backend Pipeline Architecture:** Configurable primary backends with automatic fallback chains at every stage (parsing, editing, verification, AI validation).
+- **Boot-Time API Availability Detection:** On startup, all API keys are probed and availability is displayed in the Backend Preferences UI (âœ… / â›”).
+- **Document Parsers:** Mindee Financial Doc (default), LlamaParse, Google Document AI, PyMuPDF Built-in, Local OCR â€” all with auto-fallback to offline parser.
+- **PDF Edit Engines:** PyMuPDF (primary, via PyO3), Pdfium (native fallback), Typst Reconstruct (ultimate fail-safe).
+- **Smart Balance Engine:** Document AI + Gemini AI proposals â†’ local deterministic balance fallback.
+- **Multi-Layer Verification:** SSIM + Tile-max + Perceptual Hash (always) â†’ pdfRest Cloud (optional) â†’ Applitools Eyes Visual AI (optional) â†’ Gemini Vision (optional).
+- **Visual 300 DPI preview** + high-accuracy click-to-select
+- **Multi-page support** with full document awareness
+- **Undo/Redo** + Change History + Audit Report auto-merge
+- **Font Analysis, Replication, and Completion** with deep font subsetting
+- **Transfer Transactions** between PDFs with font replication
+- **Date Period Adjustment** (shift forward/backward)
+- **Batch Processing Dashboard** for concurrent multi-PDF operations
+- **CLI + GUI parity** â€” same Runtime job loop drives both interfaces
+- **Backend Preferences UI** with per-stage backend selection, availability indicators, and visual threshold sliders
+
+**Your Task:**
+Take the current codebase (provided as flattened files) and make further improvements.
+
+**Important Guidelines:**
+- Keep the code clean and well-organized.
+- Maintain the current five-layer architecture (`app/`, `engine/`, `pdf/`, `extractors/`, `ai/`, `security/`).
+- Every new cloud integration MUST have an offline fallback.
+- New API keys must register in `ApiAvailability` and show in Backend Preferences UI.
+- Use PyMuPDF Pro as the primary high-fidelity engine.
+- Make the app feel fast, professional, and trustworthy.
+- After making changes, explain what you improved and why.
+
+Start by analyzing the current flattened codebase, then give me a clear plan before writing any code.
+
+Now begin.
+
+================================================================================
+FILE: docs\TECH_STACK.md
+================================================================================
+# Technology Stack Breakdown
+
+This document provides a detailed overview of the specific technologies, frameworks, and libraries used to build the Bank Statement Fidelity Editor (`dual-core-pdf-pipeline` v0.5.1).
+
+## Core Languages
+
+- **Rust (Edition 2021):** The primary language for the application logic, GUI, and high-performance asynchronous orchestration. Rust guarantees memory safety, fast execution, and strict concurrency control.
+- **Python (3.10+):** Used selectively for deep integrations with proprietary or C-based PDF rendering and manipulation libraries (like PyMuPDF Pro) that don't have native Rust equivalents. Runs inside a dedicated PyO3 actor thread.
+- **Node.js (18+):** Used for the Applitools Eyes visual AI bridge (`src/ai/applitools_bridge.js`). Invoked as a child process from Rust for visual diff testing.
+
+## GUI Framework (Native Desktop)
+
+- **`egui` (0.28):** A highly performant, immediate-mode GUI framework built purely in Rust. Chosen for its simplicity, speed, and seamless integration with Rust data structures, making it perfect for rapid data-driven UI development.
+- **`eframe` (0.28):** The official framework wrapper around `egui` to run it as a native desktop application (handling the OS windowing, WebGL/WGPU rendering contexts).
+- **`egui_extras`:** Extended widgets including `TableBuilder` for the editable transaction table, and image loading for rendered PDF pages.
+
+## PDF Processing Engines
+
+The application employs a multi-engine strategy with automatic fallback, managed by `PdfEngineSelector`:
+
+- **`PyMuPDF` / `pymupdfpro` (via `pyo3`):** The primary engine. Called from Rust via Python bindings. Capable of high-fidelity, per-segment redaction and text insertion while accurately reusing the exact embedded font dictionaries and glyph metrics. The Pro tier adds enhanced font handling (gated by `PYMUPDF_PRO_KEY`).
+- **`pdfium-render` (0.8.x):** Rust bindings to Google's open-source `pdfium` C++ library (the same engine used in Google Chrome). Used as the fallback engine for rendering, text extraction, and editing when PyMuPDF is unavailable.
+- **`lopdf` (0.34):** A pure-Rust library for low-level PDF dictionary manipulation. Used for the Split & Merge engine, extracting pages and merging them back together without altering visual fidelity or dropping fonts.
+- **Typst Engine (`subsetter` + `typst`):** Ultimate fail-safe reconstruction engine. When both PyMuPDF and Pdfium fail to apply edits, this engine rebuilds the PDF from scratch using Typst typesetting with font subsetting. Always available as the last resort.
+
+### Engine Mode Hierarchy
+
+```
+PdfEngineSelector:
+  Auto (default) â†’ PyMuPDF primary, Pdfium fallback
+  DualConcurrent  â†’ Both engines in parallel, prefer PyMuPDF
+  NativeOnly      â†’ Pdfium only
+  PyMuPdfOnly     â†’ PyMuPDF only
+  TypstReconstruct â†’ Full document rebuild from transaction data
+```
+
+## Document Parsers (Multi-Backend)
+
+Each parser auto-falls back to the offline parser if its API key is missing or the call fails:
+
+- **Mindee Financial Document API (default):** Cloud-based ML parser with per-field bounding boxes. Requires `MINDEE_API_KEY`. Best balance of accuracy, ease of setup, and cost.
+- **Google Cloud Document AI (v1beta3):** Highest accuracy on trained layouts. Supports custom-trained processor versions with in-app admin (train, deploy, undeploy). Requires GCP credentials.
+- **LlamaParse:** LLM-based document parser via LlamaCloud. Requires `LLAMAPARSE_API_KEY`.
+- **PyMuPDF Built-in:** Local text extraction using pymupdf's native layout parser. No external dependencies. Always available.
+- **Local OCR (`ocrs` + `rten`):** Pure Rust OCR for scanned documents. Requires `--features ocr` at compile time.
+- **Offline Parser (`offline_parser.rs`):** Deterministic heuristic parser using regex patterns and structural analysis. The universal fallback for all cloud parsers.
+
+## AI and Machine Learning Integration
+
+- **Google Gemini / Vertex AI:** Multi-purpose AI engine used for:
+  - Smart Balance Engine â€” generates minimal cascading adjustment plans to resolve math errors.
+  - Completeness Validation â€” checks for missed transaction rows.
+  - Vision Validation â€” compares rendered PDF pages for visual fidelity.
+  - Auth modes: API Key (simple) or Vertex AI (enterprise, SA/ADC).
+  - Fallback: graceful skip with score=0.7 (pipeline continues without AI).
+- **Applitools Eyes (via Node.js bridge):** Visual AI testing layer. Compares original vs. edited rendered pages using Applitools' proprietary visual AI. Requires `APPLITOOLS_API_KEY` + Node.js. Additive layer â€” gracefully skips if unavailable.
+- **pdfRest API:** Adobe-tier cloud PDF rendering for high-fidelity visual verification. Requires `PDFREST_API_KEY`. Falls back to local Pdfium rendering.
+
+## Verification Pipeline (Multi-Layer)
+
+The verification system uses additive layers â€” each layer runs independently:
+
+1. **SSIM (Structural Similarity Index):** Compares rendered page images pixel-by-pixel.
+2. **Tile-Max Diff:** Divides pages into tiles and finds the maximum local difference (catches localized drift that whole-page averages hide).
+3. **Perceptual Hash (`image_hasher`):** Hash-based similarity check for structural integrity.
+4. **pdfRest Cloud Rendering (optional):** Adobe-tier rendering for comparison against local renders.
+5. **Applitools Eyes (optional):** AI visual comparison via Node.js bridge.
+6. **Gemini Vision AI (optional):** AI-based visual fidelity analysis.
+
+Configurable thresholds: `visual_diff_threshold` (default 0.02) and `max_visual_attempts` (default 5).
+
+## Geometry Extraction (Hybrid)
+
+- **Bank Templates (YAML):** Per-bank column layouts for deterministic text extraction. Ships with templates for AU and US banks.
+- **PyMuPDF Heuristic:** Statistical column boundary detection from embedded text runs.
+- **Hybrid Merger:** Merges results from multiple geometry providers with deterministic tiebreak rules.
+
+## Concurrency and Asynchronous Runtime
+
+- **`tokio` (1.x):** The industry-standard async runtime for Rust. Handles all network requests, file I/O, job dispatching, and timeout management.
+- **MPSC Channels:** Multi-producer, single-consumer channels bridge the synchronous, immediate-mode GUI (`egui`) with the asynchronous background tasks (`tokio`).
+- **API Semaphore:** Limits concurrent cloud API calls (default 3) to prevent rate limiting.
+- **Cancellation Registry:** Per-job cancellation tokens for responsive UI cancellation.
+
+## Python Interoperability (FFI)
+
+- **`pyo3` (0.24):** The Rust/Python bridge. Embeds a Python interpreter directly inside the Rust process, allowing Rust to execute Python scripts with near-zero overhead. Work is constrained to a single dedicated actor thread to avoid Python GIL deadlocks. Panics inside the actor are caught and surfaced as structured errors.
+
+## Node.js Interoperability
+
+- **Child Process:** The Applitools bridge (`src/ai/applitools_bridge.js`) is invoked as a `node` child process from Rust. Communication is via stdout JSON lines (`APPLITOOLS_RESULT:{...}`). Failure detection is graceful â€” if Node.js or the bridge script is unavailable, the verification pipeline continues with local-only metrics.
+
+## Observability and Logging
+
+- **`tracing` / `tracing-subscriber`:** Structured, event-driven logging framework for Rust with daily file rotation.
+- **`opentelemetry` (0.21):** OpenTelemetry SDK for distributed tracing, allowing the application to export metrics and traces to an OTLP-compatible endpoint for deep debugging.
+- **Boot-Time API Summary:** `ApiAvailability::log_summary()` logs the availability status of all backends on startup for instant diagnostics.
+
+## Serialization and State Management
+
+- **`serde` (1.0) / `serde_json`:** Used ubiquitously for serializing and deserializing API requests, JSON outputs, and internal message passing.
+- **`confy` (0.6):** Configuration management for persisting `AppSettings` (dark mode, advanced mode, backend preferences, visual thresholds) to the user's local application data directory.
+- **`dotenvy`:** Loads `.env` file on startup. Hot-reloadable via `Job::ReloadConfig`.
+
+## Security and Fault Tolerance
+
+- **`chacha20poly1305`:** Strong encryption of the local Document AI cache and other sensitive artifacts at rest.
+- **Enterprise Fault Tolerance:** Exponential backoffs, automatic retry middleware via `reqwest-retry`, strict cryptographic software root-of-trust (via SHA-256 and `.pipeline_key`).
+- **Zero-Trust API Detection:** Every API key is validated at boot time. Missing keys auto-exclude their backend from the fallback chain and disable the corresponding UI toggle with an explanatory message.
+
+## Font Engineering
+
+- **`ttf-parser`:** Fast, zero-allocation TrueType/OpenType font parsing for font analysis and metric extraction.
+- **`subsetter`:** Font subsetting for Typst reconstruction â€” embeds only the glyphs needed by each page.
+- **Font Replication:** Deep font analysis extracts embedded font programs and re-embeds them with matched weight/width metrics for cross-statement font transfer.
+
+
+================================================================================
+FILE: docs\TRAINING_HANDOFF.md
+================================================================================
+# Document AI Training Handoff
+
+> **Updated:** v0.5.1 â€” The app now includes in-app Document AI admin via `Job::ListDocAiVersions`, `Job::TrainDocAiVersion`, `Job::DeployDocAiVersion`, `Job::UndeployDocAiVersion`, and `Job::SetDefaultDocAiVersion`. These can replace several of the manual Console steps below once labelling is complete.
+
+## What's already done
+
+- **GCS buckets**
+  - `gs://docai-training-1056864635772/` â€” bucket bound to the existing dataset
+  - `gs://esoteric-energy-495909-t7-docai-hns/` â€” backup HNS bucket (in case we need to re-init)
+- **PDFs uploaded** (split where needed to fit Document AI's 15-page training cap):
+  ```
+  gs://.../au-bank-statements-split/
+    807466413-AccountStatement-2026-03-11 2.pdf       (4 pages)
+    ANZ Plus Statement March 2026.pdf                  (1 page)
+    IA_Bank_Statement_202602.pdf                       (2 pages)
+    ING OrangeEveryday.pdf                             (10 pages)
+    Westpac BusinessOne (part 1 of 2).pdf              (15 pages)
+    Westpac BusinessOne (part 2 of 2).pdf              (3 pages)
+    Westpac ChoiceBasic (part 1 of 4).pdf              (15 pages)
+    Westpac ChoiceBasic (part 2 of 4).pdf              (15 pages)
+    Westpac ChoiceBasic (part 3 of 4).pdf              (15 pages)
+    Westpac ChoiceBasic (part 4 of 4).pdf              (12 pages)
+  ```
+  Total 10 docs, all under the per-doc page cap.
+- **Local Rust app**: 5 AU bank templates added under `bank_templates/`:
+  - `anz_plus_au.yaml`
+  - `ing_orange_au.yaml`
+  - `macquarie_au.yaml`
+  - `westpac_business_one_au.yaml` (column ranges learned from real layout)
+  - `westpac_choice_basic_au.yaml` (column ranges learned from real layout)
+
+## What's pending â€” manual steps in the Document AI Console
+
+API-driven import keeps hitting `storage.folders.create` permission denial because Google's Bank Statement Parser dataset writer wants HNS-managed folders, and the originally-bound bucket isn't HNS. The Console UI handles the ceremony correctly. Do these:
+
+1. Open **https://console.cloud.google.com/ai/document-ai/locations/us/processors/27af46e84ea84975/train**
+2. Click **Import documents** â†’ **Cloud Storage**
+3. Source: `gs://docai-training-1056864635772/au-bank-statements-split/`
+4. Auto-split: train 80% / test 20%
+5. Click Import. The Console picks up where the API failed because it has different internal IAM bindings.
+6. Once imported, click any document â†’ **Label** â†’ draw boxes around each:
+   - `account_number`, `bank_name`, `client_address`, `client_name`
+   - `statement_start_date`, `statement_end_date`
+   - `starting_balance`, `ending_balance`
+   - For each transaction row: a `table_item` containing `transaction_deposit_date`, `transaction_deposit_description`, and either `transaction_deposit` or `transaction_withdrawal`
+7. Mark each labelled doc as **Labelled** (top-right toggle).
+8. When at least 8 docs are labelled, click **Train new version**. Choose a name like `au-bank-v1`.
+9. Training takes 1â€“6 hours. You'll get an email.
+10. After training, **Manage versions** â†’ set `au-bank-v1` as default.
+
+## How the Rust app picks up the new version
+
+No code changes needed. The processor URL stays the same; setting `au-bank-v1` as the default version routes future calls to it automatically. If you want to keep both pretrained and trained side-by-side, set `DOCUMENT_AI_PROCESSOR_VERSION` in `.env` and add a `processor_version` field to `DocumentAiConfig` (one-line change in `src/ai/document_ai.rs::process_url_v1`).
+
+## If the Console import also fails
+
+Worst case, here's the workaround: **re-initialise the dataset** against the HNS bucket. This destroys any docs already imported.
+
+```powershell
+# 1. Mark dataset unmanaged (only works after deleting the processor's existing dataset binding via the Console)
+# 2. Re-init against HNS bucket:
+$tok = (gcloud auth application-default print-access-token).Trim()
+$url = "https://us-documentai.googleapis.com/v1beta3/projects/252607032233/locations/us/processors/27af46e84ea84975/dataset?updateMask=gcsManagedConfig"
+$body = '{ "name": "projects/252607032233/locations/us/processors/27af46e84ea84975/dataset", "gcsManagedConfig": { "gcsPrefix": { "gcsUriPrefix": "gs://esoteric-energy-495909-t7-docai-hns/dataset/" } } }'
+Invoke-WebRequest -Uri $url -Method Patch -Headers @{ Authorization = "Bearer $tok"; "Content-Type" = "application/json"; "x-goog-user-project" = "esoteric-energy-495909-t7" } -Body $body
+```
+
+
+================================================================================
+FILE: tests\README.md
+================================================================================
+# Tests
+
+These tests define the strict business logic invariants of the bank statement modification engine.
+
+## Test Categories
+
+### Unit Tests (`cargo test --lib`)
+Core business logic tests embedded in source modules:
+- `balance.rs` â€” Balance math invariants (rejecting dual debit/credit, negative balances, cascading reconciliation).
+- `offline_parser.rs` â€” Amount extraction, date parsing, row classification.
+- `number_format.rs` â€” Locale-aware number formatting and rounding.
+- `verification.rs` â€” SSIM scoring, tile-max diff, perceptual hash, Applitools graceful degradation.
+- `font_analysis.rs` â€” Font metric extraction and matching.
+- `model.rs` â€” Transaction model serialization and invariants.
+- `config.rs` â€” Configuration loading, API availability detection, mode enum defaults.
+
+### Integration Tests (`tests/`)
+- `chaos_fallback.rs` â€” Verifies `PdfEngineSelector` gracefully handles complete engine failures and falls through the fallback chain (PyMuPDF â†’ Pdfium â†’ error, not panic).
+
+### Characterization Tests
+**CRITICAL:** These tests must continue to pass through every subsequent ticket. No work is permitted to alter the tested invariants (e.g. rejecting both Debit and Credit on the same line, rejecting negative balances, etc.).
+
+## Running Tests
+
+```bash
+# All tests
+cargo test
+
+# With all features (including OCR)
+cargo test --all-features
+
+# Specific module
+cargo test --lib balance
+
+# Integration tests only
+cargo test --test chaos_fallback
+```
+
+## Validation Suite
+
+Full validation (run before PR):
+
+```bash
+cargo fmt
+cargo check
+cargo test
+cargo clippy --all-targets --all-features -- -D warnings
+```
+
+
+================================================================================
+FILE: scripts\FIDELITY_NOTES.md
+================================================================================
+# Fidelity work â€” 20-item multi-stage plan
+
+> **Context (v0.5.1):** All 20 items below are complete and integrated. The verification pipeline now includes multi-layer checking (SSIM + Tile-max + Perceptual Hash + optional pdfRest + optional Applitools Eyes + optional Gemini Vision). See `src/engine/verification.rs` for the current implementation. Configurable via Backend Preferences UI (`visual_diff_threshold`, `max_visual_attempts`).
+
+Verification harnesses (scripts/):
+- `align_diag.py` â€” round-trips a span to its original value, finds best (dx,dy)
+  shift; reports zero-shift + best-aligned 600 DPI L1 vs the untouched original.
+  Lower = more faithful. This is the primary regression gate.
+- `fidelity_compare.py` / `ink_analysis.py` / `inspect_case.py` / `ascii_view.py`
+  â€” supporting diagnostics.
+- `python/_baseline_integration.py` â€” committed-HEAD copy of the integration
+  module, used for before/after comparison. DELETE before finishing.
+
+## Stage A â€” embedded-font reuse (items 1,2,3,4)  âœ… DONE + verified
+- `_extract_font_buffer`, `_resolve_embedded_font`, `_fallback_standard14` added.
+- Non-standard fonts: re-embed original glyph program by buffer; measure with a
+  pymupdf.Font over the same bytes. Standard-14: emit with the matching builtin
+  code (most faithful) â€” NOT treated as fallback.
+- Redaction annot no longer auto-draws text; single font-faithful re-emit.
+- Result (align_diag, new vs base, zero-shift L1, lower better):
+  - HelveticaNeue-Light2: 0.043â†’0.030, 0.127â†’0.112, 0.054â†’0.038
+  - Times Roman/Bold: 0.140â†’0.130, 0.115â†’0.086, 0.088â†’0.061, 0.059â†’0.032
+  - INGMe: 0.102â†’0.094, 0.076â†’0.056, 0.067â†’0.049
+  - Westpac Helvetica: 0.252â†’0.249, 0.089â†’0.082, 0.023â†’0.016
+  All cases improved or held. No regressions.
+
+## Stage B â€” kerning & spacing (items 5,6,7)  âœ… DONE
+- All condensing flows through `_insert_kerned_text` (no more silent-overflow Tc stub).
+- `h_scale` (horizontal scaling) applied before hard tracking once -0.5pt/gap cap hit.
+- Per-glyph origin reuse extended to matching prefix+suffix runs (item 7).
+
+## Stage C â€” placement & baseline (items 8,9)  âœ… DONE
+- `_span_writing_dir` (item 8): cursor advances along baseline dir; rotated
+  text uses morph. `_snap_origin_phase` (item 9): right-align origin snapped
+  to original sub-pixel phase at 600 DPI grid. `aligned`==`zero` confirms no
+  residual drift to recover.
+
+## Stage D â€” colour fidelity (items 10,11)  âœ… DONE
+- `_native_fill_color`: emit in Gray/RGB/CMYK native space (item 10).
+- Removed "accessible red" substitution; exact colour preserved (item 11).
+  Contrast guard now hue-preserving, last-resort only (<0.12 luminance gap).
+
+## Stage E â€” background & line art (items 12,13,14)  âœ… DONE + verified
+- `_tight_glyph_bbox` colour-aware (paper-distance + fg-proximity), item 12.
+- `_sample_patch` median sampling for classify_background, item 13.
+- `_vector_strokes_through`/`_redraw_strokes` capture+restore cap/join/dash/
+  opacity, item 14. Removed orphaned dead tightening block.
+- Result: further gains. Westpac '- $202,359.19' 0.082->0.063;
+  '- $1,728.52' now 0.0000 (perfect). All other cases held or improved.
+
+## Stage F â€” font synthesis fidelity (items 15,16)  âœ… DONE + verified
+- `_host_class_advances` + `_char_class` + `_shift_glyph_x`: injected donor
+  glyphs adopt the host's per-class advance (tabular digits share one width)
+  and are re-centred in it (item 15).
+- `_infer_weight_width` + `_donor_os2` + scored `_pick_local_donor`: donor
+  chosen by OS/2 weight+width proximity, not just name (item 16).
+- Verified: test_stage_f.py (helpers) + test_stage_f_e2e.py (donor '7' at
+  native 950 normalized to host 600). Existing font_cascade.rs contract held.
+
+## Stage G â€” verification tightening (items 17,18,19,20)  âœ… DONE + verified
+- verification.rs rewritten:
+  - #17 tile-max (24px) score blending luminance + Sobel gradient; gate is
+    worst tile OUTSIDE intended regions (was whole-page average < 0.02).
+  - #18 edited neighbourhoods scored at 600 DPI via render_region_gray.
+  - #19 pinned_render_config: same engine + fixed AA (no LCD subpixel) for
+    BOTH original and edited.
+  - #20 region_fidelity_score: positive gradient-residual check of the
+    replacement glyphs after best-shift alignment (max_edit_region_score),
+    instead of blanket-masking the edit away.
+  - VerificationReport gains max_tile_score + max_edit_region_score
+    (#[serde(default)], back-compatible). visual_diff_score still populated.
+- Verified: 4 new unit tests, incl. proof tile-max catches a localized drift
+  the whole-page average hides. Full lib suite: 117 passed.
+
+## ALL 20 ITEMS COMPLETE. Cleanup: removed python/_baseline_integration.py.
+## Kept reusable harness: scripts/align_diag.py, fidelity_compare.py,
+## test_stage_f*.py. Scratch probes can be removed.
+
+
+================================================================================
+FILE: output\e2e\FINAL_REPORT.md
+================================================================================
+# End-to-End Pipeline Validation â€” Final Report
+
+> **Historical (pre-v0.5.1):** This report was generated during initial E2E validation. All bugs listed below have been fixed. The pipeline has since been expanded with multi-backend parsers (Mindee, LlamaParse), multi-layer verification (Applitools, pdfRest), and automatic fallback chains. See `CHANGELOG.md` for the full v0.5.1 changelog.
+
+Simulated every function/button against the example PDFs **and** the 6 real AU
+bank statements, exported results, compared pixel fidelity, and verified the
+split/merge + edit pipeline. All bugs found were fixed and re-verified.
+
+## What was exercised
+- RenderPage (canvas/preview) â€” pdfium-render
+- ApplyChange ("Apply Edit" button / CLI `text`) â€” PyMuPDF Pro edit
+- ExtractTransactions (Document AI parse)
+- BalanceStatement ("Analyze Document") â€” Document AI + Gemini
+- BalanceAndApplyAll ("Adjust entire statement & apply all" button)
+- Verify ("Run Full Audit") â€” render + perceptual + math diff
+- split_pdf / merge_pdfs (3-Page-Mode, Subsystem A) on all 6 real statements
+- Doctor (config/runtime health)
+
+## Bugs found AND FIXED
+1. **`verify` CLI clap panic** â€” `original` and `output_dir` both used `-o`;
+   the command crashed at startup. FIXED: `output_dir` is `--output-dir` only.
+   Re-verified: verify runs, writes verification_report.json, EXIT=0.
+
+2. **CLI Extract race** â€” `LoadDocument` fires async `FontAnalysisReady`
+   (cache hit arrives first) which the CLI waiter mistook for the answer â†’
+   "Unexpected result from runtime". FIXED: waiter now skips
+   `FontAnalysisReady`/`FontCascadeUsed`. Re-verified: extract succeeds.
+
+3. **Single-edit hard-fail on subsetted fonts (`FONT_COVERAGE_INSUFFICIENT`)**
+   â€” the "Apply Edit" path raised instead of falling back, so editing a number
+   in ANZ/INGMe/etc. (subset fonts lacking the new glyphs) failed outright.
+   FIXED (Req 18.6): `replace_text_in_rect` now completes via a weight/style-
+   matched standard-14 builtin and flags the cell for review (returns
+   `review: true`). Re-verified: ANZ edit applies, "cell flagged for review".
+
+4. **CRITICAL: split/merge produced unreadable segments on real PDFs** â€” on a
+   PDF 1.6 statement, `split_pdf` (cloneâ†’delete_pagesâ†’pruneâ†’save) wrote a
+   segment lopdf itself rejected ("Invalid file trailer"), so 3-Page-Mode (the
+   DEFAULT) would break on real multi-page statements. FIXED: `split_pdf` now
+   builds each segment as a fresh document, importing only the window's pages
+   and their transitive object closure with remapped ids (the proven merge
+   approach). Re-verified on ALL 6 statements below.
+
+## Verification results (post-fix)
+
+Split/merge lossless round-trip (Rust integration test, all real statements):
+| Statement | pages | segments (<=3) | merged pages |
+|---|---|---|---|
+| 807466413-AccountStatement | 4 | 2 | 4 âœ“ |
+| ANZ Plus | 1 | 1 | 1 âœ“ |
+| IA_Bank_Statement | 2 | 1 | 2 âœ“ |
+| ING OrangeEveryday | 10 | 4 | 10 âœ“ |
+| Westpac BusinessOne | 18 | 6 | 18 âœ“ |
+| Westpac ChoiceBasic | 15 | 5 | 15 âœ“ |
+
+Edit-locality fidelity (render orig vs edited, 150 DPI):
+- ANZ: 0.12% pixels changed, single bbox (the edited amount) â€” rest identical
+- IA:  0.12% pixels changed, single bbox â€” rest identical
+=> Best-possible: edits are pixel-local; non-edited content untouched.
+
+Tests: lib 125/125 pass; segment_mapping 2/2; split_merge_fidelity 2/2;
+dependency_isolation 1/1; e2e_segmented_pipeline 1/1 (all 6 statements).
+
+## Notes / correct-by-design behaviors (not bugs)
+- The plain CLI `text` command on a >3-page PDF is correctly blocked by the
+  PyMuPDF Pro 3-page guard (PRO_PAGE_LIMIT_EXCEEDED). The GUI handles long
+  statements via 3-Page-Mode (splitâ†’per-segment editâ†’merge), proven above.
+- Balance-out correctness on a *real imbalance* needs a statement with a
+  genuine math error; the AU samples parse as already-balanced, so the Gemini
+  proposal path returns no changes (correct). The bbox-resolution fix ensures
+  any proposed change is applyable.
+- Tesseract OCR is disabled in this build (leptess absent); low-text pages are
+  skipped with a log warning (documented, build-gated).
+
+## Improvements implemented this pass
+- split_pdf robustness rewrite (#4) â€” the headline fix.
+- Single-edit font-coverage fallback + review flag (#3).
+- verify clap flag fix (#1) and CLI extract race fix (#2).
+
+
+================================================================================
+FILE: output\smoketest_full\FINDINGS.md
+================================================================================
+# Full Function Simulation â€” Findings & Improvement List
+
+> **Historical (pre-v0.5.1):** All bugs listed below (BUG #1â€“#4) have been fixed. The pipeline now includes multi-backend parsers, multi-layer verification, and automatic fallback chains. See `CHANGELOG.md` for the full v0.5.1 changelog.
+
+Date: 2026-06-01. Driver: CLI (shares the exact Job/JobResult runtime as the GUI buttons).
+PDFs: examples/sample.pdf, mixed_content.pdf, multi_page_fonts.pdf.
+
+## Per-function results
+
+| Function (Job) | GUI button | Result | Notes |
+|---|---|---|---|
+| RenderPage | page nav / canvas | âœ… PASS | pdfium-render rasterizes all 3 PDFs, ~1.7s each |
+| ApplyChange | "Apply Edit" | âœ… PASS | Edit lands, localized: diff bbox = headline row only, 0.87% page changed, rest pixel-identical. PyMuPDF Pro trial active. |
+| BalanceStatement | "Analyze Document" | âœ… PASS | Doc AI + Gemini path runs; sample is already balanced ($0). |
+| BalanceAndApplyAll | "Adjust entire statement & apply all" | âœ… PASS (ran) | End-to-end ran; sample balanced so no changes applied. bbox-resolution fix in place. |
+| ExtractTransactions | (Extract) | âŒ BUG #1 | "Unexpected result from runtime" â€” race: LoadDocument fires async FontAnalysisReady which the CLI's wait_for_terminal_result returns before DocumentLoaded. |
+| Verify | "Run Full Audit" | âŒ BUG #2 | clap PANIC at startup: verify's `original` and `output_dir` both use short flag `-o`. Command unusable. |
+| Doctor | â€” | âœ… PASS | Doc AI auth via ADC âœ“, runtime âœ“, 10 templates âœ“ |
+
+## Bugs / improvements to implement
+
+1. **[BUG] `verify` clap short-flag collision (`-o`)** â€” `output_dir` must not reuse `-o`. Fix: remove `short` from `output_dir` (use long `--output-dir` only). HIGH â€” command is 100% broken.
+
+2. **[BUG] CLI Extract race on LoadDocument** â€” `wait_for_terminal_result` returns the first non-progress result, but LoadDocument emits both `FontAnalysisReady` (often a cache hit, arrives first) and `DocumentLoaded`. Fix: make the waiter skip `FontAnalysisReady` (treat as non-terminal, like Progress), OR have Extract wait specifically for `DocumentLoaded`. Apply the skip in `wait_for_terminal_result` so all CLI flows are robust. MEDIUM.
+
+3. **[ROBUSTNESS] `text` edit silently "succeeds" on a non-overlapping bbox** â€” a bbox that matches no span produced 0 pixel change yet returned "Change applied successfully." Improvement: when redaction/replacement finds no overlapping span for the target rect, surface a review warning (requires_visual_review) or a distinct status so the user knows nothing was edited. MEDIUM.
+
+4. **[ENV] Tesseract OCR disabled** â€” balance path logs "Tesseract OCR is disabled (leptess not present)" and skips pages with <10 text blocks. For scanned/low-text statements this silently reduces extraction. Improvement: surface this as a one-time user-visible warning in the balance/extract result rather than only a log line. LOW (build-dependency gated).
+
+5. **[VERIFY robustness] Verify depends on Python GetAllTransactions for both original and edited** â€” fine, but once #1 is fixed, re-run to confirm the math+visual diff path end-to-end.
+
+## Fidelity verdict
+- Edit fidelity is excellent: edits are pixel-local to the targeted span; non-edited regions are byte/pixel-identical at the same DPI.
+- Render fidelity: full-page raster matches expected dimensions (1700x2200 @ 200 DPI for letter).
+
+
+================================================================================
+FILE: .junie\guidelines.md
+================================================================================
+# Junie Project Guidelines
+
+## Autonomy Policy (MAX)
+
+Junie is granted maximum autonomy on this project. Junie SHOULD act without
+asking for confirmation and SHOULD automatically run commands and make changes
+needed to diagnose, fix, build, test, and validate the project.
+
+Junie may, without asking first:
+
+- Inspect any file in the repository and read build/test/runtime logs.
+- Modify source files, configuration, tests, scripts, and CI workflows.
+- Create, edit, move, or delete files that Junie itself generated.
+- Install or select the required Rust toolchain (default: 1.88.0).
+- Run formatting, linting, build, and test commands.
+- Run the application (CLI `doctor`, `verify-api-keys`, and the `gui`) to validate behavior.
+- Repeat the diagnose -> fix -> validate loop until resolved or genuinely blocked.
+
+Prefer durable project-level fixes over temporary local workarounds.
+Default to acting and reporting afterward rather than pausing to ask.
+
+## Auto-approved (non-destructive) commands
+
+    cargo check
+    cargo build
+    cargo build --release
+    cargo test
+    cargo clippy --all-targets --all-features -- -D warnings
+    cargo fmt
+    cargo run -- doctor
+    cargo run -- verify-api-keys
+    cargo run -- gui
+    rustup install 1.88.0
+    rustup override unset
+    rustc --version
+    cargo --version
+    python --version
+    pip --version
+    node --version
+    npm --version
+    git status
+    git diff
+    git log
+
+## Commands that STILL require explicit confirmation
+
+These remain gated even under MAX autonomy because they are destructive,
+irreversible, externally visible, or may expose secrets / spend credits:
+
+    git reset --hard
+    git clean -fdx
+    git push
+    git commit
+    git rebase
+    cargo publish
+    docker push
+    railway up / railway deploy
+    rm -rf / Remove-Item -Recurse -Force
+
+Also requires confirmation:
+
+- Uploading files or modifying remote repository state / Git history.
+- Reading or modifying `.env`, private keys, tokens, or credentials.
+- Deleting or modifying real bank statements, customer data, or generated audit/output files not created in the current
+  session.
+- Commands that may spend significant API credits or expose secrets in logs.
+
+## Secrets policy
+
+Never print, copy, rewrite, or commit secrets. May report whether a variable is
+set (e.g. "GEMINI_API_KEY is set") but never its value. May read `.env.example`
+but not `.env` unless explicitly instructed.
+
+## Multi-engine invariant
+
+This app must keep ALL PDF engines available for the entire lifecycle via
+`PdfEngineSelector` (Auto / DualConcurrent / NativeOnly / PyMuPdfOnly /
+TypstReconstruct). Do not remove any engine. Every pipeline stage must have at
+least one offline fallback.
+
+## Multi-backend architecture
+
+Every cloud integration must have an offline fallback:
+- Cloud parsers (Mindee, LlamaParse, DocAI) â†’ offline_parser
+- AI balance/validation (Gemini) â†’ local balance engine
+- Cloud rendering (pdfRest) â†’ local Pdfium
+- Visual AI (Applitools) â†’ SSIM-only metrics
+- PyMuPDF edit â†’ Pdfium â†’ Typst Reconstruct (ultimate)
+
+New backends must:
+1. Register in `ApiAvailability` (`src/app/config.rs`)
+2. Add to the relevant mode enum
+3. Surface in Backend Preferences UI (`src/app/modals.rs`)
+4. Add key to `.env.example`
+
+## Validation
+
+Run the narrowest useful check first, escalate as needed:
+
+    cargo check
+    cargo test
+    cargo clippy --all-targets --all-features -- -D warnings
+    cargo fmt
+
+If full validation is too slow, run targeted checks and report what was skipped.
+
+## Reporting format
+
+At the end of each session summarize: root cause, files changed, commands run,
+validation result, and any remaining manual steps.
+
+
+================================================================================
+FILE: .env.example
+================================================================================
+# Bank Statement Fidelity Editor v0.5.0 Configuration
+# Copy this file to .env and fill in your API keys.
+# .env is gitignored â€” never commit it.
+
+# =============================================================================
+# SECURITY (Required)
+# =============================================================================
+# Strong passphrase to unlock the pipeline
+DUAL_CORE_PASSPHRASE=your_secure_passphrase_here
+
+# =============================================================================
+# PDF ENGINE
+# =============================================================================
+# PyMuPDF Pro License Key (trial keys at https://pymupdf.io/try-pro/)
+PYMUPDF_PRO_KEY=your_pymupdf_pro_key_here
+
+# =============================================================================
+# AI PROVIDER â€” Gemini
+# =============================================================================
+# Google Gemini API Key (get at https://aistudio.google.com/app/apikey)
+GEMINI_API_KEY=your_gemini_api_key
+
+# Auth mode: "api_key" (default) or "vertex" (enterprise, uses SA/ADC)
+GEMINI_AUTH_MODE=api_key
+
+# =============================================================================
+# DOCUMENT PARSERS
+# =============================================================================
+
+# --- Mindee (DEFAULT parser) ---
+# Financial Document API key (get at https://platform.mindee.com/)
+MINDEE_API_KEY=
+
+# --- LlamaParse (LLM-based parser) ---
+# API key (get at https://cloud.llamaindex.ai/)
+LLAMAPARSE_API_KEY=
+
+# --- Google Document AI ---
+DOCUMENT_AI_PROJECT_ID=your_gcp_project_id
+DOCUMENT_AI_LOCATION=us
+DOCUMENT_AI_PROCESSOR_ID=your_processor_id
+
+# Auth: Service account JSON path. Not needed if you ran
+# `gcloud auth application-default login`.
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
+
+# Document AI API key (Beta v1beta3 endpoint). ADC/SA act as fallbacks.
+# Get at https://console.cloud.google.com/apis/credentials
+DOCUMENT_AI_API_KEY=
+
+# =============================================================================
+# VERIFICATION
+# =============================================================================
+
+# pdfRest â€” Adobe-tier cloud PDF rendering for visual diff
+# Get at https://pdfrest.com/ â†’ Dashboard â†’ API Keys
+PDFREST_API_KEY=
+
+# Applitools Eyes â€” Visual AI testing (optional additive layer)
+# Get at https://eyes.applitools.com/ â†’ Profile â†’ My API Key
+APPLITOOLS_API_KEY=
+
+# =============================================================================
+# TELEMETRY & LOGGING (Optional)
+# =============================================================================
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+OTEL_SERVICE_NAME=dual-core-pdf-pipeline
+RUST_LOG=info
+LOG_DIR=./logs
+
+
+

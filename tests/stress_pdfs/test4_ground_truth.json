@@ -1,0 +1,57 @@
+{
+  "ground_truth_page": 1,
+  "artifact_page": 2,
+  "artifact": {
+    "line": 4,
+    "description": "Grocery Store",
+    "expected_y": 152,
+    "actual_y": 152.75,
+    "shift_px": 1,
+    "shift_pt": 0.75,
+    "expected_x_amount": 420,
+    "actual_x_amount": 420.75
+  },
+  "total_entries": 8,
+  "entries": [
+    {
+      "date": "2026-04-01",
+      "desc": "Opening Balance",
+      "amount": "$12,500.00"
+    },
+    {
+      "date": "2026-04-03",
+      "desc": "Direct Deposit",
+      "amount": "$3,200.00"
+    },
+    {
+      "date": "2026-04-05",
+      "desc": "Rent Payment",
+      "amount": "$1,800.00"
+    },
+    {
+      "date": "2026-04-07",
+      "desc": "Grocery Store",
+      "amount": "$156.42"
+    },
+    {
+      "date": "2026-04-10",
+      "desc": "Utility Bill",
+      "amount": "$234.87"
+    },
+    {
+      "date": "2026-04-12",
+      "desc": "Online Transfer",
+      "amount": "$500.00"
+    },
+    {
+      "date": "2026-04-15",
+      "desc": "Salary Credit",
+      "amount": "$4,100.00"
+    },
+    {
+      "date": "2026-04-18",
+      "desc": "Insurance",
+      "amount": "$312.50"
+    }
+  ]
+}

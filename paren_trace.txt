@@ -1,0 +1,492 @@
+3470: p=1 tokio::spawn(async move {
+3471: p=2 let _ = res_tx.send(JobResult::WorkflowStageChanged {
+3472: p=2 stage: crate::engine::workflow::WorkflowStage::Parsing,
+3473: p=1 });
+3474: p=1 
+3475: p=1 // ---€ Tier 1: Determine parsing strategy -------------------€
+3476: p=1 use crate::app::config::DocumentParserMode;
+3477: p=1 
+3478: p=1 let stmt = match parser_mode {
+3479: p=1 // -- Document AI (online) ----------------------------
+3480: p=1 DocumentParserMode::DocumentAi => {
+3481: p=1 let _ = res_tx.send(JobResult::Progress { label: "Parsing with Document AI".into
+3482: p=1 
+3483: p=1 let doc_ai_result = crate::ai::document_ai::DocumentAiClient::from_app_config(&c
+3484: p=1 match doc_ai_result {
+3485: p=1 Ok(client) => {
+3486: p=1 let doc_ai = std::sync::Arc::new(client);
+3487: p=1 
+3488: p=1 // Page count for smart batching
+3489: p=1 let page_count = {
+3490: p=1 let p = input.clone();
+3491: p=2 tokio::task::spawn_blocking(move || -> usize {
+3492: p=2 use pdfium_render::prelude::Pdfium;
+3493: p=2 let bindings = Pdfium::bind_to_library(Pdfium::pdfium_platform_library_name_at_p
+3494: p=2 .or_else(|_| Pdfium::bind_to_system_library());
+3495: p=2 let pdfium = match bindings {
+3496: p=2 Ok(b) => Pdfium::new(b),
+3497: p=2 Err(e) => {
+3498: p=2 tracing::error!("Failed to bind Pdfium: {}", e);
+3499: p=2 return 0;
+3500: p=2 }
+3501: p=2 };
+3502: p=2 pdfium
+3503: p=2 .load_pdf_from_file(&p, None)
+3504: p=2 .map(|d| d.pages().len() as usize)
+3505: p=2 .unwrap_or(0)
+3506: p=1 })
+3507: p=1 .await
+3508: p=1 .unwrap_or(0)
+3509: p=1 };
+3510: p=1 
+3511: p=1 let final_version = version.unwrap_or_else(|| "pretrained-bankstatement-v5.0-202
+3512: p=1 let _ = res_tx.send(JobResult::Progress { label: format!("Parsing with {final_ve
+3513: p=1 
+3514: p=1 match doc_ai.parse_smart_batch(&input, Some(&final_version), page_count).await {
+3515: p=1 Ok(s) => {
+3516: p=1 tracing::info!("[workflow] Parser version {} yielded {} transactions.", final_ve
+3517: p=1 
+3518: p=1 // Phase 5: Fidelity Check (Strict Math Verification)
+3519: p=1 let mut retail_sum = s.opening_balance;
+3520: p=1 let mut formal_sum = s.opening_balance;
+3521: p=1 for tx in &s.transactions {
+3522: p=1 let d = tx.debit.unwrap_or(rust_decimal::Decimal::ZERO);
+3523: p=1 let c = tx.credit.unwrap_or(rust_decimal::Decimal::ZERO);
+3524: p=1 retail_sum += d - c;
+3525: p=1 formal_sum += c - d;
+3526: p=1 }
+3527: p=1 let expected = s.closing_balance;
+3528: p=1 let retail_diff = (retail_sum - expected).abs();
+3529: p=1 let formal_diff = (formal_sum - expected).abs();
+3530: p=1 let one_cent = rust_decimal_macros::dec!(0.01);
+3531: p=1 
+3532: p=1 if !s.transactions.is_empty() && s.opening_balance != rust_decimal::Decimal::ZER
+3533: p=1 let msg = format!("AI Fidelity Math Check Failed. Expected Closing: {expected}, 
+3534: p=1 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowF
+3535: p=1 return;
+3536: p=1 }
+3537: p=1 
+3538: p=1 s
+3539: p=1 }
+3540: p=1 Err(e) => {
+3541: p=1 // Auto-fallback to Mindee
+3542: p=1 tracing::warn!("[workflow] Document AI parse failed: {e}; falling back to Mindee
+3543: p=1 let _ = res_tx.send(JobResult::Progress { label: format!("Document AI failed, fa
+3544: p=1 let mut final_s = None;
+3545: p=1 match crate::ai::mindee::MindeeClient::from_app_config(&cfg) {
+3546: p=1 Ok(client) => match client.parse_statement(&input).await {
+3547: p=1 Ok(s) => final_s = Some(s),
+3548: p=1 Err(me) => tracing::warn!("Mindee fallback failed: {me}"),
+3549: p=1 }
+3550: p=1 Err(me) => tracing::warn!("Mindee not configured for fallback: {me}"),
+3551: p=1 }
+3552: p=1 
+3553: p=1 if let Some(s) = final_s {
+3554: p=1 s
+3555: p=1 } else {
+3556: p=1 tracing::warn!("[workflow] Mindee fallback failed/unavailable; falling back to o
+3557: p=1 let _ = res_tx.send(JobResult::Progress { label: format!("Mindee failed, falling
+3558: p=1 let eng = engine_for_tokio.clone();
+3559: p=1 let path = input.clone();
+3560: p=2 match tokio::task::spawn_blocking(move || {
+3561: p=2 crate::engine::offline_parser::parse_statement_offline(&path, eng)
+3562: p=1 }).await {
+3563: p=1 Ok(Ok(s)) => s,
+3564: p=1 Ok(Err(e2)) => {
+3565: p=4 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowF
+3566: p=4 format!("Document AI failed: {e}. Offline fallback also failed: {e2}")
+3567: p=1 )));
+3568: p=1 return;
+3569: p=1 }
+3570: p=1 Err(e2) => {
+3571: p=4 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowF
+3572: p=4 format!("Document AI failed: {e}. Offline fallback panicked: {e2}")
+3573: p=1 )));
+3574: p=1 return;
+3575: p=1 }
+3576: p=1 }
+3577: p=1 }
+3578: p=1 }
+3579: p=1 }
+3580: p=1 } // closes Ok(client)
+3581: p=1 Err(e) => {
+3582: p=1 // Document AI not configured - auto-fallback to Mindee
+3583: p=1 tracing::warn!("[workflow] Document AI not configured: {e}; auto-falling back to
+3584: p=1 let _ = res_tx.send(JobResult::Progress { label: "Document AI not configured, tr
+3585: p=1 let mut final_s = None;
+3586: p=1 match crate::ai::mindee::MindeeClient::from_app_config(&cfg) {
+3587: p=1 Ok(client) => match client.parse_statement(&input).await {
+3588: p=1 Ok(s) => final_s = Some(s),
+3589: p=1 Err(me) => tracing::warn!("Mindee fallback failed: {me}"),
+3590: p=1 }
+3591: p=1 Err(me) => tracing::warn!("Mindee not configured for fallback: {me}"),
+3592: p=1 }
+3593: p=1 
+3594: p=1 if let Some(s) = final_s {
+3595: p=1 s
+3596: p=1 } else {
+3597: p=1 tracing::warn!("[workflow] Mindee fallback failed/unavailable; falling back to o
+3598: p=1 let _ = res_tx.send(JobResult::Progress { label: "Mindee not configured, using o
+3599: p=1 let eng = engine_for_tokio.clone();
+3600: p=1 let path = input.clone();
+3601: p=2 match tokio::task::spawn_blocking(move || {
+3602: p=2 crate::engine::offline_parser::parse_statement_offline(&path, eng)
+3603: p=1 }).await {
+3604: p=1 Ok(Ok(s)) => s,
+3605: p=1 Ok(Err(e2)) => {
+3606: p=4 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowF
+3607: p=4 format!("Document AI not configured ({e}) and offline parser failed: {e2}")
+3608: p=1 )));
+3609: p=1 return;
+3610: p=1 }
+3611: p=1 Err(e2) => {
+3612: p=4 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowF
+3613: p=4 format!("Offline parser panicked: {e2}")
+3614: p=1 )));
+3615: p=1 return;
+3616: p=1 }
+3617: p=1 }
+3618: p=1 }
+3619: p=1 }
+3620: p=1 }
+3621: p=1 
+3622: p=1 // -- Mindee Financial Document (online) --------------
+3623: p=1 // ── LlamaParse (online) ──────────────
+3624: p=1 DocumentParserMode::LlamaParse => {
+3625: p=1 let mut final_stmt = None;
+3626: p=1 let mut errors = Vec::new();
+3627: p=1 
+3628: p=1 // 1. Try LlamaParse
+3629: p=1 let _ = res_tx.send(JobResult::Progress { label: "Parsing with LlamaParse...".in
+3630: p=1 match crate::ai::llamaparse::LlamaParseClient::from_app_config(&cfg) {
+3631: p=1 Ok(client) => match client.parse_statement(&input).await {
+3632: p=1 Ok(s) => final_stmt = Some(s),
+3633: p=1 Err(e) => errors.push(format!("LlamaParse failed: {}", e)),
+3634: p=1 },
+3635: p=1 Err(e) => errors.push(format!("LlamaParse not configured: {}", e)),
+3636: p=1 }
+3637: p=1 
+3638: p=1 // 2. Try DocumentAI
+3639: p=1 if final_stmt.is_none() {
+3640: p=1 let _ = res_tx.send(JobResult::Progress { label: "Falling back to Document AI...
+3641: p=1 let page_count = {
+3642: p=1 let p = input.clone();
+3643: p=2 tokio::task::spawn_blocking(move || -> usize {
+3644: p=2 use pdfium_render::prelude::Pdfium;
+3645: p=2 let bindings = Pdfium::bind_to_library(Pdfium::pdfium_platform_library_name_at_p
+3646: p=2 match bindings { Ok(b) => Pdfium::new(b).load_pdf_from_file(&p, None).map(|d| d.
+3647: p=1 }).await.unwrap_or(0)
+3648: p=1 };
+3649: p=1 match crate::ai::document_ai::DocumentAiClient::from_app_config(&cfg) {
+3650: p=1 Ok(client) => {
+3651: p=1 let doc_ai = std::sync::Arc::new(client);
+3652: p=1 let final_version = version.clone().unwrap_or_else(|| "pretrained-bankstatement-
+3653: p=1 match doc_ai.parse_smart_batch(&input, Some(&final_version), page_count).await {
+3654: p=1 Ok(s) => final_stmt = Some(s),
+3655: p=1 Err(e) => errors.push(format!("DocumentAI failed: {}", e)),
+3656: p=1 }
+3657: p=1 }
+3658: p=1 Err(e) => errors.push(format!("DocumentAI not configured: {}", e)),
+3659: p=1 }
+3660: p=1 }
+3661: p=1 
+3662: p=1 // 3. Try Mindee
+3663: p=1 if final_stmt.is_none() {
+3664: p=1 let _ = res_tx.send(JobResult::Progress { label: "Falling back to Mindee...".int
+3665: p=1 match crate::ai::mindee::MindeeClient::from_app_config(&cfg) {
+3666: p=1 Ok(client) => match client.parse_statement(&input).await {
+3667: p=1 Ok(s) => final_stmt = Some(s),
+3668: p=1 Err(e) => errors.push(format!("Mindee failed: {}", e)),
+3669: p=1 }
+3670: p=1 Err(e) => errors.push(format!("Mindee not configured: {}", e)),
+3671: p=1 }
+3672: p=1 }
+3673: p=1 
+3674: p=1 // 4. Try Offline Parser
+3675: p=1 let s = if let Some(stmt) = final_stmt {
+3676: p=1 stmt
+3677: p=1 } else {
+3678: p=1 let _ = res_tx.send(JobResult::Progress { label: "Falling back to offline parser
+3679: p=1 let eng = engine_for_tokio.clone();
+3680: p=1 let path = input.clone();
+3681: p=2 match tokio::task::spawn_blocking(move || {
+3682: p=2 crate::engine::offline_parser::parse_statement_offline(&path, eng)
+3683: p=1 }).await {
+3684: p=1 Ok(Ok(s)) => s,
+3685: p=1 Ok(Err(e)) => {
+3686: p=1 errors.push(format!("Offline parser failed: {}", e));
+3687: p=1 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowF
+3688: p=1 return;
+3689: p=1 }
+3690: p=1 Err(e) => {
+3691: p=1 errors.push(format!("Offline parser panicked: {}", e));
+3692: p=1 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowF
+3693: p=1 return;
+3694: p=1 }
+3695: p=1 }
+3696: p=1 };
+3697: p=1 
+3698: p=1 // Phase 5: Fidelity Check
+3699: p=1 let mut retail_sum = s.opening_balance;
+3700: p=1 let mut formal_sum = s.opening_balance;
+3701: p=1 for tx in &s.transactions {
+3702: p=1 let d = tx.debit.unwrap_or(rust_decimal::Decimal::ZERO);
+3703: p=1 let c = tx.credit.unwrap_or(rust_decimal::Decimal::ZERO);
+3704: p=1 retail_sum += d - c;
+3705: p=1 formal_sum += c - d;
+3706: p=1 }
+3707: p=1 let expected = s.closing_balance;
+3708: p=1 let retail_diff = (retail_sum - expected).abs();
+3709: p=1 let formal_diff = (formal_sum - expected).abs();
+3710: p=1 let one_cent = rust_decimal_macros::dec!(0.01);
+3711: p=1 
+3712: p=1 if !s.transactions.is_empty() && s.opening_balance != rust_decimal::Decimal::ZER
+3713: p=1 let msg = format!("AI Fidelity Math Check Failed. Expected Closing: {expected}, 
+3714: p=1 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowF
+3715: p=1 return;
+3716: p=1 }
+3717: p=1 
+3718: p=1 tracing::info!("[workflow] LlamaParse sequence yielded {} transactions.", s.tran
+3719: p=1 let _ = res_tx.send(JobResult::Progress { label: format!("Extracted {} transacti
+3720: p=1 
+3721: p=1 s
+3722: p=1 }
+3723: p=1 
+3724: p=1 DocumentParserMode::MindeeFinDoc => {
+3725: p=1 let _ = res_tx.send(JobResult::Progress { label: "Parsing with Mindee (Financial
+3726: p=1 
+3727: p=1 match crate::ai::mindee::MindeeClient::from_app_config(&cfg) {
+3728: p=1 Ok(client) => {
+3729: p=1 let _ = res_tx.send(JobResult::Progress { label: "Mindee: uploading document..."
+3730: p=1 
+3731: p=1 match client.parse_statement(&input).await {
+3732: p=1 Ok(s) => {
+3733: p=1 tracing::info!("[workflow] Mindee yielded {} transactions.", s.transactions.len(
+3734: p=1 let _ = res_tx.send(JobResult::Progress { label: format!("Mindee: {} transaction
+3735: p=1 
+3736: p=1 // Phase 5: Fidelity Check (Strict Math Verification)
+3737: p=1 let mut retail_sum = s.opening_balance;
+3738: p=1 let mut formal_sum = s.opening_balance;
+3739: p=1 for tx in &s.transactions {
+3740: p=1 let d = tx.debit.unwrap_or(rust_decimal::Decimal::ZERO);
+3741: p=1 let c = tx.credit.unwrap_or(rust_decimal::Decimal::ZERO);
+3742: p=1 retail_sum += d - c;
+3743: p=1 formal_sum += c - d;
+3744: p=1 }
+3745: p=1 let expected = s.closing_balance;
+3746: p=1 let retail_diff = (retail_sum - expected).abs();
+3747: p=1 let formal_diff = (formal_sum - expected).abs();
+3748: p=1 let one_cent = rust_decimal_macros::dec!(0.01);
+3749: p=1 
+3750: p=1 if !s.transactions.is_empty() && s.opening_balance != rust_decimal::Decimal::ZER
+3751: p=1 let msg = format!("Mindee Fidelity Math Check Failed. Expected Closing: {expecte
+3752: p=1 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowF
+3753: p=1 return;
+3754: p=1 }
+3755: p=1 
+3756: p=1 s
+3757: p=1 }
+3758: p=1 Err(e) => {
+3759: p=1 // Auto-fallback to offline parsing
+3760: p=1 tracing::warn!("[workflow] Mindee parse failed: {e}; falling back to offline par
+3761: p=1 let _ = res_tx.send(JobResult::Progress { label: format!("Mindee failed ({e}), f
+3762: p=1 
+3763: p=1 let eng = engine_for_tokio.clone();
+3764: p=1 let path = input.clone();
+3765: p=2 match tokio::task::spawn_blocking(move || {
+3766: p=2 crate::engine::offline_parser::parse_statement_offline(&path, eng)
+3767: p=1 }).await {
+3768: p=1 Ok(Ok(s)) => s,
+3769: p=1 Ok(Err(e2)) => {
+3770: p=4 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowF
+3771: p=4 format!("Mindee failed: {e}. Offline fallback also failed: {e2}")
+3772: p=1 )));
+3773: p=1 return;
+3774: p=1 }
+3775: p=1 Err(e2) => {
+3776: p=4 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowF
+3777: p=4 format!("Mindee failed: {e}. Offline fallback panicked: {e2}")
+3778: p=1 )));
+3779: p=1 return;
+3780: p=1 }
+3781: p=1 }
+3782: p=1 }
+3783: p=1 }
+3784: p=1 }
+3785: p=1 Err(e) => {
+3786: p=1 // Mindee not configured - auto-fallback to offline
+3787: p=1 tracing::warn!("[workflow] Mindee not configured: {e}; auto-falling back to offl
+3788: p=1 let _ = res_tx.send(JobResult::Progress { label: "Mindee not configured, using o
+3789: p=1 
+3790: p=1 let eng = engine_for_tokio.clone();
+3791: p=1 let path = input.clone();
+3792: p=2 match tokio::task::spawn_blocking(move || {
+3793: p=2 crate::engine::offline_parser::parse_statement_offline(&path, eng)
+3794: p=1 }).await {
+3795: p=1 Ok(Ok(s)) => s,
+3796: p=1 Ok(Err(e2)) => {
+3797: p=4 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowF
+3798: p=4 format!("Mindee not configured ({e}) and offline parser failed: {e2}")
+3799: p=1 )));
+3800: p=1 return;
+3801: p=1 }
+3802: p=1 Err(e2) => {
+3803: p=4 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowF
+3804: p=4 format!("Offline parser panicked: {e2}")
+3805: p=1 )));
+3806: p=1 return;
+3807: p=1 }
+3808: p=1 }
+3809: p=1 }
+3810: p=1 }
+3811: p=1 }
+3812: p=1 
+3813: p=1 // -- PyMuPDF built-in (offline) ----------------------
+3814: p=1 DocumentParserMode::PyMuPdfBuiltin => {
+3815: p=1 let _ = res_tx.send(JobResult::Progress { label: "Parsing with PyMuPDF (offline)
+3816: p=1 let eng = engine_for_tokio.clone();
+3817: p=1 let path = input.clone();
+3818: p=2 match tokio::task::spawn_blocking(move || {
+3819: p=2 crate::engine::offline_parser::parse_statement_offline(&path, eng)
+3820: p=1 }).await {
+3821: p=1 Ok(Ok(s)) => s,
+3822: p=1 Ok(Err(e)) => {
+3823: p=4 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowF
+3824: p=4 format!("Offline parser failed: {e}")
+3825: p=1 )));
+3826: p=1 return;
+3827: p=1 }
+3828: p=1 Err(e) => {
+3829: p=4 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowF
+3830: p=4 format!("Offline parser panicked: {e}")
+3831: p=1 )));
+3832: p=1 return;
+3833: p=1 }
+3834: p=1 }
+3835: p=1 }
+3836: p=1 
+3837: p=1 // -- Local OCR (ocrs, offline, feature-gated) --------
+3838: p=1 DocumentParserMode::LocalOcrs => {
+3839: p=1 let _ = res_tx.send(JobResult::Progress { label: "Parsing with Local OCR (ocrs).
+3840: p=1 
+3841: p=1 // Try ocrs first, fallback to PyMuPDF text extraction
+3842: p=1 let eng = engine_for_tokio.clone();
+3843: p=1 let path = input.clone();
+3844: p=2 match tokio::task::spawn_blocking(move || {
+3845: p=2 // First try OCR-based extraction
+3846: p=2 let ocrs_result = {
+3847: p=3 let ocr_engine = crate::extractors::OcrsEngine::new(
+3848: p=3 crate::extractors::ocrs_engine::OcrsConfig::default(),
+3849: p=2 );
+3850: p=2 use crate::extractors::GeometryProvider;
+3851: p=2 ocr_engine.extract_line_geometry(&path)
+3852: p=2 };
+3853: p=2 
+3854: p=2 match ocrs_result {
+3855: p=2 Ok(geometries) if !geometries.is_empty() => {
+3856: p=2 let total_pages = geometries.iter().map(|g| g.page).max().unwrap_or(0) + 1;
+3857: p=2 crate::engine::offline_parser::parse_statement_from_geometry(&geometries, total_
+3858: p=2 }
+3859: p=2 Ok(_) | Err(_) => {
+3860: p=2 // OCR produced nothing or failed - fallback to text layer
+3861: p=2 tracing::warn!("[workflow] LocalOCR produced no results; falling back to PyMuPDF
+3862: p=2 crate::engine::offline_parser::parse_statement_offline(&path, eng)
+3863: p=2 }
+3864: p=2 }
+3865: p=1 }).await {
+3866: p=1 Ok(Ok(s)) => s,
+3867: p=1 Ok(Err(e)) => {
+3868: p=4 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowF
+3869: p=4 format!("Local OCR + offline parser failed: {e}")
+3870: p=1 )));
+3871: p=1 return;
+3872: p=1 }
+3873: p=1 Err(e) => {
+3874: p=4 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowF
+3875: p=4 format!("Local OCR panicked: {e}")
+3876: p=1 )));
+3877: p=1 return;
+3878: p=1 }
+3879: p=1 }
+3880: p=1 }
+3881: p=1 };
+3882: p=1 
+3883: p=1 // ---€ AI Completeness Validation ---------------------------€
+3884: p=1 // If AI provider is ManualOnly, skip Gemini validation entirely
+3885: p=1 use crate::app::config::AiProviderMode;
+3886: p=1 
+3887: p=1 let (score, notes, missing, _math_ok) = match ai_provider {
+3888: p=1 AiProviderMode::ManualOnly => {
+3889: p=1 let _ = res_tx.send(JobResult::Progress { label: "AI validation skipped (Manual 
+3890: p=1 (0.8, "AI validation skipped (Manual Only mode).".into(), vec![], false)
+3891: p=1 }
+3892: p=1 _ => {
+3893: p=1 let _ = res_tx.send(JobResult::Progress { label: "Asking Gemini to validate comp
+3894: p=1 
+3895: p=1 let gemini_init_and_validate = async {
+3896: p=1 let g = crate::ai::backend::AiBackend::from_app_config_async(&cfg).await?;
+3897: p=2 g.validate_parse_completeness(
+3898: p=2 &stmt.transactions,
+3899: p=2 crate::engine::model::dec_to_f64(stmt.opening_balance),
+3900: p=2 crate::engine::model::dec_to_f64(stmt.closing_balance),
+3901: p=2 stmt.total_pages,
+3902: p=1 ).await
+3903: p=1 };
+3904: p=1 
+3905: p=1 match tokio::time::timeout(std::time::Duration::from_secs(30), gemini_init_and_v
+3906: p=1 Ok(Ok(r)) => (r.completeness_score, r.notes, r.missing_rows, r.math_consistent),
+3907: p=1 Ok(Err(e)) => {
+3908: p=1 tracing::warn!("[workflow] Gemini validation failed: {e}; continuing");
+3909: p=1 let _ = res_tx.send(JobResult::Progress { label: format!("AI validation skipped:
+3910: p=1 (0.7, format!("Gemini validation skipped: {e}"), vec![], false)
+3911: p=1 }
+3912: p=1 Err(_elapsed) => {
+3913: p=1 tracing::warn!("[workflow] Gemini validation timed out after 30s; continuing wit
+3914: p=1 let _ = res_tx.send(JobResult::Progress { label: "AI validation timed out after 
+3915: p=1 (0.7, "Gemini validation timed out; skipped.".into(), vec![], false)
+3916: p=1 }
+3917: p=1 }
+3918: p=1 }
+3919: p=1 };
+3920: p=1 
+3921: p=1 let validation = crate::engine::workflow::ParseValidation {
+3922: p=1 total_pages: stmt.total_pages,
+3923: p=1 transactions_found: stmt.transactions.len(),
+3924: p=1 opening_balance: stmt.opening_balance,
+3925: p=1 closing_balance: stmt.closing_balance,
+3926: p=1 account_number: stmt.account_number.clone(),
+3927: p=1 completeness_score: score,
+3928: p=1 completeness_notes: notes,
+3929: p=1 missing_rows: missing,
+3930: p=1 };
+3931: p=1 
+3932: p=1 // Cross-check against the deterministic template extractor
+3933: p=1 let template_row_count = {
+3934: p=1 let eng = engine_for_tokio.clone();
+3935: p=1 let path = input.clone();
+3936: p=1 let templates_dir = std::path::PathBuf::from("bank_templates");
+3937: p=2 tokio::task::spawn_blocking(move || {
+3938: p=3 let provider = crate::extractors::BankTemplateProvider::new(
+3939: p=3 templates_dir.as_path(),
+3940: p=3 eng,
+3941: p=2 );
+3942: p=2 use crate::extractors::GeometryProvider;
+3943: p=2 provider
+3944: p=2 .extract_line_geometry(&path)
+3945: p=2 .map(|g| g.len())
+3946: p=2 .unwrap_or(0)
+3947: p=1 })
+3948: p=1 .await
+3949: p=1 .unwrap_or(0)
+3950: p=1 };
+3951: p=2 let validation = crate::engine::workflow::cross_validate_with_template(
+3952: p=2 validation,
+3953: p=2 template_row_count,
+3954: p=1 );
+3955: p=1 
+3956: p=1 let txs = stmt.transactions.clone();
+3957: p=1 let _ = res_tx.send(JobResult::WorkflowParseValidated { validation: validation.c
+3958: p=2 let _ = res_tx.send(JobResult::WorkflowStageChanged {
+3959: p=2 stage: crate::engine::workflow::WorkflowStage::Editing(validation),
+3960: p=1 });
+3961: p=1 let _ = res_tx.send(JobResult::JobCompleted("WorkflowParseAndValidate".into()));

@@ -1,0 +1,12 @@
+[env]
+# Keep PyO3's stable ABI forward-compatibility available on every host. The
+# concrete Python interpreter is selected by the environment/CI for each OS.
+PYO3_USE_ABI3_FORWARD_COMPATIBILITY = "1"
+
+# Retained for the executable-base-state phase. The download and verification
+# policy is replaced by a pinned, checksummed platform strategy in PDF-006.
+PDFIUM_AUTO_DOWNLOAD = "true"
+
+# Do not set a repository-wide target, linker, archiver, or PATH here. Cargo
+# must select the native host target on Windows, macOS, and Linux development
+# CI. Platform-specific packaging targets belong in their workflow commands.

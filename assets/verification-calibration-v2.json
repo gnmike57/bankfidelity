@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "policy_id": "independent-verifier-v2",
+  "renderer": {
+    "engine": "pdfium",
+    "base_dpi": 300,
+    "edit_region_dpi": 600,
+    "all_pages_required": true,
+    "adaptive_thresholds": false,
+    "adaptive_mask_padding": false
+  },
+  "thresholds": {
+    "outside_region_tile_max": 0.02,
+    "minimum_ssim": 0.4,
+    "maximum_edit_region_residual": 0.25,
+    "mask_padding_points": 0.0,
+    "tile_pixels": 24
+  },
+  "mandatory_gates": [
+    "structure.page_count",
+    "structure.page_geometry",
+    "structure.content_presence",
+    "structure.page_identity",
+    "structure.font_resources",
+    "structure.metadata_policy",
+    "content.intended_edit_membership",
+    "content.editability",
+    "visual.outside_intended_regions",
+    "visual.perceptual_structure",
+    "visual.intended_region_fidelity",
+    "financial.ledger_continuity",
+    "evidence.persistence"
+  ],
+  "calibration_cases": [
+    {
+      "id": "identical-control",
+      "expected": "passed"
+    },
+    {
+      "id": "exact-intended-text-replacement",
+      "expected": "passed"
+    },
+    {
+      "id": "unrequested-visible-mutation",
+      "expected": "failed"
+    },
+    {
+      "id": "missing-page",
+      "expected": "failed"
+    },
+    {
+      "id": "swapped-pages",
+      "expected": "failed"
+    },
+    {
+      "id": "blank-page",
+      "expected": "failed"
+    },
+    {
+      "id": "page-box-or-rotation-drift",
+      "expected": "failed"
+    },
+    {
+      "id": "font-resource-loss",
+      "expected": "failed"
+    },
+    {
+      "id": "metadata-policy-drift",
+      "expected": "failed"
+    },
+    {
+      "id": "stale-or-wrong-target-text",
+      "expected": "failed"
+    },
+    {
+      "id": "duplicate-target-identity",
+      "expected": "failed"
+    },
+    {
+      "id": "financial-balance-mismatch",
+      "expected": "failed"
+    },
+    {
+      "id": "provider-unavailable",
+      "expected": "local-disposition-unchanged-provider-unavailable-explicit"
+    },
+    {
+      "id": "provider-disagreement",
+      "expected": "local-disposition-unchanged-provider-failed-explicit"
+    },
+    {
+      "id": "evidence-write-failure",
+      "expected": "no-verification-result"
+    }
+  ],
+  "repeatability": {
+    "required_runs": 3,
+    "stable_fields": [
+      "disposition",
+      "gate_ids",
+      "gate_statuses",
+      "thresholds",
+      "input_sha256",
+      "artifact_sha256"
+    ]
+  }
+}

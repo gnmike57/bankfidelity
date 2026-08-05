@@ -1,0 +1,494 @@
+3470: count=1 tokio::spawn(async move {
+3471: count=2 let _ = res_tx.send(JobResult::WorkflowStageChanged {
+3472: count=2 stage: crate::engine::workflow::WorkflowStage::Parsing,
+3473: count=1 });
+3474: count=1 
+3475: count=1 // ---€ Tier 1: Determine parsing strategy -------------------€
+3476: count=1 use crate::app::config::DocumentParserMode;
+3477: count=1 
+3478: count=2 let stmt = match parser_mode {
+3479: count=2 // -- Document AI (online) ----------------------------
+3480: count=3 DocumentParserMode::DocumentAi => {
+3481: count=3 let _ = res_tx.send(JobResult::Progress { label: "Parsing with Document AI".into(), fraction: 0.2 });
+3482: count=3 
+3483: count=3 let doc_ai_result = crate::ai::document_ai::DocumentAiClient::from_app_config(&cfg);
+3484: count=4 match doc_ai_result {
+3485: count=5 Ok(client) => {
+3486: count=5 let doc_ai = std::sync::Arc::new(client);
+3487: count=5 
+3488: count=5 // Page count for smart batching
+3489: count=6 let page_count = {
+3490: count=6 let p = input.clone();
+3491: count=7 tokio::task::spawn_blocking(move || -> usize {
+3492: count=7 use pdfium_render::prelude::Pdfium;
+3493: count=7 let bindings = Pdfium::bind_to_library(Pdfium::pdfium_platform_library_name_at_path("./"))
+3494: count=7 .or_else(|_| Pdfium::bind_to_system_library());
+3495: count=8 let pdfium = match bindings {
+3496: count=8 Ok(b) => Pdfium::new(b),
+3497: count=9 Err(e) => {
+3498: count=9 tracing::error!("Failed to bind Pdfium: {}", e);
+3499: count=9 return 0;
+3500: count=8 }
+3501: count=7 };
+3502: count=7 pdfium
+3503: count=7 .load_pdf_from_file(&p, None)
+3504: count=7 .map(|d| d.pages().len() as usize)
+3505: count=7 .unwrap_or(0)
+3506: count=6 })
+3507: count=6 .await
+3508: count=6 .unwrap_or(0)
+3509: count=5 };
+3510: count=5 
+3511: count=5 let final_version = version.unwrap_or_else(|| "pretrained-bankstatement-v5.0-2023-12-06".to_string());
+3512: count=5 let _ = res_tx.send(JobResult::Progress { label: format!("Parsing with {final_version}..."), fraction: 0.4 });
+3513: count=5 
+3514: count=6 match doc_ai.parse_smart_batch(&input, Some(&final_version), page_count).await {
+3515: count=7 Ok(s) => {
+3516: count=7 tracing::info!("[workflow] Parser version {} yielded {} transactions.", final_version, s.transactions.len());
+3517: count=7 
+3518: count=7 // Phase 5: Fidelity Check (Strict Math Verification)
+3519: count=7 let mut retail_sum = s.opening_balance;
+3520: count=7 let mut formal_sum = s.opening_balance;
+3521: count=8 for tx in &s.transactions {
+3522: count=8 let d = tx.debit.unwrap_or(rust_decimal::Decimal::ZERO);
+3523: count=8 let c = tx.credit.unwrap_or(rust_decimal::Decimal::ZERO);
+3524: count=8 retail_sum += d - c;
+3525: count=8 formal_sum += c - d;
+3526: count=7 }
+3527: count=7 let expected = s.closing_balance;
+3528: count=7 let retail_diff = (retail_sum - expected).abs();
+3529: count=7 let formal_diff = (formal_sum - expected).abs();
+3530: count=7 let one_cent = rust_decimal_macros::dec!(0.01);
+3531: count=7 
+3532: count=8 if !s.transactions.is_empty() && s.opening_balance != rust_decimal::Decimal::ZERO && retail_diff > one_cent && formal_diff > one_cent {
+3533: count=8 let msg = format!("AI Fidelity Math Check Failed. Expected Closing: {expected}, computed: {retail_sum} (retail) or {formal_sum} (formal).");
+3534: count=8 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowFailure::FidelityCheckFailed(msg)));
+3535: count=8 return;
+3536: count=7 }
+3537: count=7 
+3538: count=7 s
+3539: count=6 }
+3540: count=7 Err(e) => {
+3541: count=7 // Auto-fallback to Mindee
+3542: count=7 tracing::warn!("[workflow] Document AI parse failed: {e}; falling back to Mindee");
+3543: count=7 let _ = res_tx.send(JobResult::Progress { label: format!("Document AI failed, falling back to Mindee..."), fraction: 0.3 });
+3544: count=7 let mut final_s = None;
+3545: count=8 match crate::ai::mindee::MindeeClient::from_app_config(&cfg) {
+3546: count=9 Ok(client) => match client.parse_statement(&input).await {
+3547: count=9 Ok(s) => final_s = Some(s),
+3548: count=9 Err(me) => tracing::warn!("Mindee fallback failed: {me}"),
+3549: count=8 }
+3550: count=8 Err(me) => tracing::warn!("Mindee not configured for fallback: {me}"),
+3551: count=7 }
+3552: count=7 
+3553: count=8 if let Some(s) = final_s {
+3554: count=8 s
+3555: count=8 } else {
+3556: count=8 tracing::warn!("[workflow] Mindee fallback failed/unavailable; falling back to offline parser");
+3557: count=8 let _ = res_tx.send(JobResult::Progress { label: format!("Mindee failed, falling back to offline parser..."), fraction: 0.35 });
+3558: count=8 let eng = engine_for_tokio.clone();
+3559: count=8 let path = input.clone();
+3560: count=9 match tokio::task::spawn_blocking(move || {
+3561: count=9 crate::engine::offline_parser::parse_statement_offline(&path, eng)
+3562: count=9 }).await {
+3563: count=9 Ok(Ok(s)) => s,
+3564: count=10 Ok(Err(e2)) => {
+3565: count=10 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowFailure::ParseFailed(
+3566: count=10 format!("Document AI failed: {e}. Offline fallback also failed: {e2}")
+3567: count=10 )));
+3568: count=10 return;
+3569: count=9 }
+3570: count=10 Err(e2) => {
+3571: count=10 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowFailure::ParseFailed(
+3572: count=10 format!("Document AI failed: {e}. Offline fallback panicked: {e2}")
+3573: count=10 )));
+3574: count=10 return;
+3575: count=9 }
+3576: count=8 }
+3577: count=7 }
+3578: count=6 }
+3579: count=5 }
+3580: count=4 } // closes Ok(client)
+3581: count=5 Err(e) => {
+3582: count=5 // Document AI not configured - auto-fallback to Mindee
+3583: count=5 tracing::warn!("[workflow] Document AI not configured: {e}; auto-falling back to Mindee");
+3584: count=5 let _ = res_tx.send(JobResult::Progress { label: "Document AI not configured, trying Mindee...".into(), fraction: 0.3 });
+3585: count=5 let mut final_s = None;
+3586: count=6 match crate::ai::mindee::MindeeClient::from_app_config(&cfg) {
+3587: count=7 Ok(client) => match client.parse_statement(&input).await {
+3588: count=7 Ok(s) => final_s = Some(s),
+3589: count=7 Err(me) => tracing::warn!("Mindee fallback failed: {me}"),
+3590: count=6 }
+3591: count=6 Err(me) => tracing::warn!("Mindee not configured for fallback: {me}"),
+3592: count=5 }
+3593: count=5 
+3594: count=6 if let Some(s) = final_s {
+3595: count=6 s
+3596: count=6 } else {
+3597: count=6 tracing::warn!("[workflow] Mindee fallback failed/unavailable; falling back to offline parser");
+3598: count=6 let _ = res_tx.send(JobResult::Progress { label: "Mindee not configured, using offline parser...".into(), fraction: 0.35 });
+3599: count=6 let eng = engine_for_tokio.clone();
+3600: count=6 let path = input.clone();
+3601: count=7 match tokio::task::spawn_blocking(move || {
+3602: count=7 crate::engine::offline_parser::parse_statement_offline(&path, eng)
+3603: count=7 }).await {
+3604: count=7 Ok(Ok(s)) => s,
+3605: count=8 Ok(Err(e2)) => {
+3606: count=8 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowFailure::ParseFailed(
+3607: count=8 format!("Document AI not configured ({e}) and offline parser failed: {e2}")
+3608: count=8 )));
+3609: count=8 return;
+3610: count=7 }
+3611: count=8 Err(e2) => {
+3612: count=8 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowFailure::ParseFailed(
+3613: count=8 format!("Offline parser panicked: {e2}")
+3614: count=8 )));
+3615: count=8 return;
+3616: count=7 }
+3617: count=6 }
+3618: count=5 }
+3619: count=4 }
+3620: count=3 }
+3621: count=3 
+3622: count=3 // -- Mindee Financial Document (online) --------------
+3623: count=3 // ── LlamaParse (online) ──────────────
+3624: count=4 DocumentParserMode::LlamaParse => {
+3625: count=4 let mut final_stmt = None;
+3626: count=4 let mut errors = Vec::new();
+3627: count=4 
+3628: count=4 // 1. Try LlamaParse
+3629: count=4 let _ = res_tx.send(JobResult::Progress { label: "Parsing with LlamaParse...".into(), fraction: 0.2 });
+3630: count=5 match crate::ai::llamaparse::LlamaParseClient::from_app_config(&cfg) {
+3631: count=6 Ok(client) => match client.parse_statement(&input).await {
+3632: count=6 Ok(s) => final_stmt = Some(s),
+3633: count=6 Err(e) => errors.push(format!("LlamaParse failed: {}", e)),
+3634: count=5 },
+3635: count=5 Err(e) => errors.push(format!("LlamaParse not configured: {}", e)),
+3636: count=4 }
+3637: count=4 
+3638: count=4 // 2. Try DocumentAI
+3639: count=5 if final_stmt.is_none() {
+3640: count=5 let _ = res_tx.send(JobResult::Progress { label: "Falling back to Document AI...".into(), fraction: 0.3 });
+3641: count=6 let page_count = {
+3642: count=6 let p = input.clone();
+3643: count=7 tokio::task::spawn_blocking(move || -> usize {
+3644: count=7 use pdfium_render::prelude::Pdfium;
+3645: count=7 let bindings = Pdfium::bind_to_library(Pdfium::pdfium_platform_library_name_at_path("./")).or_else(|_| Pdfium::bind_to_system_library());
+3646: count=7 match bindings { Ok(b) => Pdfium::new(b).load_pdf_from_file(&p, None).map(|d| d.pages().len() as usize).unwrap_or(0), Err(_) => 0 }
+3647: count=6 }).await.unwrap_or(0)
+3648: count=5 };
+3649: count=6 match crate::ai::document_ai::DocumentAiClient::from_app_config(&cfg) {
+3650: count=7 Ok(client) => {
+3651: count=7 let doc_ai = std::sync::Arc::new(client);
+3652: count=7 let final_version = version.clone().unwrap_or_else(|| "pretrained-bankstatement-v5.0-2023-12-06".to_string());
+3653: count=8 match doc_ai.parse_smart_batch(&input, Some(&final_version), page_count).await {
+3654: count=8 Ok(s) => final_stmt = Some(s),
+3655: count=8 Err(e) => errors.push(format!("DocumentAI failed: {}", e)),
+3656: count=7 }
+3657: count=6 }
+3658: count=6 Err(e) => errors.push(format!("DocumentAI not configured: {}", e)),
+3659: count=5 }
+3660: count=4 }
+3661: count=4 
+3662: count=4 // 3. Try Mindee
+3663: count=5 if final_stmt.is_none() {
+3664: count=5 let _ = res_tx.send(JobResult::Progress { label: "Falling back to Mindee...".into(), fraction: 0.4 });
+3665: count=6 match crate::ai::mindee::MindeeClient::from_app_config(&cfg) {
+3666: count=7 Ok(client) => match client.parse_statement(&input).await {
+3667: count=7 Ok(s) => final_stmt = Some(s),
+3668: count=7 Err(e) => errors.push(format!("Mindee failed: {}", e)),
+3669: count=6 }
+3670: count=6 Err(e) => errors.push(format!("Mindee not configured: {}", e)),
+3671: count=5 }
+3672: count=4 }
+3673: count=4 
+3674: count=4 // 4. Try Offline Parser
+3675: count=5 let s = if let Some(stmt) = final_stmt {
+3676: count=5 stmt
+3677: count=5 } else {
+3678: count=5 let _ = res_tx.send(JobResult::Progress { label: "Falling back to offline parser...".into(), fraction: 0.5 });
+3679: count=5 let eng = engine_for_tokio.clone();
+3680: count=5 let path = input.clone();
+3681: count=6 match tokio::task::spawn_blocking(move || {
+3682: count=6 crate::engine::offline_parser::parse_statement_offline(&path, eng)
+3683: count=6 }).await {
+3684: count=6 Ok(Ok(s)) => s,
+3685: count=7 Ok(Err(e)) => {
+3686: count=7 errors.push(format!("Offline parser failed: {}", e));
+3687: count=7 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowFailure::ParseFailed(errors.join(" | "))));
+3688: count=7 return;
+3689: count=6 }
+3690: count=7 Err(e) => {
+3691: count=7 errors.push(format!("Offline parser panicked: {}", e));
+3692: count=7 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowFailure::ParseFailed(errors.join(" | "))));
+3693: count=7 return;
+3694: count=6 }
+3695: count=5 }
+3696: count=4 };
+3697: count=4 
+3698: count=4 // Phase 5: Fidelity Check
+3699: count=4 let mut retail_sum = s.opening_balance;
+3700: count=4 let mut formal_sum = s.opening_balance;
+3701: count=5 for tx in &s.transactions {
+3702: count=5 let d = tx.debit.unwrap_or(rust_decimal::Decimal::ZERO);
+3703: count=5 let c = tx.credit.unwrap_or(rust_decimal::Decimal::ZERO);
+3704: count=5 retail_sum += d - c;
+3705: count=5 formal_sum += c - d;
+3706: count=4 }
+3707: count=4 let expected = s.closing_balance;
+3708: count=4 let retail_diff = (retail_sum - expected).abs();
+3709: count=4 let formal_diff = (formal_sum - expected).abs();
+3710: count=4 let one_cent = rust_decimal_macros::dec!(0.01);
+3711: count=4 
+3712: count=5 if !s.transactions.is_empty() && s.opening_balance != rust_decimal::Decimal::ZERO && retail_diff > one_cent && formal_diff > one_cent {
+3713: count=5 let msg = format!("AI Fidelity Math Check Failed. Expected Closing: {expected}, computed: {retail_sum} (retail) or {formal_sum} (formal).");
+3714: count=5 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowFailure::FidelityCheckFailed(msg)));
+3715: count=5 return;
+3716: count=4 }
+3717: count=4 
+3718: count=4 tracing::info!("[workflow] LlamaParse sequence yielded {} transactions.", s.transactions.len());
+3719: count=4 let _ = res_tx.send(JobResult::Progress { label: format!("Extracted {} transactions", s.transactions.len()), fraction: 0.6 });
+3720: count=4 
+3721: count=4 s
+3722: count=3 }
+3723: count=3 
+3724: count=4 DocumentParserMode::MindeeFinDoc => {
+3725: count=4 let _ = res_tx.send(JobResult::Progress { label: "Parsing with Mindee (Financial Doc)...".into(), fraction: 0.2 });
+3726: count=4 
+3727: count=5 match crate::ai::mindee::MindeeClient::from_app_config(&cfg) {
+3728: count=6 Ok(client) => {
+3729: count=6 let _ = res_tx.send(JobResult::Progress { label: "Mindee: uploading document...".into(), fraction: 0.3 });
+3730: count=6 
+3731: count=7 match client.parse_statement(&input).await {
+3732: count=8 Ok(s) => {
+3733: count=8 tracing::info!("[workflow] Mindee yielded {} transactions.", s.transactions.len());
+3734: count=8 let _ = res_tx.send(JobResult::Progress { label: format!("Mindee: {} transactions extracted", s.transactions.len()), fraction: 0.6 });
+3735: count=8 
+3736: count=8 // Phase 5: Fidelity Check (Strict Math Verification)
+3737: count=8 let mut retail_sum = s.opening_balance;
+3738: count=8 let mut formal_sum = s.opening_balance;
+3739: count=9 for tx in &s.transactions {
+3740: count=9 let d = tx.debit.unwrap_or(rust_decimal::Decimal::ZERO);
+3741: count=9 let c = tx.credit.unwrap_or(rust_decimal::Decimal::ZERO);
+3742: count=9 retail_sum += d - c;
+3743: count=9 formal_sum += c - d;
+3744: count=8 }
+3745: count=8 let expected = s.closing_balance;
+3746: count=8 let retail_diff = (retail_sum - expected).abs();
+3747: count=8 let formal_diff = (formal_sum - expected).abs();
+3748: count=8 let one_cent = rust_decimal_macros::dec!(0.01);
+3749: count=8 
+3750: count=9 if !s.transactions.is_empty() && s.opening_balance != rust_decimal::Decimal::ZERO && retail_diff > one_cent && formal_diff > one_cent {
+3751: count=9 let msg = format!("Mindee Fidelity Math Check Failed. Expected Closing: {expected}, computed: {retail_sum} (retail) or {formal_sum} (formal).");
+3752: count=9 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowFailure::FidelityCheckFailed(msg)));
+3753: count=9 return;
+3754: count=8 }
+3755: count=8 
+3756: count=8 s
+3757: count=7 }
+3758: count=8 Err(e) => {
+3759: count=8 // Auto-fallback to offline parsing
+3760: count=8 tracing::warn!("[workflow] Mindee parse failed: {e}; falling back to offline parser");
+3761: count=8 let _ = res_tx.send(JobResult::Progress { label: format!("Mindee failed ({e}), falling back to offline parser..."), fraction: 0.3 });
+3762: count=8 
+3763: count=8 let eng = engine_for_tokio.clone();
+3764: count=8 let path = input.clone();
+3765: count=9 match tokio::task::spawn_blocking(move || {
+3766: count=9 crate::engine::offline_parser::parse_statement_offline(&path, eng)
+3767: count=9 }).await {
+3768: count=9 Ok(Ok(s)) => s,
+3769: count=10 Ok(Err(e2)) => {
+3770: count=10 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowFailure::ParseFailed(
+3771: count=10 format!("Mindee failed: {e}. Offline fallback also failed: {e2}")
+3772: count=10 )));
+3773: count=10 return;
+3774: count=9 }
+3775: count=10 Err(e2) => {
+3776: count=10 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowFailure::ParseFailed(
+3777: count=10 format!("Mindee failed: {e}. Offline fallback panicked: {e2}")
+3778: count=10 )));
+3779: count=10 return;
+3780: count=9 }
+3781: count=8 }
+3782: count=7 }
+3783: count=6 }
+3784: count=5 }
+3785: count=6 Err(e) => {
+3786: count=6 // Mindee not configured - auto-fallback to offline
+3787: count=6 tracing::warn!("[workflow] Mindee not configured: {e}; auto-falling back to offline parser");
+3788: count=6 let _ = res_tx.send(JobResult::Progress { label: "Mindee not configured, using offline parser...".into(), fraction: 0.3 });
+3789: count=6 
+3790: count=6 let eng = engine_for_tokio.clone();
+3791: count=6 let path = input.clone();
+3792: count=7 match tokio::task::spawn_blocking(move || {
+3793: count=7 crate::engine::offline_parser::parse_statement_offline(&path, eng)
+3794: count=7 }).await {
+3795: count=7 Ok(Ok(s)) => s,
+3796: count=8 Ok(Err(e2)) => {
+3797: count=8 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowFailure::ParseFailed(
+3798: count=8 format!("Mindee not configured ({e}) and offline parser failed: {e2}")
+3799: count=8 )));
+3800: count=8 return;
+3801: count=7 }
+3802: count=8 Err(e2) => {
+3803: count=8 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowFailure::ParseFailed(
+3804: count=8 format!("Offline parser panicked: {e2}")
+3805: count=8 )));
+3806: count=8 return;
+3807: count=7 }
+3808: count=6 }
+3809: count=5 }
+3810: count=4 }
+3811: count=3 }
+3812: count=3 
+3813: count=3 // -- PyMuPDF built-in (offline) ----------------------
+3814: count=4 DocumentParserMode::PyMuPdfBuiltin => {
+3815: count=4 let _ = res_tx.send(JobResult::Progress { label: "Parsing with PyMuPDF (offline)...".into(), fraction: 0.3 });
+3816: count=4 let eng = engine_for_tokio.clone();
+3817: count=4 let path = input.clone();
+3818: count=5 match tokio::task::spawn_blocking(move || {
+3819: count=5 crate::engine::offline_parser::parse_statement_offline(&path, eng)
+3820: count=5 }).await {
+3821: count=5 Ok(Ok(s)) => s,
+3822: count=6 Ok(Err(e)) => {
+3823: count=6 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowFailure::ParseFailed(
+3824: count=6 format!("Offline parser failed: {e}")
+3825: count=6 )));
+3826: count=6 return;
+3827: count=5 }
+3828: count=6 Err(e) => {
+3829: count=6 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowFailure::ParseFailed(
+3830: count=6 format!("Offline parser panicked: {e}")
+3831: count=6 )));
+3832: count=6 return;
+3833: count=5 }
+3834: count=4 }
+3835: count=3 }
+3836: count=3 
+3837: count=3 // -- Local OCR (ocrs, offline, feature-gated) --------
+3838: count=4 DocumentParserMode::LocalOcrs => {
+3839: count=4 let _ = res_tx.send(JobResult::Progress { label: "Parsing with Local OCR (ocrs)...".into(), fraction: 0.3 });
+3840: count=4 
+3841: count=4 // Try ocrs first, fallback to PyMuPDF text extraction
+3842: count=4 let eng = engine_for_tokio.clone();
+3843: count=4 let path = input.clone();
+3844: count=5 match tokio::task::spawn_blocking(move || {
+3845: count=5 // First try OCR-based extraction
+3846: count=6 let ocrs_result = {
+3847: count=6 let ocr_engine = crate::extractors::OcrsEngine::new(
+3848: count=6 crate::extractors::ocrs_engine::OcrsConfig::default(),
+3849: count=6 );
+3850: count=6 use crate::extractors::GeometryProvider;
+3851: count=6 ocr_engine.extract_line_geometry(&path)
+3852: count=5 };
+3853: count=5 
+3854: count=6 match ocrs_result {
+3855: count=7 Ok(geometries) if !geometries.is_empty() => {
+3856: count=7 let total_pages = geometries.iter().map(|g| g.page).max().unwrap_or(0) + 1;
+3857: count=7 crate::engine::offline_parser::parse_statement_from_geometry(&geometries, total_pages)
+3858: count=6 }
+3859: count=7 Ok(_) | Err(_) => {
+3860: count=7 // OCR produced nothing or failed - fallback to text layer
+3861: count=7 tracing::warn!("[workflow] LocalOCR produced no results; falling back to PyMuPDF text extraction");
+3862: count=7 crate::engine::offline_parser::parse_statement_offline(&path, eng)
+3863: count=6 }
+3864: count=5 }
+3865: count=5 }).await {
+3866: count=5 Ok(Ok(s)) => s,
+3867: count=6 Ok(Err(e)) => {
+3868: count=6 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowFailure::ParseFailed(
+3869: count=6 format!("Local OCR + offline parser failed: {e}")
+3870: count=6 )));
+3871: count=6 return;
+3872: count=5 }
+3873: count=6 Err(e) => {
+3874: count=6 let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowFailure::ParseFailed(
+3875: count=6 format!("Local OCR panicked: {e}")
+3876: count=6 )));
+3877: count=6 return;
+3878: count=5 }
+3879: count=4 }
+3880: count=3 }
+3881: count=2 };
+3882: count=2 
+3883: count=2 // ---€ AI Completeness Validation ---------------------------€
+3884: count=2 // If AI provider is ManualOnly, skip Gemini validation entirely
+3885: count=2 use crate::app::config::AiProviderMode;
+3886: count=2 
+3887: count=3 let (score, notes, missing, _math_ok) = match ai_provider {
+3888: count=4 AiProviderMode::ManualOnly => {
+3889: count=4 let _ = res_tx.send(JobResult::Progress { label: "AI validation skipped (Manual Only mode)".into(), fraction: 0.7 });
+3890: count=4 (0.8, "AI validation skipped (Manual Only mode).".into(), vec![], false)
+3891: count=3 }
+3892: count=4 _ => {
+3893: count=4 let _ = res_tx.send(JobResult::Progress { label: "Asking Gemini to validate completeness".into(), fraction: 0.7 });
+3894: count=4 
+3895: count=5 let gemini_init_and_validate = async {
+3896: count=5 let g = crate::ai::backend::AiBackend::from_app_config_async(&cfg).await?;
+3897: count=5 g.validate_parse_completeness(
+3898: count=5 &stmt.transactions,
+3899: count=5 crate::engine::model::dec_to_f64(stmt.opening_balance),
+3900: count=5 crate::engine::model::dec_to_f64(stmt.closing_balance),
+3901: count=5 stmt.total_pages,
+3902: count=5 ).await
+3903: count=4 };
+3904: count=4 
+3905: count=5 match tokio::time::timeout(std::time::Duration::from_secs(30), gemini_init_and_validate).await {
+3906: count=5 Ok(Ok(r)) => (r.completeness_score, r.notes, r.missing_rows, r.math_consistent),
+3907: count=6 Ok(Err(e)) => {
+3908: count=6 tracing::warn!("[workflow] Gemini validation failed: {e}; continuing");
+3909: count=6 let _ = res_tx.send(JobResult::Progress { label: format!("AI validation skipped: {e}"), fraction: 0.7 });
+3910: count=6 (0.7, format!("Gemini validation skipped: {e}"), vec![], false)
+3911: count=5 }
+3912: count=6 Err(_elapsed) => {
+3913: count=6 tracing::warn!("[workflow] Gemini validation timed out after 30s; continuing without AI validation");
+3914: count=6 let _ = res_tx.send(JobResult::Progress { label: "AI validation timed out after 30s".into(), fraction: 0.7 });
+3915: count=6 (0.7, "Gemini validation timed out; skipped.".into(), vec![], false)
+3916: count=5 }
+3917: count=4 }
+3918: count=3 }
+3919: count=2 };
+3920: count=2 
+3921: count=3 let validation = crate::engine::workflow::ParseValidation {
+3922: count=3 total_pages: stmt.total_pages,
+3923: count=3 transactions_found: stmt.transactions.len(),
+3924: count=3 opening_balance: stmt.opening_balance,
+3925: count=3 closing_balance: stmt.closing_balance,
+3926: count=3 account_number: stmt.account_number.clone(),
+3927: count=3 completeness_score: score,
+3928: count=3 completeness_notes: notes,
+3929: count=3 missing_rows: missing,
+3930: count=2 };
+3931: count=2 
+3932: count=2 // Cross-check against the deterministic template extractor
+3933: count=3 let template_row_count = {
+3934: count=3 let eng = engine_for_tokio.clone();
+3935: count=3 let path = input.clone();
+3936: count=3 let templates_dir = std::path::PathBuf::from("bank_templates");
+3937: count=4 tokio::task::spawn_blocking(move || {
+3938: count=4 let provider = crate::extractors::BankTemplateProvider::new(
+3939: count=4 templates_dir.as_path(),
+3940: count=4 eng,
+3941: count=4 );
+3942: count=4 use crate::extractors::GeometryProvider;
+3943: count=4 provider
+3944: count=4 .extract_line_geometry(&path)
+3945: count=4 .map(|g| g.len())
+3946: count=4 .unwrap_or(0)
+3947: count=3 })
+3948: count=3 .await
+3949: count=3 .unwrap_or(0)
+3950: count=2 };
+3951: count=2 let validation = crate::engine::workflow::cross_validate_with_template(
+3952: count=2 validation,
+3953: count=2 template_row_count,
+3954: count=2 );
+3955: count=2 
+3956: count=2 let txs = stmt.transactions.clone();
+3957: count=2 let _ = res_tx.send(JobResult::WorkflowParseValidated { validation: validation.clone(), transactions: txs });
+3958: count=3 let _ = res_tx.send(JobResult::WorkflowStageChanged {
+3959: count=3 stage: crate::engine::workflow::WorkflowStage::Editing(validation),
+3960: count=2 });
+3961: count=2 let _ = res_tx.send(JobResult::JobCompleted("WorkflowParseAndValidate".into()));
+3962: count=1 });
+3963: count=0 }

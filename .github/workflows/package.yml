@@ -1,0 +1,106 @@
+name: Portable Packages
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: packages-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_BUILD_JOBS: "2"
+  DUAL_CORE_PASSPHRASE: package-ci-only-passphrase
+
+jobs:
+  windows-x86_64:
+    name: Windows x64 portable bundle
+    runs-on: windows-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.89.0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-pro.txt
+      - uses: Swatinem/rust-cache@v2
+      - name: Build and verify portable bundle
+        shell: pwsh
+        run: ./scripts/build_windows_portable.ps1
+      - name: Verify packaged startup and evidence
+        shell: pwsh
+        run: |
+          $Root = "target/release/portable/windows-x86_64/BankStatementFidelityEditor"
+          & "$Root/BankStatementFidelityEditor.exe" --version
+          & "$Root/BankStatementFidelityEditor.exe" --help | Out-Null
+          $env:PYTHONPATH = "$Root/resources/python"
+          & "$Root/resources/python/runtime/python.exe" "$Root/resources/python/verify_runtime_manifest.py" --tier pro
+          $Manifest = Get-Content "$Root/bundle-manifest.json" -Raw | ConvertFrom-Json
+          if ($Manifest.platform -ne "windows-x86_64") { throw "wrong package platform" }
+          if ($Manifest.signature -ne "unsigned-build-artifact") { throw "unexpected signature claim" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BankStatementFidelityEditor-1.1.1-windows-x86_64
+          path: |
+            target/release/artifacts/BankStatementFidelityEditor-1.1.1-windows-x86_64.zip
+            target/release/artifacts/BankStatementFidelityEditor-1.1.1-windows-x86_64.zip.sha256
+          if-no-files-found: error
+          compression-level: 0
+
+  macos-aarch64:
+    name: macOS Apple Silicon portable bundle
+    runs-on: macos-14
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert native Apple Silicon runner
+        run: test "$(uname -m)" = "arm64"
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.89.0
+          targets: aarch64-apple-darwin
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-pro.txt
+      - name: Install native build dependencies
+        run: brew install pkg-config openssl@3
+      - uses: Swatinem/rust-cache@v2
+      - name: Build and verify portable bundle
+        run: ./scripts/build_mac_app.sh
+      - name: Verify packaged startup and evidence
+        run: |
+          ROOT="target/release/portable/macos-aarch64/BankStatementFidelityEditor.app"
+          file "$ROOT/Contents/MacOS/dual-core-pdf-pipeline" | grep -q arm64
+          "$ROOT/Contents/MacOS/dual-core-pdf-pipeline" --version
+          "$ROOT/Contents/MacOS/dual-core-pdf-pipeline" --help >/dev/null
+          export PYTHONPATH="$ROOT/Contents/Resources/python"
+          "$ROOT/Contents/Resources/python/runtime/bin/python3" \
+            "$ROOT/Contents/Resources/python/verify_runtime_manifest.py" --tier pro
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path("target/release/portable/macos-aarch64/BankStatementFidelityEditor.app")
+          manifest = json.loads((root / "bundle-manifest.json").read_text())
+          assert manifest["platform"] == "macos-aarch64"
+          assert manifest["signature"] == "unsigned-build-artifact"
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BankStatementFidelityEditor-1.1.1-macos-aarch64
+          path: |
+            target/release/artifacts/BankStatementFidelityEditor-1.1.1-macos-aarch64.tar.gz
+            target/release/artifacts/BankStatementFidelityEditor-1.1.1-macos-aarch64.tar.gz.sha256
+          if-no-files-found: error
+          compression-level: 0

@@ -1,0 +1,613 @@
+info: cargo-llvm-cov currently setting cfg(coverage); you can opt-out it by passing --no-cfg-coverage
+   Compiling dual-core-pdf-pipeline v1.1.1 (/Volumes/Macintosh_HD/Users/user298993/Documents/GitHub/bank-statement-fidelity-editor)
+warning: unused import: `tokio::sync::Mutex`
+  --> src/ai/document_ai.rs:23:5
+   |
+23 | use tokio::sync::Mutex;
+   |     ^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` on by default
+
+warning: `dual-core-pdf-pipeline` (lib test) generated 1 warning (1 duplicate)
+warning: `dual-core-pdf-pipeline` (lib) generated 1 warning (run `cargo fix --lib -p dual-core-pdf-pipeline` to apply 1 suggestion)
+warning: unused imports: `BalancePreview`, `ParseValidation`, `VisualAttempt`, and `WorkflowStage`
+ --> tests/gui_interaction_tests.rs:3:48
+  |
+3 | use dual_core_pdf_pipeline::engine::workflow::{WorkflowStage, ParseValidation, BalancePreview, VisualAttempt};
+  |                                                ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `rust_decimal::Decimal`
+ --> tests/engine_typst_tests.rs:4:5
+  |
+4 | use rust_decimal::Decimal;
+  |     ^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: variable does not need to be mutable
+  --> tests/engine_statement_tests.rs:22:9
+   |
+22 |     let mut engine = SmartDocumentEngine::new(
+   |         ----^^^^^^
+   |         |
+   |         help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` on by default
+
+warning: variable does not need to be mutable
+  --> tests/engine_statement_tests.rs:45:9
+   |
+45 |     let mut engine = SmartDocumentEngine::new(
+   |         ----^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: `dual-core-pdf-pipeline` (test "gui_interaction_tests") generated 1 warning (run `cargo fix --test "gui_interaction_tests"` to apply 1 suggestion)
+warning: unused import: `ChangeRecord`
+  --> tests/gui_button_core_tests.rs:12:62
+   |
+12 | use dual_core_pdf_pipeline::engine::history::{ChangeHistory, ChangeRecord};
+   |                                                              ^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` on by default
+
+warning: `dual-core-pdf-pipeline` (test "engine_typst_tests") generated 1 warning (run `cargo fix --test "engine_typst_tests"` to apply 1 suggestion)
+warning: unused import: `BoundingBox`
+ --> tests/extractors_geometry_tests.rs:1:114
+  |
+1 | use dual_core_pdf_pipeline::extractors::geometry::{detect_table_grid, NativeTextLayerProvider, GeometryProvider, BoundingBox};
+  |                                                                                                                  ^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `PdfEngine`
+ --> tests/extractors_geometry_tests.rs:2:35
+  |
+2 | use dual_core_pdf_pipeline::pdf::{PdfEngine, OxidizePdfEngine};
+  |                                   ^^^^^^^^^
+
+warning: `dual-core-pdf-pipeline` (test "engine_statement_tests") generated 2 warnings (run `cargo fix --test "engine_statement_tests"` to apply 2 suggestions)
+warning: `dual-core-pdf-pipeline` (test "gui_button_core_tests") generated 1 warning (run `cargo fix --test "gui_button_core_tests"` to apply 1 suggestion)
+warning: unused variable: `doc`
+  --> tests/engine_font_replication_tests.rs:59:9
+   |
+59 |     let doc = lopdf::Document::load(&pdf_path).unwrap();
+   |         ^^^ help: if this is intentional, prefix it with an underscore: `_doc`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: `dual-core-pdf-pipeline` (test "extractors_geometry_tests") generated 2 warnings (run `cargo fix --test "extractors_geometry_tests"` to apply 2 suggestions)
+warning: unused import: `EngineError`
+ --> tests/pdf_native_engine_tests.rs:1:43
+  |
+1 | use dual_core_pdf_pipeline::pdf::engine::{EngineError, PdfEngine};
+  |                                           ^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: `dual-core-pdf-pipeline` (test "engine_font_replication_tests") generated 1 warning
+warning: unused import: `GeminiBalancePlan`
+ --> tests/ai_gemini_client_tests.rs:1:76
+  |
+1 | use dual_core_pdf_pipeline::ai::gemini_client::{GeminiClient, GeminiError, GeminiBalancePlan};
+  |                                                                            ^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `dual_core_pdf_pipeline::engine::model::Transaction`
+ --> tests/ai_gemini_client_tests.rs:2:5
+  |
+2 | use dual_core_pdf_pipeline::engine::model::Transaction;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `app_config`
+  --> tests/ai_gemini_client_tests.rs:26:9
+   |
+26 |     let app_config = AppConfig::default();
+   |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_app_config`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `app_config`
+  --> tests/ai_gemini_client_tests.rs:59:9
+   |
+59 |     let app_config = AppConfig::default();
+   |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_app_config`
+
+warning: `dual-core-pdf-pipeline` (test "pdf_native_engine_tests") generated 1 warning (run `cargo fix --test "pdf_native_engine_tests"` to apply 1 suggestion)
+warning: unused import: `std::path::PathBuf`
+ --> tests/ai_document_ai_tests.rs:5:5
+  |
+5 | use std::path::PathBuf;
+  |     ^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused variable: `app_config`
+  --> tests/ai_document_ai_tests.rs:32:9
+   |
+32 |     let app_config = AppConfig::default();
+   |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_app_config`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `doc_ai_response`
+  --> tests/ai_document_ai_tests.rs:92:9
+   |
+92 |     let doc_ai_response = serde_json::json!({
+   |         ^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_doc_ai_response`
+
+warning: unused variable: `app_config`
+   --> tests/ai_document_ai_tests.rs:112:9
+    |
+112 |     let app_config = AppConfig::default();
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_app_config`
+
+warning: `dual-core-pdf-pipeline` (test "ai_gemini_client_tests") generated 4 warnings (run `cargo fix --test "ai_gemini_client_tests"` to apply 2 suggestions)
+warning: `dual-core-pdf-pipeline` (test "ai_document_ai_tests") generated 4 warnings (run `cargo fix --test "ai_document_ai_tests"` to apply 1 suggestion)
+    Finished `test` profile [optimized] target(s) in 55.35s
+     Running unittests src/lib.rs (target/llvm-cov-target/debug/deps/dual_core_pdf_pipeline-18fa0326aa3c6d12)
+
+running 186 tests
+test ai::document_ai::tests::from_app_config_requires_credential ... ok
+test ai::document_ai::tests::merge_chunk_results_handles_empty ... ok
+test ai::document_ai::tests::merge_chunk_results_preserves_transaction_order ... ok
+test ai::document_ai::tests::merge_chunk_results_sums_pages_keeps_first_opening_last_closing ... ok
+test ai::document_ai::tests::merge_chunk_results_handles_single_chunk ... ok
+test ai::document_ai::tests::extract_helpers_pull_nested_properties ... ok
+test ai::docai_cache::tests::key_changes_when_processor_changes ... ok
+test ai::docai_cache::tests::miss_returns_none ... ok
+test ai::docai_cache::tests::key_changes_when_pdf_content_changes ... ok
+test ai::docai_cache::tests::corrupt_entry_is_treated_as_miss ... ok
+test ai::document_ai::tests::parse_response_handles_legacy_transaction_type ... ok
+test ai::document_ai::tests::parse_falls_back_to_row_bbox_when_property_anchor_missing ... ok
+test ai::gemini_client::tests::vision_should_reject_when_overall_score_too_high ... ok
+test ai::gemini_client::tests::vision_should_reject_when_hotspot_outside_intended_bboxes ... ok
+test ai::gemini_client::tests::vision_accepts_pristine_render_with_no_hotspots ... ok
+test ai::gemini_client::tests::vision_should_accept_when_hotspots_overlap_intended ... ok
+test ai::document_ai::tests::parse_response_into_bank_statement_works ... ok
+test ai::document_ai::tests::parse_extracts_row_and_per_field_bboxes_from_page_anchor ... ok
+test ai::gemini_client::tests::request_body_uses_camelcase_and_object_schema ... ok
+test ai::docai_cache::tests::roundtrip_through_cache ... ok
+test app::audit::tests::value_containing_key_prefix ... ok
+test app::audit::tests::snapshot_link_overwrites_existing_destination ... ok
+test app::audit::tests::snapshot_link_creates_either_a_hard_link_or_a_copy_and_content_matches ... ok
+test app::config::tests::ai_provider_mode_env_token_round_trip ... ok
+test app::config::tests::ai_provider_mode_from_env_str ... ok
+test app::config::tests::detect_availability_exposes_backend_state_and_helpful_reasons ... ok
+test app::config::tests::pro_editing_available_with_well_formed_trial_key ... ok
+test app::config::tests::pro_editing_unavailable_when_key_absent ... ok
+test app::config::tests::pro_editing_unavailable_with_malformed_key ... ok
+test app::config::tests::pro_key_status_does_not_affect_validate_for_split_merge ... ok
+test app::config::tests::pro_key_status_serializes_to_json ... ok
+test app::config::tests::detect_adc_path_returns_string_or_none_without_panicking ... ok
+test app::config::tests::test_has_ai_for_balancing ... ok
+test app::config::tests::unavailable_reason_exposes_openrouter_guidance_when_unconfigured ... ok
+test app::config::tests::unavailable_reason_exposes_vision_ai_guidance_when_unconfigured ... ok
+test app::config::tests::validate_reports_missing_pro_key_and_passphrase_in_production_mode ... ok
+test app::env_spec::tests::every_required_var_has_setup_hint ... ok
+test app::env_spec::tests::guidance_for_unknown_var_is_graceful ... ok
+test app::env_spec::tests::guidance_mentions_the_variable_name ... ok
+test app::env_spec::tests::lookup_finds_known_var ... ok
+test app::env_spec::tests::pymupdf_pro_key_var_is_catalogued ... ok
+test app::env_spec::tests::well_formed_pro_key_accepts_24_char_hfkt_key ... ok
+test app::env_spec::tests::well_formed_pro_key_rejects_wrong_length_or_prefix ... ok
+test app::fontcache::tests::seed_list_is_non_empty ... ok
+test app::runtime::tests::alloc_job_id_is_strictly_monotonic ... ok
+test app::fontcache::tests::manifest_path_is_inside_cache_dir ... ok
+test app::audit::tests::parse_file_missing_returns_read_error ... ok
+test app::runtime::tests::cancellation_registry_cancel_all_drains_every_token ... ok
+test app::runtime::tests::cancellation_registry_register_and_cancel_round_trip ... ok
+test app::runtime::tests::cancellation_registry_complete_removes_without_cancelling ... ok
+test app::runtime::tests::cancellation_registry_unknown_id_is_noop ... ok
+test app::runtime::tests::runtime_fallback_branch_prefers_offline_parser_when_online_backends_are_unavailable ... ok
+test app::runtime::tests::test_python_job_recursion_regression ... ok
+test app::runtime::tests::test_bridge_fail_loud ... ok
+test engine::ai_confirm::tests::format_uncertain_includes_format_name ... ok
+test engine::ai_confirm::tests::parsing_uncertain_builds_valid_confirmation ... ok
+test engine::ai_confirm::tests::should_ask_below_threshold ... ok
+test engine::balance::polars_balance_tests::polars_recalculate_empty_errors ... ok
+test app::telemetry::tests::init_with_unreachable_otlp_endpoint_does_not_panic ... ok
+test ai::document_ai::tests::jwt_claim_shape ... ok
+test engine::balance::tests::auto_correct_noop_when_already_balanced ... ok
+test engine::balance::tests::auto_correct_smart_fixes_anomalous_row ... ok
+test engine::balance::tests::process_and_reconcile_no_expected_balance_returns_none_message ... ok
+test engine::balance::tests::process_and_reconcile_with_expected_balance_returns_some_message ... ok
+test engine::balance::tests::recalculate_allows_negative_balance ... ok
+test engine::balance::tests::recalculate_disambiguates_both_debit_and_credit ... ok
+test engine::balance::tests::recalculate_empty_transactions_errors ... ok
+test engine::balance::tests::recalculate_simple_running_balances ... ok
+test engine::date_adjust::tests::parse_various_formats ... ok
+test engine::balance::proptest_balance_tests::doesnt_crash_on_random_transactions ... ok
+test engine::date_adjust::tests::preview_does_not_mutate ... ok
+test app::audit::tests::roundtrip_records ... ok
+test engine::date_adjust::tests::remap_period_jan_to_feb ... ok
+test engine::date_adjust::tests::shift_dates_by_30_days ... ok
+test engine::date_adjust::tests::shift_dates_negative ... ok
+test engine::font_analysis::tests::one_line_summary_clean_when_all_covered ... ok
+test engine::font_analysis::tests::digit_only_vs_alpha_action_classification ... ok
+test engine::font_analysis::tests::decodes_python_payload_shape ... ok
+test engine::font_analysis::tests::one_line_summary_lists_each_kind_of_missing ... ok
+test engine::font_replication::tests::parses_a_failure_payload ... ok
+test engine::font_replication::tests::parses_a_successful_payload_with_metrics ... ok
+test engine::font_shaping::tests::test_shaping_signature ... ok
+test engine::history::tests::ids_are_monotonic_within_history ... ok
+test engine::history::tests::save_and_load_round_trip_preserves_records_and_id_counter ... ok
+test engine::model::tests::decimal_avoids_f64_drift_across_hundreds_of_rows ... ok
+test engine::model::tests::delta_helpers_match_running_balance_arithmetic ... ok
+test engine::model::tests::proposed_change_roundtrips_with_bbox ... ok
+test engine::number_format::tests::detect_eu_style ... ok
+test engine::number_format::tests::detect_no_decimals ... ok
+test engine::number_format::tests::detect_paren_negative ... ok
+test engine::number_format::tests::detect_plain_decimal ... ok
+test engine::number_format::tests::detect_trailing_minus ... ok
+test engine::number_format::tests::detect_us_style ... ok
+test engine::number_format::tests::format_like_preserves_original_pattern ... ok
+test engine::number_format::tests::negative_round_trips_under_minus_style ... ok
+test engine::number_format::tests::round_trip_eu ... ok
+test engine::number_format::tests::round_trip_paren_negative ... ok
+test engine::number_format::tests::round_trip_us ... ok
+test engine::model::dataframe_tests::empty_transactions_produce_empty_dataframe ... ok
+test engine::model::dataframe_tests::round_trip_transactions_through_dataframe ... ok
+test engine::offline_parser::tests::extract_amounts_parses_various_formats ... ok
+test engine::offline_parser::tests::extract_amounts_handles_negative ... ok
+test engine::offline_parser::tests::extract_account_number_finds_number ... ok
+test engine::offline_parser::tests::extract_date_finds_date ... ok
+test engine::offline_parser::tests::extract_date_finds_month_name ... ok
+test engine::statement::tests::calculate_global_imbalance_correct ... ok
+test engine::transfer::tests::convert_date_dd_mm_to_mm_dd ... ok
+test engine::transfer::tests::convert_date_mm_dd_to_yyyy_mm_dd ... ok
+test engine::offline_parser::tests::parse_rows_identifies_opening_closing ... ok
+test engine::transfer::tests::convert_date_same_format_is_identity ... ok
+test engine::transfer::tests::recompute_balances_from_opening ... ok
+test engine::transfer::tests::transfer_stage_labels_all_defined ... ok
+test engine::transfer_test_harness::tests::build_report_counts ... ok
+test engine::transfer_test_harness::tests::generate_pairs_3_statements ... ok
+test engine::transfer_test_harness::tests::generate_pairs_2_statements ... ok
+test engine::transfer_test_harness::tests::test_output_path_format ... ok
+test app::preflight::tests::verify_environment_rejects_headless_fallback_override ... ok
+test ai::gemini_client::tests::low_confidence_response_returns_error ... ok
+test engine::balance::polars_balance_tests::polars_recalculate_matches_iterative ... ok
+[2m2026-07-20T18:25:24.021642Z[0m [31mERROR[0m ai::pyo3_bridge::tests::test_python_panic_safely_caught ThreadId(26) [PANIC] at src/ai/pyo3_bridge.rs:491 -- Raw Rust panic inside python worker thread
+test ai::pyo3_bridge::tests::test_python_panic_safely_caught ... ok
+test engine::balance::polars_balance_tests::polars_recalculate_preserves_metadata ... ok
+test ai::pyo3_bridge::tests::test_python_exception_safely_mapped_to_rust_error ... ok
+test engine::workflow::tests::borderline_calculation_is_accurate ... ok
+test engine::workflow::tests::build_preview_applies_edits_and_cascades_balances ... ok
+test engine::workflow::tests::build_preview_marks_balanced_when_final_matches_expected ... ok
+test engine::workflow::tests::changed_pages_empty_when_no_rows_changed ... ok
+test engine::workflow::tests::changed_pages_returns_unique_sorted_pages_with_changes ... ok
+test engine::workflow::tests::cross_validate_clamps_to_unit_interval ... ok
+test engine::workflow::tests::cross_validate_no_template_match_leaves_score_alone ... ok
+test engine::workflow::tests::cross_validate_template_agrees_leaves_score_alone ... ok
+test engine::workflow::tests::cross_validate_template_one_extra_row_is_within_tolerance ... ok
+test engine::workflow::tests::cross_validate_template_three_extra_rows_drops_score_to_0_665 ... ok
+test engine::workflow::tests::mask_padding_grows_then_caps ... ok
+test engine::workflow::tests::parse_validation_acceptable_threshold_works ... ok
+test engine::workflow::tests::prune_redundant_edits_drops_running_balance_edits_that_match_cascade ... ok
+test engine::workflow::tests::prune_redundant_edits_keeps_running_balance_edits_that_differ_from_cascade ... ok
+test engine::workflow::tests::prune_redundant_edits_never_drops_non_running_balance_fields ... ok
+test engine::workflow::tests::should_accept_near_perfect_only_after_attempt_3_and_below_half_threshold ... ok
+test engine::workflow::tests::test_borderline_calculation ... ok
+test engine::workflow::tests::visual_attempt_passes_only_when_under_threshold_and_intended ... ok
+test engine::workflow::tests::workflow_draft_load_rejects_incompatible_schema ... ok
+test engine::workflow::tests::workflow_draft_matches_pdf_returns_false_when_pdf_modified ... ok
+test engine::workflow::tests::workflow_draft_matches_pdf_returns_true_when_unchanged ... ok
+test engine::workflow::tests::workflow_draft_new_with_hash_matches_new_when_hash_is_correct ... ok
+test engine::workflow::tests::workflow_draft_round_trips_through_disk ... ok
+test extractors::merger::tests::test_merge_and_tiebreak ... ok
+test extractors::ocrs_engine::tests::default_config_has_model_paths ... ok
+test extractors::ocrs_engine::tests::extract_fails_gracefully_on_invalid_image ... ok
+test extractors::ocrs_engine::tests::extract_fails_gracefully_without_models ... ok
+[2m2026-07-20T18:25:24.037896Z[0m [33m WARN[0m extractors::ocrs_engine::tests::geometry_provider_returns_unsupported_error ThreadId(185) [OCRS] OCR geometry extraction not yet available for PDF: dummy.pdf
+test extractors::ocrs_engine::tests::geometry_provider_returns_unsupported_error ... ok
+test extractors::templates::parsers::tests::parse_au_date_month_name_format ... ok
+test extractors::templates::parsers::tests::parse_au_date_slash_format ... ok
+test extractors::templates::parsers::tests::parse_currency_large_amount ... ok
+test extractors::templates::parsers::tests::parse_currency_negative ... ok
+test extractors::templates::parsers::tests::parse_currency_no_dollar_sign ... ok
+test extractors::templates::parsers::tests::parse_currency_simple ... ok
+test extractors::templates::parsers::tests::parse_invalid_date_rejected ... ok
+[2m2026-07-20T18:25:24.038824Z[0m [32m INFO[0m     extractors::templates::tests::learn_template_clamps_negative_lo_to_zero ThreadId(193) [templates] refined template written: /var/folders/26/3_4bt35d1k71ykdlsyczblp00000l4/T/.tmprVwg6k/test_bank.refined.yaml (fields: ["date"])
+test extractors::templates::tests::learn_template_clamps_negative_lo_to_zero ... ok
+[2m2026-07-20T18:25:24.039278Z[0m [32m INFO[0m extractors::templates::tests::learn_template_ignores_repeated_field_observations_correctly ThreadId(194) [templates] refined template written: /var/folders/26/3_4bt35d1k71ykdlsyczblp00000l4/T/.tmpN0NB7A/test_bank.refined.yaml (fields: ["date"])
+test extractors::templates::tests::learn_template_ignores_repeated_field_observations_correctly ... ok
+test extractors::templates::tests::learn_template_rejects_empty_observations ... ok
+[2m2026-07-20T18:25:24.039775Z[0m [32m INFO[0m     extractors::templates::tests::learn_template_writes_refined_yaml_with_observed_columns ThreadId(196) [templates] refined template written: /var/folders/26/3_4bt35d1k71ykdlsyczblp00000l4/T/.tmpr7hHBj/test_bank.refined.yaml (fields: ["amount", "date"])
+test extractors::templates::tests::learn_template_writes_refined_yaml_with_observed_columns ... ok
+test pdf::engine::tests::bbox_overlap_full_match_returns_one ... ok
+test pdf::engine::tests::bbox_overlap_half_overlap_returns_half ... ok
+test pdf::engine::tests::bbox_overlap_no_intersection_returns_zero ... ok
+test pdf::engine::tests::bbox_overlap_zero_area_bbox_returns_zero ... ok
+test pdf::engine::tests::dominant_span_overlap_picks_the_best_match ... ok
+test pdf::engine::tests::dominant_span_overlap_prefers_larger_fraction_over_document_order ... ok
+test pdf::engine::tests::dominant_span_overlap_returns_none_when_nothing_intersects ... ok
+test pdf::native_engine::tests::operand_to_f32_converts_correctly ... ok
+test pdf::native_engine::tests::test_capabilities ... ok
+test pdf::pymupdf_engine::tests::find_text_block_at_click_returns_none_on_null_json ... ok
+[2m2026-07-20T18:25:24.040462Z[0m [31mERROR[0m ThreadId(209) [PANIC] at src/pdf/selector.rs:412 -- MockEngine panic!
+[2m2026-07-20T18:25:24.040978Z[0m [33m WARN[0m                          pdf::selector::tests::dual_concurrent_falls_back_on_primary_panic ThreadId(208) Primary engine failed in DualConcurrent mode, using fallback result [3mengine.fallback_triggered[0m[2m=[0mtrue [3mprimary_error[0m[2m=[0mFailed to extract text: Native engine thread panicked
+test pdf::selector::tests::dual_concurrent_falls_back_on_primary_panic ... ok
+test pdf::selector::tests::fallback_takes_over_when_primary_fails ... ok
+[2m2026-07-20T18:25:24.041114Z[0m [31mERROR[0m           pdf::selector::tests::sequential_auto_catches_primary_panic_and_returns_fallback ThreadId(212) [PANIC] at src/pdf/selector.rs:412 -- MockEngine panic!
+[2m2026-07-20T18:25:24.041220Z[0m [33m WARN[0m           pdf::selector::tests::sequential_auto_catches_primary_panic_and_returns_fallback ThreadId(212) PyMuPDF engine failed, falling back to Native engine [3mengine.fallback_triggered[0m[2m=[0mtrue [3mprimary_error[0m[2m=[0mFailed to apply change: Engine thread panicked: MockEngine panic!
+test pdf::selector::tests::sequential_auto_catches_primary_panic_and_returns_fallback ... ok
+test security::software_root::tests::compute_hash_is_deterministic ... ok
+test security::software_root::tests::entropy_calculation_matches_expectations ... ok
+[2m2026-07-20T18:25:24.041390Z[0m [32m INFO[0m      security::software_root::tests::require_software_attestation_rejects_weak_passphrases ThreadId(215) [SECURITY] ═══════════════════════════════════════════════
+[2m2026-07-20T18:25:24.041439Z[0m [32m INFO[0m      security::software_root::tests::require_software_attestation_rejects_weak_passphrases ThreadId(215) [SECURITY] Software Root of Trust (Production Mode)
+[2m2026-07-20T18:25:24.041455Z[0m [32m INFO[0m      security::software_root::tests::require_software_attestation_rejects_weak_passphrases ThreadId(215) [SECURITY] Strong passphrase-based cryptographic attestation active.
+test security::software_root::tests::require_software_attestation_rejects_weak_passphrases ... ok
+test engine::verification::stage_g_tests::ssim_with_excluded_diff_region_stays_high ... ok
+test ai::pyo3_bridge::tests::test_python_gil_lock_simulation ... ok
+test engine::verification::stage_g_tests::ssim_identical_images_returns_one ... ok
+test engine::verification::stage_g_tests::ssim_blank_vs_content_is_very_low ... ok
+test engine::verification::stage_g_tests::tile_max_detects_localized_change_that_average_hides ... ok
+test engine::verification::stage_g_tests::vision_ai_bridge_missing_does_not_crash ... ok
+test engine::verification::stage_g_tests::excluded_region_change_does_not_trip_gate ... ok
+test engine::verification::stage_g_tests::region_fidelity_aligns_out_pure_translation ... ok
+test engine::verification::stage_g_tests::region_fidelity_rewards_matching_and_zero_shift ... ok
+
+test result: ok. 186 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+     Running unittests src/main.rs (target/llvm-cov-target/debug/deps/dual_core_pdf_pipeline-f7a5bebd975c2d14)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/dump_text.rs (target/llvm-cov-target/debug/deps/dump_text-93da6897905b1579)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/test_pdfium.rs (target/llvm-cov-target/debug/deps/test_pdfium-54055c429739d0fa)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/validate.rs (target/llvm-cov-target/debug/deps/validate-1c04fd92be0b9de2)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ai_backend_tests.rs (target/llvm-cov-target/debug/deps/ai_backend_tests-71d0556a0c06d248)
+
+running 3 tests
+test test_ai_backend_cascade_success_on_primary ... ok
+test test_ai_backend_cascade_fallback ... ok
+test test_ai_backend_cascade_all_failed ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 43.83s
+
+     Running tests/ai_document_ai_tests.rs (target/llvm-cov-target/debug/deps/ai_document_ai_tests-4f1382e049e61c34)
+
+running 2 tests
+test test_parse_entire_statement_success ... ok
+test test_parse_entire_statement_retry_on_429 ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.61s
+
+     Running tests/ai_gemini_client_tests.rs (target/llvm-cov-target/debug/deps/ai_gemini_client_tests-4e26d52c614c28f9)
+
+running 3 tests
+test test_propose_balance_adjustments_success ... ok
+test test_propose_balance_adjustments_low_confidence ... ok
+test test_gemini_retry_on_429 ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 41.03s
+
+     Running tests/ai_live.rs (target/llvm-cov-target/debug/deps/ai_live-6802315b0e7b0cbc)
+
+running 3 tests
+test document_ai_can_parse_a_real_statement ... ignored, live network test - requires DOCUMENT_AI_* in .env + a sample PDF
+test document_ai_client_constructs_when_configured ... ignored, live network test - requires DOCUMENT_AI_* in .env
+test gemini_client_can_propose_a_balance_plan ... ignored, live network test - requires GEMINI_API_KEY in .env
+
+test result: ok. 0 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ai_loop_tests.rs (target/llvm-cov-target/debug/deps/ai_loop_tests-af4752300e8ce3d4)
+
+running 1 test
+test test_verify_and_repair_extraction_loop ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/api_chaos_tests.rs (target/llvm-cov-target/debug/deps/api_chaos_tests-76514a37d24acce0)
+
+running 2 tests
+test test_document_ai_api_chaos_malformed_json ... ok
+test test_gemini_api_chaos_recovery ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.36s
+
+     Running tests/api_mock_tests.rs (target/llvm-cov-target/debug/deps/api_mock_tests-6e65dccd6f05480d)
+
+running 1 test
+test test_document_ai_retry_logic_mocked ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/au_statements_deep_dive.rs (target/llvm-cov-target/debug/deps/au_statements_deep_dive-78005e7e0fdc8bbf)
+
+running 1 test
+test test_all_au_statements ... ignored
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/au_transfer_stress.rs (target/llvm-cov-target/debug/deps/au_transfer_stress-98f2b2eeb4f8e0a8)
+
+running 1 test
+test test_all_au_transfer_pairs ... ignored
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cascade_fallback.rs (target/llvm-cov-target/debug/deps/cascade_fallback-cc5d9f275d6e9aa6)
+
+running 1 test
+test test_cascade_fallback_with_downed_actor ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/chaos_fallback.rs (target/llvm-cov-target/debug/deps/chaos_fallback-5b5779e0a96ca7e3)
+
+running 2 tests
+test test_chaos_fallback_selector_returns_encrypted_error ... ok
+test test_chaos_fallback_triggers_typst_reconstruct ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/chaos_tests.rs (target/llvm-cov-target/debug/deps/chaos_tests-f60bd849265619e0)
+
+running 1 test
+test test_chaos_malformed_json_repair ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/check_sysinfo.rs (target/llvm-cov-target/debug/deps/check_sysinfo-e57d29ef4156c72a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/computer_use.rs (target/llvm-cov-target/debug/deps/computer_use-fe169c7f84fa8fe6)
+
+running 1 test
+test test_computer_use_framework_bootstrap ... ignored, Requires active desktop session and compiled binary
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/concurrency_chaos.rs (target/llvm-cov-target/debug/deps/concurrency_chaos-fcefa3dab4f44807)
+
+running 1 test
+test test_concurrency_chaos ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/consensus_matrix_tests.rs (target/llvm-cov-target/debug/deps/consensus_matrix_tests-eca2c1a91dd48f2c)
+
+running 3 tests
+test test_dpi_auto_scaling_limits ... ok
+test test_recalculation_loop_convergence ... ok
+test test_ai_matrix_consensus ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/dependency_e2e.rs (target/llvm-cov-target/debug/deps/dependency_e2e-e6a719754dc5c0cb)
+
+running 2 tests
+test test_pdfium_library_loads ... ok
+test test_ai_provider_dns_resolution ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/e2e_engine_tests.rs (target/llvm-cov-target/debug/deps/e2e_engine_tests-9bc4e42a29a17d1b)
+
+running 12 tests
+test test_cli_help ... ok
+test test_cli_ai_fix_visual ... ok
+test test_cli_run_transfer_tests ... ok
+test test_cli_ping ... ok
+test test_cli_text ... ok
+test test_cli_analyze_fonts ... ok
+test test_cli_doctor ... FAILED
+test test_cli_balance ... ok
+test test_cli_auto_balance ... ok
+test test_cli_transfer_transactions ... ok
+test test_cli_adjust_dates ... ok
+test test_cli_extract ... ok
+
+failures:
+
+---- test_cli_doctor stdout ----
+
+thread 'test_cli_doctor' panicked at tests/e2e_engine_tests.rs:36:32:
+Unexpected failure.
+code=2
+stderr=```""```
+command=`"/Volumes/Macintosh_HD/Users/user298993/Documents/GitHub/bank-statement-fidelity-editor/target/llvm-cov-target/debug/dual-core-pdf-pipeline" "doctor"`
+code=2
+stdout=<105 lines total>
+```
+╔════════════════════════════════════════════════════════════╗
+║   Bank Statement Fidelity Editor v1.0.0                   ║
+║   100% Visual Fidelity • Smart Targeted Editing           ║
+╚════════════════════════════════════════════════════════════╝
+
+\x1b[2m2026-07-20T18:27:23.608427Z\x1b[0m \x1b[32m INFO\x1b[0m main ThreadId(01) [SECURITY] ═══════════════════════════════════════════════
+\x1b[2m2026-07-20T18:27:23.613937Z\x1b[0m \x1b[32m INFO\x1b[0m main ThreadId(01) [SECURITY] Software Root of Trust (Production Mode)
+\x1b[2m2026-07-20T18:27:23.613950Z\x1b[0m \x1b[32m INFO\x1b[0m main ThreadId(01) [SECURITY] Strong passphrase-based cryptographic attestation active.
+\x1b[2m2026-07-20T18:27:23.615269Z\x1b[0m \x1b[32m INFO\x1b[0m main ThreadId(01) [SECURITY] ✓ Passphrase hash computed: 76342a5f...6266355f
+\x1b[2m2026-07-20T18:27:23.615287Z\x1b[0m \x1b[32m INFO\x1b[0m main ThreadId(01) [SECURITY] ✓ Strong passphrase verified (40 chars, 262.2 bits entropy)
+\x1b[2m2026-07-20T18:27:23.615299Z\x1b[0m \x1b[32m INFO\x1b[0m main ThreadId(01) [SECURITY] ✓ Software root of trust established (production-grade).
+\x1b[2m2026-07-20T18:27:23.615315Z\x1b[0m \x1b[32m INFO\x1b[0m main ThreadId(01) [SECURITY]    Pipeline unlocked.
+\x1b[2m2026-07-20T18:27:23.615328Z\x1b[0m \x1b[32m INFO\x1b[0m main ThreadId(01) [SECURITY] ═══════════════════════════════════════════════
+══════════════════════════════════════════════════════════
+  Bank Statement Fidelity Editor - Doctor
+══════════════════════════════════════════════════════════
+
+ Environment variables
+  ✅  DUAL_CORE_PASSPHRASE                Application startup
+  ❌  PYMUPDF_PRO_KEY                     [REQUIRED] Per-segment editing/rendering (Subsystem B). Split/merge work without it.
+```
+<45 lines omitted>
+```
+        \"metadata\": {
+          \"service\": \"generativelanguage.googleapis.com\"
+        }
+      },
+      {
+        \"@type\": \"type.googleapis.com/google.rpc.LocalizedMessage\",
+        \"locale\": \"en-US\",
+        \"message\": \"API key not valid. Please pass a valid API key.\"
+      }
+    ]
+  }
+}
+
+      Guidance: API error (HTTP 400 Bad Request): Check your API key and quota.
+
+  ⊘  LlamaParse  (0ms)
+      Error: LLAMAPARSE_API_KEY not configured
+      Guidance: Set LLAMAPARSE_API_KEY to use the alternative LLM parser. Get a key at https://cloud.llamaindex.ai/
+
+  ✅  pdfRest  (0ms)
+      Method: API Key Configured
+
+  ⊘  Vision AI  (0ms)
+      Error: VISION_API_KEY not configured
+      Guidance: Set VISION_API_KEY to enable visual AI testing verification layer.
+
+══════════════════════════════════════════════════════════
+  Overall Status: ❌  (Exit code: 2)
+══════════════════════════════════════════════════════════
+  ✅  Worker responding                   Tokio + Python actor
+
+══════════════════════════════════════════════════════════
+ Doctor: ❌ Not ready - required items are missing.
+
+  PYMUPDF_PRO_KEY (REQUIRED)
+    Purpose : PyMuPDF Pro license key (24-char trial key, prefix \'hFKt\').
+    Enables : Per-segment editing/rendering (Subsystem B). Split/merge work without it.
+    Setup   : Obtain from https://pymupdf.io/ and keep it out of version control. A 24-char \'hFKt\'-prefixed trial key is accepted; splitting and merging run regardless of this key.
+    Example : PYMUPDF_PRO_KEY=hFKtxxxxxxxxxxxxxxxxxxxx
+
+```
+
+stderr=""
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    test_cli_doctor
+
+test result: FAILED. 11 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.83s
+
+error: test failed, to rerun pass `--test e2e_engine_tests`
+error: process didn't exit successfully: `/Users/user298993/.rustup/toolchains/1.89.0-aarch64-apple-darwin/bin/cargo test --tests --manifest-path /Volumes/Macintosh_HD/Users/user298993/Documents/GitHub/bank-statement-fidelity-editor/Cargo.toml --target-dir /Volumes/Macintosh_HD/Users/user298993/Documents/GitHub/bank-statement-fidelity-editor/target/llvm-cov-target` (exit status: 101)

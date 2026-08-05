@@ -1,0 +1,108 @@
+{
+  "corrupted_glyph": "7",
+  "total_entries": 8,
+  "target_coordinates": [
+    {
+      "y": 100,
+      "x_approx": 424,
+      "char": "7",
+      "context": "$1,275.00"
+    },
+    {
+      "y": 122,
+      "x_approx": 424,
+      "char": "7",
+      "context": "$3,470.50"
+    },
+    {
+      "y": 144,
+      "x_approx": 406,
+      "char": "7",
+      "context": "$7,890.25"
+    },
+    {
+      "y": 166,
+      "x_approx": 412,
+      "char": "7",
+      "context": "$475.75"
+    },
+    {
+      "y": 166,
+      "x_approx": 430,
+      "char": "7",
+      "context": "$475.75"
+    },
+    {
+      "y": 188,
+      "x_approx": 424,
+      "char": "7",
+      "context": "$2,175.00"
+    },
+    {
+      "y": 210,
+      "x_approx": 406,
+      "char": "7",
+      "context": "$7,350.00"
+    },
+    {
+      "y": 232,
+      "x_approx": 418,
+      "char": "7",
+      "context": "$1,770.50"
+    },
+    {
+      "y": 232,
+      "x_approx": 424,
+      "char": "7",
+      "context": "$1,770.50"
+    },
+    {
+      "y": 254,
+      "x_approx": 412,
+      "char": "7",
+      "context": "$370.25"
+    }
+  ],
+  "entries": [
+    {
+      "date": "2026-01-05",
+      "desc": "Invoice #1071",
+      "amount": "$1,275.00"
+    },
+    {
+      "date": "2026-01-12",
+      "desc": "Payment #2073",
+      "amount": "$3,470.50"
+    },
+    {
+      "date": "2026-01-19",
+      "desc": "Invoice #3077",
+      "amount": "$7,890.25"
+    },
+    {
+      "date": "2026-02-02",
+      "desc": "Refund #4070",
+      "amount": "$475.75"
+    },
+    {
+      "date": "2026-02-14",
+      "desc": "Invoice #5071",
+      "amount": "$2,175.00"
+    },
+    {
+      "date": "2026-02-28",
+      "desc": "Payment #6073",
+      "amount": "$7,350.00"
+    },
+    {
+      "date": "2026-03-07",
+      "desc": "Invoice #7077",
+      "amount": "$1,770.50"
+    },
+    {
+      "date": "2026-03-15",
+      "desc": "Adjustment #87",
+      "amount": "$370.25"
+    }
+  ]
+}

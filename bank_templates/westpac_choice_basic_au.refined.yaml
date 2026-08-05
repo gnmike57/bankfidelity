@@ -1,0 +1,23 @@
+id: westpac_choice_basic_au
+header_signatures:
+- Westpac
+- Choice
+- Basic
+date_format: '%d/%m/%y'
+amount_regex: ^-?\$?[0-9,]+\.\d{2}$
+column_x_ranges:
+  debit:
+  - 63.103394
+  - 545.9077
+  balance:
+  - 535.0
+  - 545.0
+  description:
+  - 115.0
+  - 380.0
+  amount:
+  - 385.0
+  - 400.0
+  date:
+  - 60.0
+  - 110.0

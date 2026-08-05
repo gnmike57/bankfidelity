@@ -1,0 +1,6 @@
+pywinauto==0.6.8
+pyautogui==0.9.54
+opencv-python==4.10.0.84
+pytest==8.2.2
+pytesseract
+Pillow

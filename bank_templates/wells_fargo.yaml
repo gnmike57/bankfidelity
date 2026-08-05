@@ -1,0 +1,10 @@
+id: wells_fargo
+header_signatures:
+  - "Wells Fargo"
+date_format: "%m/%d"
+amount_regex: "^-?\\$?[0-9,]+\\.\\d{2}$"
+column_x_ranges:
+  date: [45.0, 95.0]
+  description: [105.0, 310.0]
+  amount: [320.0, 440.0]
+  balance: [450.0, 540.0]

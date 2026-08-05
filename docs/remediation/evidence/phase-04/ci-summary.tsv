@@ -1,0 +1,11 @@
+91388433285	base state (windows-latest)	completed	success	https://github.com/rogertqq-code/bank-statement-fidelity-editor/actions/runs/30707260996/job/91388433285
+91388433293	base state (ubuntu-latest)	completed	success	https://github.com/rogertqq-code/bank-statement-fidelity-editor/actions/runs/30707260996/job/91388433293
+91388433294	optional PyMuPDF Pro import (windows-latest)	completed	success	https://github.com/rogertqq-code/bank-statement-fidelity-editor/actions/runs/30707260996/job/91388433294
+91388433296	deferred hardening inventory	completed	failure	https://github.com/rogertqq-code/bank-statement-fidelity-editor/actions/runs/30707260996/job/91388433296
+91388433302	base state (macos-14)	completed	success	https://github.com/rogertqq-code/bank-statement-fidelity-editor/actions/runs/30707260996/job/91388433302
+91388433312	optional PyMuPDF Pro import (macos-14)	completed	success	https://github.com/rogertqq-code/bank-statement-fidelity-editor/actions/runs/30707260996/job/91388433312
+91388433321	clippy production surfaces	completed	success	https://github.com/rogertqq-code/bank-statement-fidelity-editor/actions/runs/30707260996/job/91388433321
+91388433323	rustfmt	completed	success	https://github.com/rogertqq-code/bank-statement-fidelity-editor/actions/runs/30707260996/job/91388433323
+91388887084	P0 integrity regressions (ubuntu-latest)	completed	success	https://github.com/rogertqq-code/bank-statement-fidelity-editor/actions/runs/30707260996/job/91388887084
+91388887095	P0 integrity regressions (windows-latest)	completed	success	https://github.com/rogertqq-code/bank-statement-fidelity-editor/actions/runs/30707260996/job/91388887095
+91388887124	P0 integrity regressions (macos-14)	completed	success	https://github.com/rogertqq-code/bank-statement-fidelity-editor/actions/runs/30707260996/job/91388887124

@@ -1,0 +1,13 @@
+42435af39f84c69b7cc3f29d1207fb816d778b46	feat(transfer): add deterministic local planner
+97fb5330a41d7bf2cf7dfb67666b1d6ca173181c	fix(transfer): remove mandatory AI prerequisite
+d5fb2fb186f930552b6432879108b598b3206665	fix(extraction): parse ISO statement rows exactly
+185750c17361977d3936f4cb98f06d719c42327c	fix(workflow): block incomplete ledgers before editing
+c312d43c0c06ee5a7fb0de6258730a87d58ac4b3	fix(dates): reject invalid adjustment inputs
+62daee2b023b6365b59bb1579b58c83e5166151c	fix(extraction): remove unqualified local OCR from v1
+bf03b45f5860b5afa5b08589f8ccf777b959f194	fix(verification): require exact workflow math evidence
+9ac070006ff94917bdc5fb8c6cfdc831d12981f5	feat(model): standardize canonical transaction metadata
+16f139f668eb8e52e30938c23df3658965aa58f5	fix(extraction): honor selected parser and validate fallback
+3608a415831d083088ceb425003f4115a5724e81	feat(extraction): add bounded folder batch command
+dc1c759907e8b35e4bf823ef2c4cd115c971d0a1	fix(finance): fail closed on invalid cascade edits
+11c9b1b94ff889454e16909a9ccd10b79c1e5217	test(transfer): remove external provider dependency
+9e5e8a1ca7ee32b3a8c8ee4bf73c3cbb2958c64f	test(runtime): avoid blocking lifecycle timer executor

@@ -1,0 +1,4 @@
+base_sha	c84c631e62590a366608b9dd2d9c20c476568f78
+candidate_sha	85e15fca5574068035eccab9e3a700958ee94b92
+workflow_run	30707260996
+branch	remediation/phase-04-python-fortification
