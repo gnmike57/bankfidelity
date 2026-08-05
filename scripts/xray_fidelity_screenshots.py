@@ -145,9 +145,19 @@ def run_xray(pdf_dir: Path, out_dir: Path, dpi: int = 150) -> dict:
                 orig_path = bank_dir / f"page_{i+1:02d}_original.png"
                 page_img.save(str(orig_path))
 
-                # For demonstration: the "edited" is the same page
-                # (in a real run, this would be the output PDF page)
-                edited_img = page_img.copy()
+                # Load the edited PDF page
+                edited_pdf_path = Path("stress_test_outputs") / f"{filename.replace('.pdf', '')}__to__{filename.replace('.pdf', '')}.pdf"
+                if edited_pdf_path.exists():
+                    edited_doc = fitz.open(str(edited_pdf_path))
+                    if i < len(edited_doc):
+                        edited_page = edited_doc[i]
+                        edited_pix = edited_page.get_pixmap(matrix=fitz.Matrix(dpi / 72, dpi / 72), alpha=False)
+                        edited_img = Image.frombytes("RGB", [edited_pix.width, edited_pix.height], edited_pix.samples)
+                    else:
+                        edited_img = page_img.copy()
+                    edited_doc.close()
+                else:
+                    edited_img = page_img.copy()
                 diff_img = make_diff_image(page_img, edited_img)
 
                 score = compute_ssim(page_img, edited_img)

@@ -24,6 +24,7 @@
   },
   "homepage": "https://github.com/flak3dd/bank-statement-fidelity-editor-remediated#readme",
   "dependencies": {
+    "@applitools/eyes-images": "^4.31.54",
     "agy": "^0.0.0"
   }
 }

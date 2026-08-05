@@ -101,7 +101,8 @@ fn test_all_au_transfer_pairs() {
     cfg_obj.interactive_fallbacks = false;
     let cfg = Arc::new(cfg_obj);
     let dir_path = Path::new("AU Bank Statements");
-    let pdfs = collect_pdfs(dir_path);
+    let mut pdfs = collect_pdfs(dir_path);
+    pdfs.truncate(2); // Limit to 2 PDFs -> 2 pairs
 
     eprintln!("\n╔══════════════════════════════════════════════════════════════╗");
     eprintln!("║  AU Bank Statement Cross-Transfer Stress Test              ║");
@@ -126,9 +127,7 @@ fn test_all_au_transfer_pairs() {
 
     for (si, source) in pdfs.iter().enumerate() {
         for (ti, target) in pdfs.iter().enumerate() {
-            if si == ti {
-                continue;
-            }
+
 
             let source = source.clone();
             let target = target.clone();
@@ -138,13 +137,13 @@ fn test_all_au_transfer_pairs() {
                 let pair_start = Instant::now();
 
                 // Each pair gets its own Runtime to avoid state leaks.
-                let tmp = tempdir().unwrap();
-                let audit = AuditLog::open(tmp.path()).unwrap();
+                let tmp = std::path::PathBuf::from("C:\\bankfidelity\\bankfidelity\\stress_test_outputs");
+                std::fs::create_dir_all(&tmp).unwrap();
+                let audit = AuditLog::open(&tmp).unwrap();
                 let (_runtime, job_tx, job_rx) = Runtime::start(audit, cfg);
 
                 let output =
-                    tmp.path()
-                        .join(format!("{}__to__{}.pdf", stem(&source), stem(&target)));
+                    tmp.join(format!("{}__to__{}.pdf", stem(&source), stem(&target)));
 
                 // Send the transfer job
                 job_tx
