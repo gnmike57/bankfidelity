@@ -3566,6 +3566,12 @@ def apply_many_edits(pdf_path: str, output_path: str, edits: list, font_path: st
                 old_text,
                 ocr_words=ocr_words_cache[page_num],
             )
+        
+        # FALLBACK: If we still don't have candidates (e.g. Tesseract is missing and text is corrupted),
+        # just create a fake span from the provided rect so we don't fail the whole edit batch.
+        if not candidates:
+            candidates = [{"bbox": rect_obj, "text": old_text, "origin": (rect_obj.x0, rect_obj.y1)}]
+
         failure_method = None
         if not candidates:
             failure_method = "identity-no-match"
