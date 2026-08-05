@@ -216,7 +216,7 @@ fn handle_extract(body: &str, channel: &RuntimeChannel) -> (&'static str, &'stat
         Some(p) if !p.is_empty() => p,
         _ => return ("400 Bad Request", "application/json", r#"{"error":"'pdf_path' field is required"}"#.to_string()),
     };
-    let provider_str = json_str(body, "provider").unwrap_or_else(|| "offline".to_string());
+    let provider_str = json_str(body, "provider").unwrap_or_else(|| "llamaparse".to_string());
     let parser_mode = match provider_str.to_lowercase().as_str() {
         "llamaparse" => crate::app::config::DocumentParserMode::LlamaParse,
         "documentai" | "document_ai" => crate::app::config::DocumentParserMode::DocumentAi,

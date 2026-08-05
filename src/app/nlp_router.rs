@@ -80,6 +80,20 @@ pub fn parse(input: &str) -> NlpCommand {
         return NlpCommand::Extract { provider };
     }
 
+    // ── Stress test ───────────────────────────────────────────────────────────
+    if s.contains("stress test") || s.contains("transfer matrix") || s.contains("xray suite") || s.contains("run test") {
+        let test_type = if s.contains("xray") || s.contains("fidelity") {
+            "xray_fidelity"
+        } else if s.contains("provider") || s.contains("probe") {
+            "provider_probe"
+        } else if s.contains("all") {
+            "all"
+        } else {
+            "transfer_matrix"
+        };
+        return NlpCommand::StressTest { test_type: test_type.to_string() };
+    }
+
     // ── Transfer ──────────────────────────────────────────────────────────────
     if s.contains("transfer") || s.contains("copy to") || s.contains("move to") {
         let bank = detect_bank(&s).unwrap_or_else(|| "unknown".to_string());
@@ -107,20 +121,6 @@ pub fn parse(input: &str) -> NlpCommand {
     // ── Reload config / keys ─────────────────────────────────────────────────
     if matches_any(&s, &["reload", "refresh keys", "update keys", "reload config", "hot reload"]) {
         return NlpCommand::ReloadConfig;
-    }
-
-    // ── Stress test ───────────────────────────────────────────────────────────
-    if s.contains("stress test") || s.contains("transfer matrix") || s.contains("xray suite") || s.contains("run test") {
-        let test_type = if s.contains("xray") || s.contains("fidelity") {
-            "xray_fidelity"
-        } else if s.contains("provider") || s.contains("probe") {
-            "provider_probe"
-        } else if s.contains("all") {
-            "all"
-        } else {
-            "transfer_matrix"
-        };
-        return NlpCommand::StressTest { test_type: test_type.to_string() };
     }
 
     // ── AI edit fallback ─────────────────────────────────────────────────────

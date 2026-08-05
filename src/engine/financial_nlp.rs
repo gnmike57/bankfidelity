@@ -1168,8 +1168,8 @@ mod tests {
         let intent = parse_financial_intent("rename Woolworths to Coles");
         assert!(matches!(intent, FinancialIntent::RenamePayee { .. }));
         if let FinancialIntent::RenamePayee { from, to } = intent {
-            assert_eq!(from, "woolworths");
-            assert_eq!(to, "coles");
+            assert_eq!(from, "Woolworths");
+            assert_eq!(to, "Coles");
         }
     }
 
