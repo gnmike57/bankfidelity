@@ -1092,6 +1092,56 @@ impl GeminiClient {
         Ok(parsed["math_valid"].as_bool().unwrap_or(false))
     }
 
+    pub async fn review_visual_proof(
+        &self,
+        proof_png_bytes: &[u8],
+    ) -> Result<bool, GeminiError> {
+        use base64::Engine;
+        if self.api_key.is_empty() {
+            return Ok(true); // Auto-approve if no Gemini API key (offline mode)
+        }
+        
+        let prompt = "You are a visual layout verifier for a PDF editor. 
+Look at this PNG proof image. The original text has been blanked out and replaced with blue bounding boxes showing where the new text will be placed. 
+Your job is to verify that these blue boxes are perfectly aligned with the surrounding text, don't overlap boundaries, and look visually correct.
+Reply with exactly 'APPROVED' if the layout looks flawless, or 'REJECTED: <reason>' if there are layout issues.";
+
+        let b64 = base64::engine::general_purpose::STANDARD.encode(proof_png_bytes);
+        
+        let parts = vec![
+            serde_json::json!({ "text": prompt }),
+            serde_json::json!({
+                "inline_data": {
+                    "mime_type": "image/png",
+                    "data": b64
+                }
+            })
+        ];
+
+        let payload = serde_json::json!({
+            "contents": [{ "parts": parts }],
+            "generationConfig": {
+                "temperature": 0.0,
+                "maxOutputTokens": 2048,
+            }
+        });
+
+        let resp = self.post_generate_pro(&payload).await?;
+        let resp_json: serde_json::Value = resp.json().await.map_err(|e| GeminiError::InvalidResponse(e.to_string()))?;
+        if let Some(candidates) = resp_json["candidates"].as_array() {
+            if let Some(first) = candidates.first() {
+                if let Some(parts) = first["content"]["parts"].as_array() {
+                    if let Some(text) = parts[0]["text"].as_str() {
+                        tracing::info!("AI Visual Review result: {}", text.trim());
+                        return Ok(text.trim().starts_with("APPROVED"));
+                    }
+                }
+            }
+        }
+        
+        Ok(false)
+    }
+
     pub async fn apply_natural_language_edit(
         &self,
         prompt: &str,

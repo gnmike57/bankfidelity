@@ -23,10 +23,11 @@ pub enum PythonOperation {
     ClonePages,
     RemovePages,
     RenderPageToPng,
+    GenerateVisualProof,
 }
 
 impl PythonOperation {
-    pub const ALL: [Self; 15] = [
+    pub const ALL: [Self; 16] = [
         Self::Ping,
         Self::GetTextBlocks,
         Self::ReplaceTextInRect,
@@ -42,12 +43,13 @@ impl PythonOperation {
         Self::ClonePages,
         Self::RemovePages,
         Self::RenderPageToPng,
+        Self::GenerateVisualProof,
     ];
 
     pub fn mutates_document(self) -> bool {
         matches!(
             self,
-            Self::ReplaceTextInRect | Self::ApplyManyEdits | Self::ClonePages | Self::RemovePages
+            Self::ReplaceTextInRect | Self::ApplyManyEdits | Self::ClonePages | Self::RemovePages | Self::GenerateVisualProof
         )
     }
 }

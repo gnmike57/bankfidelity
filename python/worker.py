@@ -64,7 +64,7 @@ def _gc_collections() -> int:
 
 
 MUTATING_OPERATIONS = frozenset(
-    {"replace_text_in_rect", "apply_many_edits", "clone_pages", "remove_pages"}
+    {"replace_text_in_rect", "apply_many_edits", "clone_pages", "remove_pages", "generate_visual_proof"}
 )
 
 
@@ -368,6 +368,9 @@ class WorkerRuntime:
             "render_page_to_png": lambda: self.bridge.render_page_to_png(
                 payload["pdf_path"], payload["page_num"], payload["dpi"]
             ),
+            "generate_visual_proof": lambda: self.bridge.generate_visual_proof(
+                payload["pdf_path"], payload["output_path"], payload["edits_json"]
+            ),
         }.get(operation)
         if method is None:
             raise ProtocolError("UNSUPPORTED_OPERATION", f"unsupported operation: {operation}")
@@ -390,6 +393,7 @@ class WorkerRuntime:
             "apply_many_edits",
             "clone_pages",
             "remove_pages",
+            "generate_visual_proof",
         }:
             return outcome
 
@@ -424,7 +428,7 @@ class WorkerRuntime:
 
     @staticmethod
     def _requested_count(operation: str, payload: Mapping[str, Any]) -> int:
-        if operation == "replace_text_in_rect":
+        if operation == "replace_text_in_rect" or operation == "generate_visual_proof":
             return 1
         if operation == "apply_many_edits":
             return len(payload["edits"])
@@ -433,7 +437,7 @@ class WorkerRuntime:
     @staticmethod
     def _applied_count(operation: str, result: Any) -> int:
         if not isinstance(result, dict):
-            return 1 if operation == "replace_text_in_rect" else 0
+            return 1 if operation in ("replace_text_in_rect", "generate_visual_proof") else 0
         if operation == "apply_many_edits":
             return int(result.get("placed", 0))
         if operation == "clone_pages":

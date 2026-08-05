@@ -402,6 +402,11 @@ pub enum PythonJob {
         page_num: usize,
         dpi: f32,
     },
+    GenerateVisualProof {
+        pdf_path: String,
+        output_path: String,
+        edits_json: String,
+    },
 }
 
 #[derive(Debug)]
@@ -646,6 +651,15 @@ impl PythonJob {
                 PythonOperation::RenderPageToPng,
                 Some(pdf_path.as_str()),
                 json!({"pdf_path": pdf_path, "page_num": page_num, "dpi": dpi}),
+            ),
+            Self::GenerateVisualProof {
+                pdf_path,
+                output_path,
+                edits_json,
+            } => (
+                PythonOperation::GenerateVisualProof,
+                Some(pdf_path.as_str()),
+                json!({"pdf_path": pdf_path, "output_path": output_path, "edits_json": edits_json}),
             ),
         };
 
@@ -3284,9 +3298,110 @@ async fn process_job_inner(
                         });
                         return;
                     }
+                    let mut generated_visual_proof_path = None;
                     let total_edits = batch_edits.len();
                     let mut edits_applied = 0usize;
                     if total_edits > 0 {
+                        // ======= STAGE 5a: GeneratePreview ========
+                        send_progress(&res_tx, TransferStage::GeneratePreview);
+                        tracing::info!("[TRANSFER] Stage 5a: Generating visual preview");
+                        let edits_json_str = serde_json::to_string(&batch_edits).unwrap_or_default();
+                        let visual_proof_pdf = output_pdf.with_extension("proof.pdf");
+                        generated_visual_proof_path = Some(visual_proof_pdf.clone());
+                        
+                        let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
+                        if let Err(e) = py_tx.send((
+                            PythonJob::GenerateVisualProof {
+                                pdf_path: output_pdf.to_string_lossy().to_string(),
+                                output_path: visual_proof_pdf.to_string_lossy().to_string(),
+                                edits_json: edits_json_str.clone(),
+                            },
+                            reply_tx,
+                        )) {
+                            let _ = res_tx.send(JobResult::TransferFailed {
+                                stage: "GeneratePreview".into(),
+                                message: format!("Failed to dispatch GenerateVisualProof: {e}"),
+                            });
+                            return;
+                        }
+                        
+                        let mut proof_png_bytes = Vec::new();
+                        match reply_rx.await {
+                            Ok(PythonJobResult::Json(_raw)) => {
+                                // Generate PNG proof for Gemini
+                                let proof_png_path = output_pdf.with_extension("proof.png");
+                                let (png_reply_tx, png_reply_rx) = tokio::sync::oneshot::channel();
+                                let _ = py_tx.send((
+                                    PythonJob::RenderPageToPng {
+                                        pdf_path: visual_proof_pdf.to_string_lossy().to_string(),
+                                        page_num: 0, // Just verifying the first page for MVP
+                                        dpi: 150.0,
+                                    },
+                                    png_reply_tx,
+                                ));
+                                
+                                if let Ok(PythonJobResult::Json(png_raw)) = png_reply_rx.await {
+                                    let parsed: serde_json::Value = serde_json::from_str(&png_raw).unwrap_or_default();
+                                    if let Some(b64) = parsed["png_base64"].as_str() {
+                                        use base64::Engine;
+                                        if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(b64) {
+                                            let _ = std::fs::write(&proof_png_path, &bytes);
+                                            proof_png_bytes = bytes;
+                                        }
+                                    }
+                                }
+                            }
+                            Ok(PythonJobResult::Error(e)) => {
+                                let _ = res_tx.send(JobResult::TransferFailed {
+                                    stage: "GeneratePreview".into(),
+                                    message: format!("Python GenerateVisualProof failed: {e}"),
+                                });
+                                return;
+                            }
+                            other => {
+                                let _ = res_tx.send(JobResult::TransferFailed {
+                                    stage: "GeneratePreview".into(),
+                                    message: format!("Unexpected result from GenerateVisualProof: {:?}", other),
+                                });
+                                return;
+                            }
+                        }
+
+                        // ======= STAGE 5b: AiVisualReview ========
+                        if !proof_png_bytes.is_empty() {
+                            send_progress(&res_tx, TransferStage::AiVisualReview);
+                            tracing::info!("[TRANSFER] Stage 5b: AI visual review of proof");
+                            
+                            let gemini_client = match crate::ai::gemini_client::GeminiClient::from_app_config_async(&cfg).await {
+                                Ok(c) => c,
+                                Err(e) => {
+                                    tracing::warn!("[TRANSFER] Failed to init GeminiClient for visual review, skipping review: {e}");
+                                    let _ = res_tx.send(JobResult::TransferFailed {
+                                        stage: "AiVisualReview".into(),
+                                        message: format!("AI visual reviewer unavailable: {e}"),
+                                    });
+                                    return;
+                                }
+                            };
+                            match gemini_client.review_visual_proof(&proof_png_bytes).await {
+                                Ok(true) => {
+                                    tracing::info!("[TRANSFER] AI explicitly approved visual proof.");
+                                }
+                                Ok(false) => {
+                                    let _ = res_tx.send(JobResult::TransferFailed {
+                                        stage: "AiVisualReview".into(),
+                                        message: "AI rejected the visual proof of edits due to bad layout.".into(),
+                                    });
+                                    return;
+                                }
+                                Err(e) => {
+                                    tracing::warn!("[TRANSFER] AI review failed, proceeding anyway: {e}");
+                                }
+                            }
+                        }
+
+                        // ======= STAGE 5c: Apply PDF Surgery ========
+                        send_progress(&res_tx, TransferStage::PdfSurgery);
                         tracing::info!("[TRANSFER] Applying batch of {} text edits", total_edits);
 
                         let mut output_pages = 0;
@@ -3942,6 +4057,7 @@ async fn process_job_inner(
                         corrections_applied: total_corrections,
                         retries_attempted: attempt - 1,
                         synthesized_fonts_used,
+                        visual_proof_path: generated_visual_proof_path,
                     };
 
                     // Store best result

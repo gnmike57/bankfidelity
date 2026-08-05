@@ -28,12 +28,14 @@ OPERATIONS = (
     "clone_pages",
     "remove_pages",
     "render_page_to_png",
+    "generate_visual_proof",
 )
 MUTATING_OPERATIONS = {
     "replace_text_in_rect",
     "apply_many_edits",
     "clone_pages",
     "remove_pages",
+    "generate_visual_proof",
 }
 DISPOSITIONS = {
     "succeeded",

@@ -244,6 +244,54 @@ def get_text_blocks(pdf_path: str, page_num: int = 0):
     return blocks
 
 
+def generate_visual_proof(pdf_path: str, output_path: str, edits_json: str):
+    """
+    Draws bounding boxes over the specified edits to generate a visual proof of the changes.
+    Does not use Pro redactions, just standard PyMuPDF drawing.
+    Outputs a PNG of the first page that has edits (or multiple PNGs if we want, but returning just one path for now).
+    Actually, let's output the annotated PDF, and the rust engine can chunk or render it to PNG.
+    Wait, the user wants PNGs. Let's just output an annotated PDF for simplicity, and then render it to PNG if needed, or just return the PNG path.
+    Let's save an annotated PDF at `output_path`.
+    """
+    try:
+        edits = json.loads(edits_json)
+    except Exception as e:
+        raise ValueError(f"Invalid edits_json: {e}")
+
+    if not _PYMUPDF_AVAILABLE:
+        raise RuntimeError("PyMuPDF is not installed")
+
+    doc = pymupdf.open(pdf_path)
+    
+    for edit in edits:
+        page_num = edit.get("page", 0)
+        if page_num >= doc.page_count:
+            continue
+        page = doc[page_num]
+        rect = edit.get("rect")
+        if not rect or len(rect) != 4:
+            continue
+        r = pymupdf.Rect(*rect)
+        
+        old_text = edit.get("old_text", "")
+        new_text = edit.get("new_text", "")
+        
+        # Draw a red transparent rectangle over the old text
+        annot = page.add_rect_annot(r)
+        annot.set_colors(stroke=(1, 0, 0), fill=(1, 0.8, 0.8))
+        annot.set_opacity(0.5)
+        annot.update()
+        
+        # Add text describing the change
+        # Place it slightly below the rect
+        text_p = pymupdf.Point(r.x0, r.y1 + 10)
+        page.insert_text(text_p, f"[{old_text}] -> [{new_text}]", color=(0, 0.5, 0), fontsize=8)
+
+    doc.save(output_path)
+    doc.close()
+    
+    return {"success": True, "output_path": output_path}
+
 def _color_int_to_rgb(color_int: int):
     """PyMuPDF gives sRGB span colour as a single int (0xRRGGBB). Map to (r,g,b) floats."""
     if color_int is None:

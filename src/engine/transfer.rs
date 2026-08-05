@@ -95,6 +95,10 @@ pub struct TransferPlan {
     pub strategy: String,
     /// Confidence score (0..1).
     pub confidence: f32,
+    /// Path to the visual proof PDF (if generated).
+    pub visual_proof_path: Option<PathBuf>,
+    /// Whether the AI has explicitly approved this plan based on the visual proof.
+    pub ai_approved: bool,
 }
 
 /// How a single source transaction maps to the target format.
@@ -129,6 +133,7 @@ pub struct TransferResult {
     pub corrections_applied: usize,
     pub retries_attempted: usize,
     pub synthesized_fonts_used: bool,
+    pub visual_proof_path: Option<PathBuf>,
 }
 
 /// Tracks which stage the pipeline is currently executing.
@@ -138,6 +143,8 @@ pub enum TransferStage {
     AnalyzeTarget,
     AiFormatMapping,
     ComputeBalances,
+    GeneratePreview,
+    AiVisualReview,
     PdfSurgery,
     VisualFidelityCheck,
     MathVerificationEngine,
@@ -152,6 +159,8 @@ impl TransferStage {
             Self::AnalyzeTarget => "Analyzing target statement...",
             Self::AiFormatMapping => "AI mapping transaction formats...",
             Self::ComputeBalances => "Computing balances...",
+            Self::GeneratePreview => "Generating visual proof of edits...",
+            Self::AiVisualReview => "AI reviewing visual proof...",
             Self::PdfSurgery => "Applying PDF changes...",
             Self::VisualFidelityCheck => "Verifying visual fidelity...",
             Self::MathVerificationEngine => "Verifying math (engine)...",
@@ -166,8 +175,10 @@ impl TransferStage {
             Self::AnalyzeSource => (0.00, 0.10),
             Self::AnalyzeTarget => (0.10, 0.20),
             Self::AiFormatMapping => (0.20, 0.30),
-            Self::ComputeBalances => (0.30, 0.35),
-            Self::PdfSurgery => (0.35, 0.55),
+            Self::ComputeBalances => (0.30, 0.33),
+            Self::GeneratePreview => (0.33, 0.35),
+            Self::AiVisualReview => (0.35, 0.40),
+            Self::PdfSurgery => (0.40, 0.55),
             Self::VisualFidelityCheck => (0.55, 0.75),
             Self::MathVerificationEngine => (0.75, 0.85),
             Self::MathVerificationGemini => (0.85, 0.95),
@@ -738,6 +749,8 @@ pub fn plan_transaction_transfer_deterministic(
         pages_to_remove,
         strategy: "deterministic-local-exact-geometry-capacity".into(),
         confidence: 1.0,
+        ai_approved: false,
+        visual_proof_path: None,
     })
 }
 
