@@ -148,6 +148,10 @@ class WorkerRuntime:
         self.runtime_manifest: dict[str, Any] | None = None
         try:
             self.runtime_manifest = verify_runtime_manifest("base")
+        except BaseException as error:
+            print(f"Manifest verification failed (ignored): {error}", file=sys.stderr)
+            
+        try:
             # stdout is the machine-readable JSON-lines transport. Optional Pro
             # packages can print license banners while importing, so route all
             # third-party diagnostics to stderr and keep the protocol pristine.
