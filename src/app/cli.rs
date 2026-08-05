@@ -39,6 +39,16 @@ pub enum Commands {
     /// Start the Model Context Protocol (MCP) Server loop over stdio.
     Mcp,
 
+    /// Dispatch a UI automation task to Microsoft UFO
+    Ufo {
+        /// The instruction for UFO (e.g. "download bank statement")
+        #[arg(short, long)]
+        task: String,
+        /// The target app (e.g. "chrome")
+        #[arg(short, long, default_value_t = String::from("chrome"))]
+        app: String,
+    },
+
     /// Run headless and expose an HTTP health surface (for containers /
     /// cloud platforms like Railway). Binds 0.0.0.0:$PORT (default 8080)
     /// and keeps the worker runtime alive. Reuses the same Job/JobResult
@@ -1144,6 +1154,18 @@ pub fn run_inner(
         Commands::Mcp => {
             crate::ai::mcp::McpServer::start();
             Ok(exit_code::SUCCESS)
+        }
+        Commands::Ufo { task, app } => {
+            match crate::ai::ufo::UfoClient::dispatch_task(&task, &app) {
+                Ok(result) => {
+                    println!("UFO Task Result:\n{}", serde_json::to_string_pretty(&result).unwrap_or_default());
+                    Ok(exit_code::SUCCESS)
+                }
+                Err(e) => {
+                    tracing::error!("UFO dispatch failed: {}", e);
+                    Ok(exit_code::GENERAL)
+                }
+            }
         }
         Commands::Gui => {
             // [Phase 0.1] Environment & Memory Assertions
