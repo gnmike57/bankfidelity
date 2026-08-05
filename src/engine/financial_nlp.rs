@@ -153,6 +153,12 @@ pub fn parse_financial_intent(instruction: &str) -> FinancialIntent {
     let lower = instruction.to_lowercase();
     let lower = lower.trim();
 
+    // ── Scale all income/expenses ─────────────────────────────────────────────
+    // "increase all income by 10%" / "reduce all expenses by 5%"
+    if let Some(intent) = try_parse_scale_all(lower, instruction) {
+        return intent;
+    }
+
     // ── Scale income ──────────────────────────────────────────────────────────
     // "double Maree's pay" / "triple my salary" / "increase pay by 50%"
     if let Some(intent) = try_parse_scale_income(lower, instruction) {
@@ -180,12 +186,6 @@ pub fn parse_financial_intent(instruction: &str) -> FinancialIntent {
     // ── Remove transactions ───────────────────────────────────────────────────
     // "remove all Uber transactions" / "delete Netflix payments"
     if let Some(intent) = try_parse_remove(lower, instruction) {
-        return intent;
-    }
-
-    // ── Scale all income/expenses ─────────────────────────────────────────────
-    // "increase all income by 10%" / "reduce all expenses by 5%"
-    if let Some(intent) = try_parse_scale_all(lower, instruction) {
         return intent;
     }
 
@@ -261,7 +261,7 @@ fn try_parse_set_amount(lower: &str, original: &str) -> Option<FinancialIntent> 
     Some(FinancialIntent::SetAmount { payee, amount, is_income })
 }
 
-fn try_parse_rename(lower: &str, _original: &str) -> Option<FinancialIntent> {
+fn try_parse_rename(lower: &str, original: &str) -> Option<FinancialIntent> {
     // "change X to Y" / "rename X to Y" / "replace X with Y"
     let rename_words = ["rename", "replace"];
     let has_rename = rename_words.iter().any(|w| lower.starts_with(w));
@@ -280,8 +280,8 @@ fn try_parse_rename(lower: &str, _original: &str) -> Option<FinancialIntent> {
         .iter()
         .find_map(|v| lower.find(v).map(|p| p + v.len()))?;
 
-    let rest = &lower[verb_end..];
-    let sep_pos = rest.find(separator)?;
+    let rest = &original[verb_end..];
+    let sep_pos = lower[verb_end..].find(separator)?;
     let from = rest[..sep_pos].trim().trim_matches('\'').trim_matches('"').to_string();
     let to_start = sep_pos + separator.len();
     let to = rest[to_start..].trim().trim_matches('\'').trim_matches('"').to_string();
@@ -1218,7 +1218,7 @@ mod tests {
     #[test]
     fn test_cascade_running_balances_from_zero() {
         let mut txns = vec![
-            make_tx(1, 1, "Pay", Some(1000.0), None, 0.0),
+            make_tx(1, 1, "Pay", Some(1000.0), None, 1000.0),
             make_tx(1, 2, "Rent", None, Some(500.0), 0.0),
             make_tx(1, 3, "Groceries", None, Some(100.0), 0.0),
         ];

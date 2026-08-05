@@ -119,6 +119,7 @@ $haveInput = Test-Path $InputPdf
 
 # --- Build / test steps -----------------------------------------------------
 Invoke-Step -Name 'cargo-check' -Log 'cargo_check.log' -Command { cargo check }
+$env:PYTHON_EXECUTABLE="C:\Users\zbook\Downloads\python-3.15.0rc1-embed-amd64\python.exe"
 Invoke-Step -Name 'cargo-test'  -Log 'cargo_test_all_features.log' -Command { cargo test --all --all-features }
 Invoke-Step -Name 'cargo-build' -Log 'cargo_build_release.log' -Command { cargo build --release }
 

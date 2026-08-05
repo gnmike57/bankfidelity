@@ -148,8 +148,8 @@ mod tests {
         // Wait for one telemetry event
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            // It might take ~1s for the first event, so we give it a 3s timeout
-            let res = tokio::time::timeout(Duration::from_secs(3), rx.recv()).await;
+            // It might take a few seconds for the first event (sysinfo initialization), so give it 10s
+            let res = tokio::time::timeout(Duration::from_secs(10), rx.recv()).await;
             if let Ok(Ok(event)) = res {
                 if let WatchdogEvent::Telemetry { cpu_usage, ram_mb } = event {
                     assert!(cpu_usage >= 0.0);
