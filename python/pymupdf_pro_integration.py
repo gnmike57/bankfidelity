@@ -45,7 +45,11 @@ if sys.platform == "win32" and hasattr(os, "add_dll_directory"):
     except Exception:
         pass  # Non-fatal: pymupdf may still load if DLLs are already on PATH
 
-import pymupdf
+try:
+    import pymupdf
+    _PYMUPDF_AVAILABLE = True
+except ImportError:
+    _PYMUPDF_AVAILABLE = False
 import json
 import math
 import gc
@@ -216,13 +220,11 @@ def render_page_to_png(pdf_path: str, page_num: int = 0, dpi: float = 150.0):
 
 
 def get_text_blocks(pdf_path: str, page_num: int = 0):
-    """Return text spans using the core PyMuPDF extraction API.
-
-    Text extraction does not require PyMuPDF Pro. Keep this operation available in
-    the base runtime and use a context manager so every success and failure path
-    deterministically closes the document handle.
-    """
+    """Return text spans using the core PyMuPDF extraction API."""
     blocks = []
+    if not _PYMUPDF_AVAILABLE:
+        return blocks
+    
     with pymupdf.open(pdf_path) as doc:
         page = doc[page_num]
         for block in page.get_text("dict")["blocks"]:

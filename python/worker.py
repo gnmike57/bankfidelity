@@ -154,6 +154,8 @@ class WorkerRuntime:
             with contextlib.redirect_stdout(sys.stderr):
                 self.bridge = importlib.import_module("pymupdf_pro_integration")
         except BaseException as error:  # startup must report even loader-level failures
+            import traceback
+            traceback.print_exc()
             self.bridge_error_class = type(error).__name__
 
     def handshake(self) -> dict[str, Any]:
@@ -163,7 +165,8 @@ class WorkerRuntime:
         pro_version_compatible = False
         pro_error_class = None
         if self.bridge is not None:
-            version = getattr(self.bridge.pymupdf, "version", None)
+            bridge_pymupdf = getattr(self.bridge, "pymupdf", None)
+            version = getattr(bridge_pymupdf, "version", None) if bridge_pymupdf else None
             if isinstance(version, tuple):
                 pymupdf_version = str(version[0]) if version else None
             elif version is not None:

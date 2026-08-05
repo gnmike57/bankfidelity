@@ -12,7 +12,7 @@
   "protocol_version": "1.0.0",
   "python": {
     "major": 3,
-    "minor": 12
+    "minor": 15
   },
   "schema_version": 1,
   "source_files": {

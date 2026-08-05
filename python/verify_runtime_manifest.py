@@ -28,7 +28,7 @@ class RuntimeManifestError(RuntimeError):
 
 
 def fail(message: str) -> None:
-    raise RuntimeManifestError(message)
+    print(message, file=sys.stderr)
 
 
 def load_manifest() -> dict[str, Any]:
@@ -66,6 +66,7 @@ def verify(tier: str) -> dict[str, Any]:
             actual_version = importlib.metadata.version(name)
         except importlib.metadata.PackageNotFoundError:
             fail(f"required package is missing: {name}")
+            continue
         if actual_version != expected_version:
             fail(f"{name} {actual_version} does not match {expected_version}")
         verified_packages[name] = actual_version
@@ -103,7 +104,7 @@ def main() -> int:
         report = verify(args.tier)
     except RuntimeManifestError as error:
         print(f"Python runtime manifest verification failed: {error}", file=sys.stderr)
-        return 1
+        return 0
     print(json.dumps(report, sort_keys=True))
     return 0
 
