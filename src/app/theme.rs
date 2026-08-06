@@ -24,16 +24,16 @@ impl Theme {
     pub fn palette(self) -> Palette {
         match self {
             Theme::ForensicDark => Palette {
-                bg: egui::Color32::from_rgb(10, 10, 12), // Deep near-black workspace
-                panel: egui::Color32::from_rgb(16, 16, 18), // Slightly elevated panels
-                surface: egui::Color32::from_rgb(22, 22, 24), // Interactive surfaces
-                text: egui::Color32::from_rgb(240, 240, 245), // Crisp off-white text
-                weak: egui::Color32::from_rgb(130, 135, 150), // Muted technical text
-                accent: egui::Color32::from_rgb(0, 191, 255), // Vibrant cyan/blue accent
+                bg: egui::Color32::from_rgb(5, 5, 7), // Ultra-deep obsidian workspace
+                panel: egui::Color32::from_rgb(12, 12, 14), // Subtly elevated panels
+                surface: egui::Color32::from_rgb(18, 18, 20), // Interactive surfaces
+                text: egui::Color32::from_rgb(250, 250, 255), // Brilliant white text
+                weak: egui::Color32::from_rgb(140, 145, 160), // Muted technical text
+                accent: egui::Color32::from_rgb(0, 210, 255), // Striking neon cyan accent
                 success: egui::Color32::from_rgb(34, 197, 94), // Clinical green
                 warn: egui::Color32::from_rgb(245, 158, 11), // Alert amber
                 error: egui::Color32::from_rgb(239, 68, 68), // Critical red
-                info: egui::Color32::from_rgb(0, 191, 255), // Info cyan aligned with accent
+                info: egui::Color32::from_rgb(0, 210, 255), // Info cyan aligned with accent
             },
             Theme::ForensicLight => Palette {
                 bg: egui::Color32::from_rgb(248, 250, 252),
@@ -118,7 +118,7 @@ impl Theme {
         // Modern typography sizing
         style.text_styles.insert(
             egui::TextStyle::Heading,
-            egui::FontId::new(22.0, egui::FontFamily::Proportional),
+            egui::FontId::new(24.0, egui::FontFamily::Proportional), // Slightly larger
         );
         style.text_styles.insert(
             egui::TextStyle::Body,
@@ -132,6 +132,10 @@ impl Theme {
             egui::TextStyle::Small,
             egui::FontId::new(12.0, egui::FontFamily::Proportional),
         );
+        
+        // Micro-animations
+        style.animation_time = 0.15; // Smooth 150ms transitions for hovers and expansions
+        
         ctx.set_style(style);
     }
 }
