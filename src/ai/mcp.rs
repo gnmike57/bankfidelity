@@ -159,6 +159,31 @@ impl McpServer {
                                     },
                                     "required": ["instruction"]
                                 }
+                            },
+                            {
+                                "name": "transfer_transactions",
+                                "description": "Transfers transactions from a Source PDF to a Target PDF, adapting to the target's visual layout.",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "source": { "type": "string", "description": "Absolute path to the source PDF." },
+                                        "target": { "type": "string", "description": "Absolute path to the target PDF layout." },
+                                        "output": { "type": "string", "description": "Absolute path to save the transferred PDF." }
+                                    },
+                                    "required": ["source", "target", "output"]
+                                }
+                            },
+                            {
+                                "name": "export_history",
+                                "description": "Cryptographically extracts the immutable .audit history from a modified BankFidelity PDF.",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "input": { "type": "string", "description": "Absolute path to the modified PDF." },
+                                        "output_dir": { "type": "string", "description": "Absolute path to the directory to save the history." }
+                                    },
+                                    "required": ["input", "output_dir"]
+                                }
                             }
                         ]
                     }
@@ -217,6 +242,17 @@ impl McpServer {
                         cmd.arg("chat");
                         if let Some(i) = args.get("instruction").and_then(|v| v.as_str()) { cmd.arg("--instruction").arg(i); }
                         if let Some(t) = args.get("target_pdf").and_then(|v| v.as_str()) { cmd.arg("--target-pdf").arg(t); }
+                    }
+                    "transfer_transactions" => {
+                        cmd.arg("transfer-transactions");
+                        if let Some(s) = args.get("source").and_then(|v| v.as_str()) { cmd.arg("--source-pdf").arg(s); }
+                        if let Some(t) = args.get("target").and_then(|v| v.as_str()) { cmd.arg("--target-pdf").arg(t); }
+                        if let Some(o) = args.get("output").and_then(|v| v.as_str()) { cmd.arg("--output").arg(o); }
+                    }
+                    "export_history" => {
+                        cmd.arg("export-history");
+                        if let Some(i) = args.get("input").and_then(|v| v.as_str()) { cmd.arg("--input").arg(i); }
+                        if let Some(o) = args.get("output_dir").and_then(|v| v.as_str()) { cmd.arg("--output-dir").arg(o); }
                     }
                     _ => {
                         return json!({
@@ -296,7 +332,7 @@ impl McpServer {
                                     "role": "user",
                                     "content": {
                                         "type": "text",
-                                        "text": "You are connected to BankFidelity, a highly advanced Dual-Core AI system. You have three primary directives:\n1. Maximize High Visual Fidelity: When modifying PDFs, ALWAYS sequence `modify_text` followed immediately by `verify_layout` to ensure perfect typography. If a layout fails completely, use `typst_reconstruct` to declaratively rebuild it.\n2. Prioritize Speed & Data: When processing bulk directories or requesting analysis, use `extract_data` for a single file or `extract_batch` for an entire directory to rapidly retrieve structured tabular data.\n3. Bank Statement Operations: When directed to process, audit, or operate on a bank statement, you must automatically ingest using `extract_data`, verify financial intent using `local_ai_chat`, and if modifications are requested, strictly follow Directive 1. Do not manually read financial PDFs by eye.\nAdditionally, if you encounter a complex semantic or financial intent, you can delegate the task using `local_ai_chat` to leverage BankFidelity's offline Qwen 7B model."
+                                        "text": "You are connected to BankFidelity, a highly advanced Dual-Core AI system. You have complete E2E operational capability with these primary directives:\n1. Maximize High Visual Fidelity: When modifying PDFs, ALWAYS sequence `modify_text` followed immediately by `verify_layout` to ensure perfect typography. If a layout fails completely, use `typst_reconstruct` to declaratively rebuild it.\n2. Prioritize Speed & Data: When processing bulk directories or requesting analysis, use `extract_data` for a single file or `extract_batch` for an entire directory to rapidly retrieve structured tabular data.\n3. Bank Statement Operations: When directed to process, audit, or operate on a bank statement, you must automatically ingest using `extract_data`, verify financial intent using `local_ai_chat`, and if modifications are requested, strictly follow Directive 1. Do not manually read financial PDFs by eye.\n4. Multimodal Vision: If you need to physically see a bank statement page to verify visual anomalies, request the resource `pdf-page://<absolute_path_to_pdf>?page=<page_number>` via `resources/read`. BankFidelity will natively rasterize and return a Base64 PNG.\n5. Advanced Layout Orchestration: If instructed to adapt or move data between different bank formats, use `transfer_transactions`.\n6. Audit Verification: To cryptographically prove past manipulations, use `export_history` to pull the immutable `.audit` trail.\nAdditionally, if you encounter a complex semantic or financial intent, you can delegate the task using `local_ai_chat` to leverage BankFidelity's offline Qwen 7B model."
                                     }
                                 }
                             ]

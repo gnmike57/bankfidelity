@@ -32,6 +32,7 @@ The MCP Server natively provides:
    - *Directive 1*: Always prioritize flawless typography (sequence `modify_text` + `verify_layout`).
    - *Directive 2*: Balance rapid data extraction (`extract_data`).
    - *Directive 3*: **Automatic Bank Statement Protocol**: When directed to process a bank statement, strictly ingest using `extract_data`, verify using `local_ai_chat`, and format using Directive 1. Never read PDFs manually by eye.
+   - *Directive 4*: **Multimodal Vision**: If you need visual context of a page, request `pdf-page://<absolute_path>?page=<N>` via `resources/read`.
 2. **Dynamic Resources**: `resources/list` natively resolves and reads BankFidelity's active `task.md` and `walkthrough.md` from the IDE's dynamically resolved brain directory (using `.gemini/antigravity/brain`).
 3. **Execution Tools**: UFO natively executes `balance_statement`, `modify_text`, `extract_data`, and `verify_layout` directly against the Rust binary.
 
