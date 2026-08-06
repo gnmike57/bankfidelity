@@ -20,8 +20,14 @@ pub struct LocalLlmClient {
 
 impl LocalLlmClient {
     pub fn new() -> Self {
+        let reqwest_client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(90))
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new());
+        let http = reqwest_middleware::ClientBuilder::new(reqwest_client).build();
+
         Self {
-            http: crate::app::config::global_http_client(),
+            http,
             base_url: "http://127.0.0.1:11434/v1".to_string(),
         }
     }

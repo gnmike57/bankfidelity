@@ -30,11 +30,16 @@ impl McpServer {
                 Err(_) => break,
             };
 
-            if let Ok(req) = serde_json::from_str::<JsonRpcRequest>(&line) {
-                let response = Self::handle_request(req);
-                let response_str = serde_json::to_string(&response).unwrap();
-                writeln!(stdout, "{}", response_str).unwrap();
-                stdout.flush().unwrap();
+            match serde_json::from_str::<JsonRpcRequest>(&line) {
+                Ok(req) => {
+                    let response = Self::handle_request(req);
+                    let response_str = serde_json::to_string(&response).unwrap();
+                    writeln!(stdout, "{}", response_str).unwrap();
+                    stdout.flush().unwrap();
+                }
+                Err(e) => {
+                    tracing::warn!("MCP Server received malformed payload: '{}' - Error: {}", line, e);
+                }
             }
         }
     }
