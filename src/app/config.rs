@@ -176,12 +176,14 @@ impl PdfEngineMode {
 pub enum AiProviderMode {
     /// Skip AI entirely - manual-only editing with no AI balance/vision calls.
     ManualOnly,
+    /// Local LLaMA Server backend (e.g. llama-server with Qwen model).
+    #[default]
+    LocalLlama,
     /// Google Gemini via AI Studio API key.
     GeminiApiKey,
     /// Google Gemini via Vertex AI (enterprise, uses service-account / ADC).
     GeminiVertex,
     /// Groq API (extremely fast Llama 3 inference, free tier available).
-    #[default]
     GroqApiKey,
     /// OpenRouter API (access to DeepSeek and hundreds of other models).
     OpenRouterApiKey,
@@ -192,41 +194,38 @@ pub enum AiProviderMode {
 impl AiProviderMode {
     pub fn label(self) -> &'static str {
         match self {
+            Self::LocalLlama => "Local LLaMA Server",
             Self::GeminiApiKey => "Gemini (API Key)",
             Self::GeminiVertex => "Gemini (Vertex AI)",
-            Self::GroqApiKey => "Groq (Llama 3 / Fast)",
-            Self::OpenRouterApiKey => "OpenRouter (DeepSeek)",
-            Self::MistralApiKey => "Mistral AI",
+            Self::GroqApiKey => "Groq (Llama 3)",
+            Self::OpenRouterApiKey => "OpenRouter",
+            Self::MistralApiKey => "Mistral",
             Self::ManualOnly => "Manual Only (No AI)",
         }
     }
 
-    /// Token written to `.env` / `AI_PROVIDER` and read back by
-    /// [`AppConfig::from_env`]. Matches the serde `rename_all = "snake_case"`
-    /// representation of each variant.
-    pub fn env_token(self) -> &'static str {
+    pub fn env_key(self) -> &'static str {
         match self {
+            Self::LocalLlama => "local_llama",
             Self::GeminiApiKey => "gemini_api_key",
             Self::GeminiVertex => "gemini_vertex",
             Self::GroqApiKey => "groq_api_key",
             Self::OpenRouterApiKey => "openrouter_api_key",
             Self::MistralApiKey => "mistral_api_key",
-            Self::ManualOnly => "manual_only",
+            Self::ManualOnly => "manual",
         }
     }
 
-    /// Tolerant parse from an environment variable string. Accepts the
-    /// canonical serde snake_case tokens and convenient short aliases.
-    /// Returns `ManualOnly` on empty/unknown input.
-    pub fn from_env_str(s: &str) -> Self {
-        match s.trim().to_ascii_lowercase().as_str() {
+    pub fn from_env_str(val: &str) -> Self {
+        match val.to_lowercase().as_str() {
+            "local_llama" | "local" => Self::LocalLlama,
             "gemini_api_key" | "gemini" => Self::GeminiApiKey,
             "gemini_vertex" | "vertex" | "vertex_ai" => Self::GeminiVertex,
-            "groq_api_key" | "groq" => Self::GroqApiKey,
-            "openrouter_api_key" | "openrouter" => Self::OpenRouterApiKey,
-            "mistral_api_key" | "mistral" | "mistralai" => Self::MistralApiKey,
-            "manual_only" | "manual" => Self::ManualOnly,
-            _ => Self::ManualOnly,
+            "groq" | "groq_api_key" => Self::GroqApiKey,
+            "openrouter" | "openrouter_api_key" => Self::OpenRouterApiKey,
+            "mistral" | "mistral_api_key" => Self::MistralApiKey,
+            "manual" | "none" => Self::ManualOnly,
+            _ => Self::LocalLlama, // Default fallback
         }
     }
 }
@@ -693,6 +692,7 @@ impl AppConfig {
     pub fn has_ai_for_balancing(&self) -> bool {
         match self.ai_provider {
             AiProviderMode::ManualOnly => false,
+            AiProviderMode::LocalLlama => true, // No API key required for local LLaMA
             AiProviderMode::GeminiApiKey => self.gemini_api_key.is_some(),
             AiProviderMode::GeminiVertex => self
                 .document_ai

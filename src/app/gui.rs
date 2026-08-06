@@ -593,7 +593,7 @@ impl MyApp {
 
         // Seed AI_PROVIDER from persisted settings so the runtime AppConfig
         // snapshot picks it up on the initial ReloadConfig below.
-        std::env::set_var("AI_PROVIDER", app.settings.ai_provider.env_token());
+        std::env::set_var("AI_PROVIDER", app.settings.ai_provider.env_key());
         std::env::set_var(
             "INTERACTIVE_FALLBACKS",
             if app.settings.interactive_fallbacks {
@@ -746,7 +746,7 @@ impl MyApp {
             ),
             (
                 "AI_PROVIDER",
-                self.settings.ai_provider.env_token().to_string(),
+                self.settings.ai_provider.env_key().to_string(),
             ),
             (
                 "INTERACTIVE_FALLBACKS",

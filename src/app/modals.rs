@@ -644,6 +644,7 @@ impl AppModals for MyApp {
                         warn_if_unavailable("Mistral", capabilities.status(Capability::Mistral))
                     }
                     AiProviderMode::ManualOnly => {}
+                    AiProviderMode::LocalLlama => {}
                 }
 
                 match self.settings.document_parser {
