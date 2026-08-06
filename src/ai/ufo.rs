@@ -36,7 +36,7 @@ impl UfoClient {
             "python".to_string()
         };
 
-        let output = Command::new(python_cmd)
+        let mut child = Command::new(python_cmd)
             .arg("-m")
             .arg("ufo")
             .arg("--task")
@@ -44,10 +44,36 @@ impl UfoClient {
             .arg("--request")
             .arg(&context_prompt)
             .current_dir(&ufo_dir)
-            .output()
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
             .map_err(|e| format!("Failed to execute UFO python process: {}", e))?;
 
-        let stderr_str = String::from_utf8_lossy(&output.stderr);
+        let stdout = child.stdout.take().expect("Failed to open stdout");
+        let stderr = child.stderr.take().expect("Failed to open stderr");
+
+        let stderr_thread = std::thread::spawn(move || {
+            use std::io::{BufRead, BufReader};
+            let reader = BufReader::new(stderr);
+            for line in reader.lines() {
+                if let Ok(l) = line {
+                    tracing::warn!("[UFO-STDERR] {}", l);
+                }
+            }
+        });
+
+        use std::io::{BufRead, BufReader};
+        let reader = BufReader::new(stdout);
+        for line in reader.lines() {
+            if let Ok(l) = line {
+                tracing::info!("[UFO] {}", l);
+            }
+        }
+
+        let status = child.wait().map_err(|e| format!("Failed to wait on UFO process: {}", e))?;
+        let _ = stderr_thread.join();
+        
+        let stderr_str = if status.success() { String::new() } else { "See tracing logs for stderr".into() };
         
         // Try to read the output.md
         let log_path = ufo_dir.join("logs").join(&task_id).join("output.md");
@@ -57,7 +83,7 @@ impl UfoClient {
             "UFO did not generate an output.md file.".into()
         };
 
-        if !output.status.success() {
+        if !status.success() {
             return Err(format!("UFO task failed. StdErr: {}\n\nLog Output: {}", stderr_str, ufo_result));
         }
 
