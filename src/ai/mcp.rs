@@ -33,10 +33,13 @@ impl McpServer {
 
             match serde_json::from_str::<JsonRpcRequest>(&line) {
                 Ok(req) => {
+                    let is_notification = req.id.is_none();
                     let response = Self::handle_request(req);
-                    let response_str = serde_json::to_string(&response).unwrap();
-                    writeln!(stdout, "{}", response_str).unwrap();
-                    stdout.flush().unwrap();
+                    if !is_notification {
+                        let response_str = serde_json::to_string(&response).unwrap();
+                        writeln!(stdout, "{}", response_str).unwrap();
+                        stdout.flush().unwrap();
+                    }
                 }
                 Err(e) => {
                     tracing::warn!("MCP Server received malformed payload: '{}' - Error: {}", line, e);
@@ -484,6 +487,23 @@ impl McpServer {
                         "error": { "code": -32602, "message": "Invalid resource URI" }
                     })
                 }
+            }
+            "ping" => {
+                json!({
+                    "jsonrpc": "2.0",
+                    "id": req.id,
+                    "result": {}
+                })
+            }
+            "notifications/initialized" => {
+                // Notifications don't expect a response, but our loop requires returning a Value.
+                // We'll return a special 'null' response which the write loop can filter out,
+                // or just return a dummy response that MCP clients will ignore.
+                json!({
+                    "jsonrpc": "2.0",
+                    "id": req.id,
+                    "result": {}
+                })
             }
             _ => {
                 json!({

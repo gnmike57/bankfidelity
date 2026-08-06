@@ -224,7 +224,7 @@ impl AiProviderMode {
             "groq" | "groq_api_key" => Self::GroqApiKey,
             "openrouter" | "openrouter_api_key" => Self::OpenRouterApiKey,
             "mistral" | "mistral_api_key" => Self::MistralApiKey,
-            "manual" | "none" => Self::ManualOnly,
+            "manual" | "manual_only" | "none" => Self::ManualOnly,
             _ => Self::LocalLlama, // Default fallback
         }
     }
@@ -1014,10 +1014,10 @@ mod tests {
             AiProviderMode::from_env_str("manual_only"),
             AiProviderMode::ManualOnly
         );
-        assert_eq!(AiProviderMode::from_env_str(""), AiProviderMode::ManualOnly);
+        assert_eq!(AiProviderMode::from_env_str(""), AiProviderMode::LocalLlama);
         assert_eq!(
             AiProviderMode::from_env_str("unknown"),
-            AiProviderMode::ManualOnly
+            AiProviderMode::LocalLlama
         );
     }
 
@@ -1030,7 +1030,7 @@ mod tests {
             AiProviderMode::ManualOnly,
         ];
         for mode in modes {
-            assert_eq!(AiProviderMode::from_env_str(mode.env_token()), mode);
+            assert_eq!(AiProviderMode::from_env_str(mode.env_key()), mode);
         }
     }
 
