@@ -48,7 +48,7 @@ When contributing to the core engine, you must respect the following invariants 
 
 1.  **No Widen-on-Fail:** Verification thresholds (e.g., SSIM structural floor of `0.85`) are immutable. The engine must never silently widen a mask or lower a threshold to force a pass.
 2.  **Explicit Provider Outcomes:** Cloud AI providers (Vision, Document AI, pdfRest) are optional and additive. Their outcomes must be explicitly recorded as `PASS`, `FAIL`, or `UNAVAILABLE`. A provider failure must never be converted into a local pass.
-3.  **No Local LLMs:** Per ADR-0003 and Gate 08, local LLMs (e.g., Ollama, Llama.cpp) are explicitly forbidden in the v1 release to preserve deterministic execution and security. Do not submit PRs attempting to bundle local inference adapters.
+3.  **Mandatory Offline NLU (Qwen 7B):** Per our Dual-Core architecture, all sensitive natural language understanding (NLU) and intent routing MUST be performed entirely offline. You are strictly required to use the local Qwen 2.5 Coder 7B model via the `11434` bridge. Cloud LLMs are explicitly forbidden for intent routing to preserve maximum privacy.
 4.  **Exact Decimal Math:** All financial calculations must use exact decimal representations. Floating-point floats (`f32`, `f64`) are forbidden in the balance engine.
 
 ## Code Quality

@@ -67,6 +67,11 @@ The application works offline, but cloud parsers drastically improve extraction 
 | `LLAMAPARSE_API_KEY` | Enables the LLM-based fallback parser. |
 | `PDFREST_API_KEY` | Enables Adobe-tier cloud rendering for verification. |
 
+### Dual-Core & Offline AI Setup (New in v1.0.0)
+To enable the advanced UI automation and fully offline intent routing features:
+1. **Microsoft UFO**: Install Microsoft UFO at `C:\UFO`. The `dual-core-pdf-pipeline ufo` command natively hooks into this directory to automate UI tasks.
+2. **Qwen 7B (Local LLM)**: Run a local instance of `llama-server.exe` on port `11434` with the Qwen 2.5 Coder 7B model. BankFidelity will automatically detect it and route complex intent/math reasoning completely offline.
+
 ---
 
 ## 4. Build and Run

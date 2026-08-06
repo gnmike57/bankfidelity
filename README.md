@@ -1,7 +1,7 @@
 # Bank Statement Fidelity Editor
 
-**Version:** 0.5.0  
-**Status:** Beta  
+**Version:** 1.0.0  
+**Status:** Stable  
 **License:** Proprietary (Dual-Core PASSPHRASE required)
 
 A professional Rust/egui desktop application designed for **pixel-perfect, evidence-verified in-place editing of Australian bank statement PDFs**. 
@@ -19,6 +19,8 @@ Unlike standard PDF editors that reconstruct or flatten documents (destroying fo
 *   **Offline Fallback:** Works entirely offline with a deterministic geometry extractor if API keys are missing or cloud services fail.
 *   **Batch Processing:** Concurrent extraction and auto-balancing across entire directories of PDFs.
 *   **100% CLI Parity:** Every GUI feature is fully available via the command line for headless automation.
+*   **Dual-Core Automation (UFO):** Natively bridges with Microsoft UFO UI Agent via MCP, granting full UI automation and batch processing capabilities.
+*   **Local Offline AI (Qwen 7B):** Secures complex intent routing and math reasoning entirely offline, guaranteeing maximum privacy and determinism.
 
 ---
 
@@ -55,7 +57,6 @@ This tool is designed for **evidence-verified in-place edits** of known bank sta
 *   Generate fake transactions from scratch.
 *   Forge cryptographic signatures or bypass digital certificates.
 *   Claim universal visual or forensic identity with every commercial PDF producer.
-*   Ship with or support local LLM execution (explicitly disabled in v1 for security and determinism).
 
 ---
 

@@ -51,6 +51,7 @@ Parser routing is explicit: only the selected cloud parser may run, followed by 
   - Auth modes: API Key (simple) or Vertex AI (enterprise, SA/ADC).
   - Provider pass, rejection, malformed response, and unavailability are represented explicitly; optional AI never overrides mandatory local gates.
 - **pdfRest API:** Optional additive cloud rendering. Requests are bounded and contract-tested; authorization is scoped to the API upload, downloaded evidence must be PNG, and provider failure cannot weaken local acceptance.
+- **Qwen 2.5 Coder 7B (Local Offline):** A fully local, offline LLM operating via `llama-server.exe` on port `11434`. This handles all complex intent routing and math reasoning locally to guarantee maximum privacy.
 
 ## Verification Pipeline (Multi-Layer)
 
@@ -78,9 +79,11 @@ The immutable policy is versioned in `assets/verification-calibration-v2.json`; 
 - **API Semaphore:** Limits concurrent cloud API calls (default 3) to prevent rate limiting.
 - **Cancellation Registry:** Per-job cancellation tokens for responsive UI cancellation.
 
-## Python Interoperability (FFI)
+## Interoperability & Automation
 
 - **Supervised Python worker:** Rust launches a pinned Python runtime through a strict JSON-lines protocol. Native/third-party stdout is quarantined from the protocol stream, request/response schemas reject unknown fields, lifecycle results are exactly-once, and worker termination is bounded.
+- **Microsoft UFO (UI Agent):** The Rust backend natively shells out to the Microsoft UFO desktop agent to automate web-to-PDF downloads and GUI driving.
+- **MCP (Model Context Protocol) Server:** A JSON-RPC 2.0 server operating over `stdio` that exposes BankFidelity's layout reconstruction, transaction extraction, and cryptography engines natively to any connected AI Agent.
 
 ## Observability and Logging
 
