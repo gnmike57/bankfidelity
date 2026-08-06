@@ -58,10 +58,7 @@ impl UfoClient {
         };
 
         if !output.status.success() {
-            return Ok(json!({
-                "status": "error",
-                "message": format!("UFO task failed. StdErr: {}\n\nLog Output: {}", stderr_str, ufo_result)
-            }));
+            return Err(format!("UFO task failed. StdErr: {}\n\nLog Output: {}", stderr_str, ufo_result));
         }
 
         Ok(json!({

@@ -2029,7 +2029,11 @@ async fn process_job_inner(
                 
                 let request = format!("Automatically extract, verify, and fully correct the formatting of the bank statement located at: {:?}", path);
                 
-                match crate::ai::ufo::UfoClient::dispatch_task(&request) {
+                let result = tokio::task::spawn_blocking(move || {
+                    crate::ai::ufo::UfoClient::dispatch_task(&request)
+                }).await.unwrap_or_else(|e| Err(format!("Tokio spawn_blocking panicked: {}", e)));
+
+                match result {
                     Ok(val) => {
                         let _ = res_tx.send(JobResult::UfoAutoEditResult(val));
                     }
