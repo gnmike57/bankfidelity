@@ -780,6 +780,7 @@ fn python_input_sha256(path: &str) -> Result<String, String> {
 #[derive(Debug)]
 pub enum Job {
     Ping,
+    UfoAutoEdit { path: PathBuf },
     Python(PythonJob, oneshot::Sender<PythonJobResult>),
     LoadDocument {
         path: PathBuf,
@@ -1045,6 +1046,7 @@ impl Job {
             Self::UndeployDocAiVersion { .. } => "undeploy_docai_version",
             Self::SetDefaultDocAiVersion { .. } => "set_default_docai_version",
             Self::TrainDocAiVersion { .. } => "train_docai_version",
+            Self::UfoAutoEdit { .. } => "ufo_auto_edit",
         }
     }
 
@@ -1106,6 +1108,7 @@ pub enum OperationDisposition {
 #[derive(Debug)]
 pub enum JobResult {
     Pong,
+    UfoAutoEditResult(serde_json::Value),
     ApiKeysVerified(crate::app::api_verification::VerificationReport),
     DocumentLoaded {
         layout_json: String,
@@ -2015,6 +2018,29 @@ async fn process_job_inner(
                     let _ = result_tx_clone.send(JobResult::Pong);
                 }
             }
+        }
+        Job::UfoAutoEdit { path } => {
+            let res_tx = result_tx_clone.clone();
+            tokio::spawn(async move {
+                let _ = res_tx.send(JobResult::Progress {
+                    label: "Delegating to BankFidelity UFO Orchestrator...".into(),
+                    fraction: 0.5,
+                });
+                
+                let request = format!("Automatically extract, verify, and fully correct the formatting of the bank statement located at: {:?}", path);
+                
+                match crate::ai::ufo::UfoClient::dispatch_task(&request) {
+                    Ok(val) => {
+                        let _ = res_tx.send(JobResult::UfoAutoEditResult(val));
+                    }
+                    Err(e) => {
+                        let _ = res_tx.send(JobResult::Error {
+                            job_label: "ufo_dispatch".into(),
+                            message: format!("UFO Auto-Edit failed: {}", e),
+                        });
+                    }
+                }
+            });
         }
         Job::ExplainImbalance { transactions_json, opening_balance, closing_balance, imbalance } => {
             let client = crate::ai::local_llm::LocalLlmClient::new();

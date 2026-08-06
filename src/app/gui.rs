@@ -1540,6 +1540,16 @@ impl MyApp {
 impl MyApp {
     fn handle_job_result(&mut self, ctx: &egui::Context, res: JobResult) {
         match res {
+            JobResult::UfoAutoEditResult(val) => {
+                self.in_flight = self.in_flight.saturating_sub(1);
+                self.progress = None;
+                
+                let task_id = val["task_id"].as_str().unwrap_or("unknown");
+                self.toast(
+                    ToastKind::Success,
+                    format!("UFO Auto-Edit Complete (Task: {})", task_id),
+                );
+            }
             JobResult::McpRenderComplete { .. } => {
                 self.in_flight = self.in_flight.saturating_sub(1);
                 self.progress = None;
@@ -2502,6 +2512,33 @@ impl MyApp {
                             .pick_file()
                         {
                             self.open_pdf(path);
+                        }
+                    }
+
+                    ui.add_space(10.0);
+
+                    // 🪄 📄 Auto-Edit (UFO) Button
+                    let auto_edit_btn = ui.add_sized(
+                        [180.0, 58.0],
+                        egui::Button::new(
+                            egui::RichText::new("🪄 📄 Auto-Edit (UFO)")
+                                .size(15.0)
+                                .strong()
+                                .color(self.settings.theme.palette().bg),
+                        )
+                        .fill(self.settings.theme.palette().accent), // Use accent color for high visibility
+                    );
+
+                    if auto_edit_btn.clicked() {
+                        if self.current_pdf_path.exists() {
+                            if let Err(e) = self.dispatch_workflow_job(Job::UfoAutoEdit {
+                                path: self.current_pdf_path.clone(),
+                            }) {
+                                tracing::error!("Failed to dispatch Auto-Edit: {}", e);
+                            }
+                            self.in_flight += 1;
+                        } else {
+                            self.toast(ToastKind::Warn, "Please open a statement first.");
                         }
                     }
 
