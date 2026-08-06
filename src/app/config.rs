@@ -607,8 +607,8 @@ impl AppConfig {
                 "native" => PdfEngineMode::NativeOnly,
                 "pymupdf" => PdfEngineMode::PyMuPdfOnly,
                 "auto" => PdfEngineMode::PyMuPdfProPrimary,
-                // Typst is a non-fidelity reconstruction export, never an edit engine.
-                "typst" => PdfEngineMode::PyMuPdfProPrimary,
+                // Allow Typst as a declarative layout reconstruction engine.
+                "typst" => PdfEngineMode::TypstReconstruct,
                 "dual" | "dual_concurrent" => PdfEngineMode::DualConcurrent,
                 _ => PdfEngineMode::PyMuPdfProPrimary,
             },

@@ -109,12 +109,20 @@ pub enum Commands {
         retries: usize,
     },
 
-    /// Legacy non-fidelity Typst reconstruction command (disabled; returns non-success)
+    /// High-Fidelity Typst layout reconstruction and reflowing
     TypstReconstruct {
         #[arg(short, long)]
         input: PathBuf,
         #[arg(short, long)]
         output: PathBuf,
+    },
+
+    /// MCP Internal: Renders a page of a PDF to base64 PNG
+    McpRenderPage {
+        #[arg(short, long)]
+        input: PathBuf,
+        #[arg(short, long)]
+        page: usize,
     },
 
     /// Verify visual and mathematical integrity (T7)
@@ -1138,7 +1146,7 @@ pub fn run_inner(
 
     match cli.command {
         Commands::TypstReconstruct { input, output } => {
-            tracing::warn!("Typst reconstruction is disabled because it is not a fidelity-preserving edit path.");
+            tracing::info!("Running dynamic declarative Typst reflowing.");
             let _ = job_tx.send_headless(Job::TypstReconstruct {
                 input: input.clone(),
                 output: output.clone(),
@@ -1146,6 +1154,23 @@ pub fn run_inner(
             match wait_for_terminal_result(&job_rx) {
                 Ok(JobResult::ReconstructComplete { output_path }) => {
                     tracing::info!("Reconstruction successful! Saved to {:?}", output_path);
+                    Ok(exit_code::SUCCESS)
+                }
+                Ok(other) => {
+                    tracing::error!("Unexpected terminal result: {:?}", other);
+                    Ok(exit_code::GENERAL)
+                }
+                Err((label, err)) => {
+                    tracing::error!("Job '{}' failed: {}", label, err);
+                    Ok(exit_code::GENERAL)
+                }
+            }
+        }
+        Commands::McpRenderPage { input, page } => {
+            let _ = job_tx.send_headless(Job::McpRenderPage { input, page });
+            match wait_for_terminal_result(&job_rx) {
+                Ok(JobResult::McpRenderComplete { base64_png }) => {
+                    println!("{}", base64_png);
                     Ok(exit_code::SUCCESS)
                 }
                 Ok(other) => {

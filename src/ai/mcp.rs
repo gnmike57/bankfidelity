@@ -275,7 +275,49 @@ impl McpServer {
                 let params = req.params.unwrap_or(json!({}));
                 let uri = params.get("uri").and_then(|u| u.as_str()).unwrap_or("");
                 
-                if uri.starts_with("file://") {
+                if uri.starts_with("pdf-page://") {
+                    let path_and_query = uri.trim_start_matches("pdf-page://");
+                    let mut parts = path_and_query.split("?page=");
+                    let path = parts.next().unwrap_or("");
+                    let page: usize = parts.next().and_then(|s| s.parse().ok()).unwrap_or(1);
+                    
+                    let mut cmd = std::process::Command::new(std::env::current_exe().unwrap_or_default());
+                    cmd.arg("mcp-render-page").arg("--input").arg(path).arg("--page").arg(page.to_string());
+                    
+                    match cmd.output() {
+                        Ok(output) if output.status.success() => {
+                            let base64_png = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                            json!({
+                                "jsonrpc": "2.0",
+                                "id": req.id,
+                                "result": {
+                                    "contents": [
+                                        {
+                                            "uri": uri,
+                                            "mimeType": "image/png",
+                                            "text": base64_png
+                                        }
+                                    ]
+                                }
+                            })
+                        }
+                        Ok(output) => {
+                            let err = String::from_utf8_lossy(&output.stderr);
+                            json!({
+                                "jsonrpc": "2.0",
+                                "id": req.id,
+                                "error": { "code": -32602, "message": format!("Failed to render PDF page: {}", err) }
+                            })
+                        }
+                        Err(e) => {
+                            json!({
+                                "jsonrpc": "2.0",
+                                "id": req.id,
+                                "error": { "code": -32602, "message": format!("Failed to spawn render process: {}", e) }
+                            })
+                        }
+                    }
+                } else if uri.starts_with("file://") {
                     let path = uri.trim_start_matches("file://");
                     match std::fs::read_to_string(path) {
                         Ok(content) => {
