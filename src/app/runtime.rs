@@ -1003,6 +1003,7 @@ impl Job {
 
     pub fn label(&self) -> &'static str {
         match self {
+            Job::McpRenderPage { .. } => "mcp_render_page",
             Self::Ping => "ping",
             Self::Python(..) => "python",
             Self::LoadDocument { .. } => "load_document",
@@ -6943,11 +6944,10 @@ async fn process_job_inner(
                 let mut statement = crate::ai::document_ai::BankStatement {
                     bank_name: None,
                     account_number: None,
-                    opening_balance: "0.00".into(),
-                    closing_balance: "0.00".into(),
+                    opening_balance: rust_decimal::Decimal::new(0, 2),
+                    closing_balance: rust_decimal::Decimal::new(0, 2),
                     transactions: vec![],
-                    page_number: 1,
-                    has_been_audited: false,
+                    total_pages: 1,
                 };
                 
                 let typst_engine = crate::engine::typst_engine::TypstEngine::new();

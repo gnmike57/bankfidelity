@@ -1540,6 +1540,10 @@ impl MyApp {
 impl MyApp {
     fn handle_job_result(&mut self, ctx: &egui::Context, res: JobResult) {
         match res {
+            JobResult::McpRenderComplete { .. } => {
+                self.in_flight = self.in_flight.saturating_sub(1);
+                self.progress = None;
+            }
             JobResult::ImbalanceExplained { explanation } => {
                 self.in_flight = self.in_flight.saturating_sub(1);
                 self.progress = None;

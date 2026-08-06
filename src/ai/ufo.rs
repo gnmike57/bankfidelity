@@ -8,8 +8,8 @@ impl UfoClient {
     /// Dispatches a UI automation task to Microsoft UFO directly.
     /// Injects BankFidelity state context to maximize common understanding.
     pub fn dispatch_task(request: &str) -> Result<Value, String> {
-        let home_dir = dirs::home_dir().unwrap_or_default();
-        let ufo_dir = home_dir.join("UFO");
+        // Microsoft UFO is installed directly on C:\UFO per user configuration
+        let ufo_dir = std::path::PathBuf::from("C:\\UFO");
             
         if !ufo_dir.exists() {
             return Ok(json!({

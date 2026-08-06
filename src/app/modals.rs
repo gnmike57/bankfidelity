@@ -43,10 +43,10 @@ impl CommandPalette for MyApp {
                     .inner_margin(16.0)
                     .rounding(12.0)
                     .shadow(egui::epaint::Shadow {
-                        offset: egui::vec2(0.0, 20.0),
-                        blur: 40.0,
+                        offset: egui::vec2(0.0, 8.0),
+                        blur: 16.0,
                         spread: 0.0,
-                        color: egui::Color32::from_black_alpha(150),
+                        color: egui::Color32::from_black_alpha(40),
                     }),
             )
             .open(&mut open)
