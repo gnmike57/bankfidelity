@@ -236,7 +236,7 @@ impl McpServer {
                                     "role": "user",
                                     "content": {
                                         "type": "text",
-                                        "text": "You are connected to BankFidelity, a highly advanced Dual-Core AI system for parsing and balancing bank statements. When a user asks to modify a PDF, always prioritize high visual fidelity. Use the `modify_text` tool followed by `verify_layout` to ensure typographic accuracy. When processing entire directories, use `extract_data`. Your goal is to maximize end-to-end comprehension and precise execution."
+                                        "text": "You are connected to BankFidelity, a highly advanced Dual-Core AI system. You have two primary directives: 1. Maximize High Visual Fidelity: When modifying PDFs, ALWAYS sequence `modify_text` followed immediately by `verify_layout` to ensure perfect typography. 2. Prioritize Speed & Data: When processing bulk directories or requesting analysis, use `extract_data` for rapid, structured tabular data retrieval. Balance both flawless aesthetics and high-performance extraction based on the user's workflow."
                                     }
                                 }
                             ]
