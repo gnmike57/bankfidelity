@@ -116,6 +116,44 @@ impl McpServer {
                                     },
                                     "required": ["original", "edited", "output_dir"]
                                 }
+                            },
+                            {
+                                "name": "extract_batch",
+                                "description": "Extracts tabular data from an entire directory of PDFs concurrently.",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "input_dir": { "type": "string", "description": "Absolute path to the input directory of PDFs." },
+                                        "output_dir": { "type": "string", "description": "Absolute path to the output directory for JSON files." },
+                                        "max_concurrency": { "type": "integer", "description": "Maximum concurrent workers (default: 4)." },
+                                        "retries": { "type": "integer", "description": "Number of retries for failures (default: 1)." }
+                                    },
+                                    "required": ["input_dir", "output_dir"]
+                                }
+                            },
+                            {
+                                "name": "typst_reconstruct",
+                                "description": "Programmatically rebuilds a BankStatement PDF using a declarative Typst layout.",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "input": { "type": "string", "description": "Absolute path to the input BankStatement JSON (or original PDF to extract from)." },
+                                        "output": { "type": "string", "description": "Absolute path to save the reconstructed PDF." }
+                                    },
+                                    "required": ["input", "output"]
+                                }
+                            },
+                            {
+                                "name": "local_ai_chat",
+                                "description": "Delegates complex NLU intent back to the localized Qwen 7B model for offline analysis.",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "instruction": { "type": "string", "description": "The complex natural language instruction." },
+                                        "target_pdf": { "type": "string", "description": "Optional absolute path to the target PDF for context." }
+                                    },
+                                    "required": ["instruction"]
+                                }
                             }
                         ]
                     }
@@ -157,6 +195,23 @@ impl McpServer {
                         if let Some(orig) = args.get("original").and_then(|v| v.as_str()) { cmd.arg("--original").arg(orig); }
                         if let Some(edit) = args.get("edited").and_then(|v| v.as_str()) { cmd.arg("--edited").arg(edit); }
                         if let Some(out) = args.get("output_dir").and_then(|v| v.as_str()) { cmd.arg("--output-dir").arg(out); }
+                    }
+                    "extract_batch" => {
+                        cmd.arg("extract-batch");
+                        if let Some(i) = args.get("input_dir").and_then(|v| v.as_str()) { cmd.arg("--input-dir").arg(i); }
+                        if let Some(o) = args.get("output_dir").and_then(|v| v.as_str()) { cmd.arg("--output-dir").arg(o); }
+                        if let Some(c) = args.get("max_concurrency").and_then(|v| v.as_u64()) { cmd.arg("--max-concurrency").arg(c.to_string()); }
+                        if let Some(r) = args.get("retries").and_then(|v| v.as_u64()) { cmd.arg("--retries").arg(r.to_string()); }
+                    }
+                    "typst_reconstruct" => {
+                        cmd.arg("typst-reconstruct");
+                        if let Some(i) = args.get("input").and_then(|v| v.as_str()) { cmd.arg("--input").arg(i); }
+                        if let Some(o) = args.get("output").and_then(|v| v.as_str()) { cmd.arg("--output").arg(o); }
+                    }
+                    "local_ai_chat" => {
+                        cmd.arg("chat");
+                        if let Some(i) = args.get("instruction").and_then(|v| v.as_str()) { cmd.arg("--instruction").arg(i); }
+                        if let Some(t) = args.get("target_pdf").and_then(|v| v.as_str()) { cmd.arg("--target-pdf").arg(t); }
                     }
                     _ => {
                         return json!({
@@ -236,7 +291,7 @@ impl McpServer {
                                     "role": "user",
                                     "content": {
                                         "type": "text",
-                                        "text": "You are connected to BankFidelity, a highly advanced Dual-Core AI system. You have two primary directives: 1. Maximize High Visual Fidelity: When modifying PDFs, ALWAYS sequence `modify_text` followed immediately by `verify_layout` to ensure perfect typography. 2. Prioritize Speed & Data: When processing bulk directories or requesting analysis, use `extract_data` for rapid, structured tabular data retrieval. Balance both flawless aesthetics and high-performance extraction based on the user's workflow."
+                                        "text": "You are connected to BankFidelity, a highly advanced Dual-Core AI system. You have two primary directives:\n1. Maximize High Visual Fidelity: When modifying PDFs, ALWAYS sequence `modify_text` followed immediately by `verify_layout` to ensure perfect typography. If a layout fails completely, use `typst_reconstruct` to declaratively rebuild it.\n2. Prioritize Speed & Data: When processing bulk directories or requesting analysis, use `extract_data` for a single file or `extract_batch` for an entire directory to rapidly retrieve structured tabular data.\nAdditionally, if you encounter a complex semantic or financial intent, you can delegate the task using `local_ai_chat` to leverage BankFidelity's offline Qwen 7B model. Balance both flawless aesthetics and high-performance extraction based on the user's workflow."
                                     }
                                 }
                             ]

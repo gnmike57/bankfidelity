@@ -26,10 +26,12 @@ cargo run -- chat -i statement.pdf "Analyze the transactions on page 1 and verif
 ```
 
 ### 2. Available MCP Resources & Tools
-UFO has access to the following capabilities via BankFidelity's MCP:
+UFO has access to the following expanded capabilities via BankFidelity's MCP:
 - **Vision (`resources/read`)**: UFO can read `pdf-page://<path_to_pdf>?page=<number>` to receive a 150 DPI Base64 PNG image of the document, allowing it to "see" the statement before editing.
 - **Semantic Guidance (`prompts/get`)**: UFO automatically pulls the `bankfidelity_agent_instructions` prompt. This forces UFO to balance high-speed data extraction (`extract_data`) against pixel-perfect typography (`modify_text` followed immediately by `verify_layout`).
-- **Declarative Layout Reflowing**: If UFO detects that an edit has overflowed the physical bounding box, it should trigger the `TypstReconstruct` command to natively rebuild the PDF.
+- **Declarative Layout Reflowing (`typst_reconstruct`)**: If UFO detects that an edit has overflowed the physical bounding box, it MUST use `typst_reconstruct` to natively rebuild the PDF.
+- **Batch Processing (`extract_batch`)**: UFO can autonomously chew through entire directories of statements at high speed using `extract_batch`.
+- **Local AI Delegation (`local_ai_chat`)**: For highly complex financial analysis or intent routing, UFO can use `local_ai_chat` to delegate the reasoning directly to the local offline Qwen 7B model.
 
 ### 3. Execution & Logs
 UFO stores its logs in `C:\UFO\logs\<task_id>\output.md`. 
