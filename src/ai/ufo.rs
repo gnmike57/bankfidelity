@@ -29,7 +29,14 @@ impl UfoClient {
             std::env::current_dir().unwrap_or_default()
         );
 
-        let output = Command::new("python")
+        let python_exe = ufo_dir.join("python_env").join("python.exe");
+        let python_cmd = if python_exe.exists() {
+            python_exe.to_string_lossy().to_string()
+        } else {
+            "python".to_string()
+        };
+
+        let output = Command::new(python_cmd)
             .arg("-m")
             .arg("ufo")
             .arg("--task")
