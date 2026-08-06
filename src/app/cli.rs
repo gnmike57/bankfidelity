@@ -1188,7 +1188,7 @@ pub fn run_inner(
             Ok(exit_code::SUCCESS)
         }
         Commands::Ufo { request } => {
-            match crate::ai::ufo::UfoClient::dispatch_task(&request) {
+            match crate::ai::ufo::UfoClient::dispatch_task(&request, None::<fn(String)>) {
                 Ok(result) => {
                     println!("UFO Task Result:\n{}", serde_json::to_string_pretty(&result).unwrap_or_default());
                     Ok(exit_code::SUCCESS)

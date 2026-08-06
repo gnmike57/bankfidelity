@@ -4,10 +4,27 @@ use std::time::SystemTime;
 
 pub struct UfoClient;
 
+static UFO_ACTIVE_PID: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
 impl UfoClient {
+    /// Cancels the currently running UFO task (if any) by forcefully terminating the python process
+    pub fn cancel_task() {
+        let pid = UFO_ACTIVE_PID.swap(0, std::sync::atomic::Ordering::SeqCst);
+        if pid != 0 {
+            tracing::warn!("Cancelling UFO Task with PID: {}", pid);
+            let _ = Command::new("taskkill")
+                .arg("/F")
+                .arg("/PID")
+                .arg(pid.to_string())
+                .output();
+        }
+    }
+
     /// Dispatches a UI automation task to Microsoft UFO directly.
     /// Injects BankFidelity state context to maximize common understanding.
-    pub fn dispatch_task(request: &str) -> Result<Value, String> {
+    pub fn dispatch_task<F>(request: &str, mut on_log: Option<F>) -> Result<Value, String> 
+    where F: FnMut(String) + Send + 'static
+    {
         // Microsoft UFO is installed directly on C:\UFO per user configuration
         let ufo_dir = std::path::PathBuf::from("C:\\UFO");
             
@@ -49,6 +66,8 @@ impl UfoClient {
             .spawn()
             .map_err(|e| format!("Failed to execute UFO python process: {}", e))?;
 
+        UFO_ACTIVE_PID.store(child.id(), std::sync::atomic::Ordering::SeqCst);
+
         let stdout = child.stdout.take().expect("Failed to open stdout");
         let stderr = child.stderr.take().expect("Failed to open stderr");
 
@@ -67,10 +86,14 @@ impl UfoClient {
         for line in reader.lines() {
             if let Ok(l) = line {
                 tracing::info!("[UFO] {}", l);
+                if let Some(cb) = on_log.as_mut() {
+                    cb(l);
+                }
             }
         }
 
         let status = child.wait().map_err(|e| format!("Failed to wait on UFO process: {}", e))?;
+        UFO_ACTIVE_PID.store(0, std::sync::atomic::Ordering::SeqCst);
         let _ = stderr_thread.join();
         
         let stderr_str = if status.success() { String::new() } else { "See tracing logs for stderr".into() };

@@ -780,7 +780,8 @@ fn python_input_sha256(path: &str) -> Result<String, String> {
 #[derive(Debug)]
 pub enum Job {
     Ping,
-    UfoAutoEdit { path: PathBuf },
+    UfoAutoEdit { path: PathBuf, context: String },
+    CancelUfo,
     Python(PythonJob, oneshot::Sender<PythonJobResult>),
     LoadDocument {
         path: PathBuf,
@@ -1047,6 +1048,7 @@ impl Job {
             Self::SetDefaultDocAiVersion { .. } => "set_default_docai_version",
             Self::TrainDocAiVersion { .. } => "train_docai_version",
             Self::UfoAutoEdit { .. } => "ufo_auto_edit",
+            Self::CancelUfo => "cancel_ufo",
         }
     }
 
@@ -1109,6 +1111,7 @@ pub enum OperationDisposition {
 pub enum JobResult {
     Pong,
     UfoAutoEditResult(serde_json::Value),
+    UfoLog(String),
     ApiKeysVerified(crate::app::api_verification::VerificationReport),
     DocumentLoaded {
         layout_json: String,
@@ -2019,7 +2022,10 @@ async fn process_job_inner(
                 }
             }
         }
-        Job::UfoAutoEdit { path } => {
+        Job::CancelUfo => {
+            crate::ai::ufo::UfoClient::cancel_task();
+        }
+        Job::UfoAutoEdit { path, context } => {
             let res_tx = result_tx_clone.clone();
             tokio::spawn(async move {
                 let _ = res_tx.send(JobResult::Progress {
@@ -2027,10 +2033,13 @@ async fn process_job_inner(
                     fraction: 0.5,
                 });
                 
-                let request = format!("Automatically extract, verify, and fully correct the formatting of the bank statement located at: {:?}", path);
+                let request = format!("Automatically extract, verify, and fully correct the formatting of the bank statement located at: {:?}\n\nAdditional Context:\n{}", path, context);
                 
+                let res_tx_cb = res_tx.clone();
                 let result = tokio::task::spawn_blocking(move || {
-                    crate::ai::ufo::UfoClient::dispatch_task(&request)
+                    crate::ai::ufo::UfoClient::dispatch_task(&request, Some(move |log_line: String| {
+                        let _ = res_tx_cb.send(JobResult::UfoLog(log_line));
+                    }))
                 }).await.unwrap_or_else(|e| Err(format!("Tokio spawn_blocking panicked: {}", e)));
 
                 match result {

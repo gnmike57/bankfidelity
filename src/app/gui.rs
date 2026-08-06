@@ -401,10 +401,13 @@ pub struct MyApp {
     /// True while fetching versions from the API
     docai_versions_loading: bool,
     /// Whether to show the version management panel
-    /// Status message for training operations
     docai_training_status: Option<String>,
     /// Active long-running operation name (training, deploy, etc.)
     docai_active_operation: Option<String>,
+    /// Streaming logs from the UFO process
+    ufo_logs: Vec<String>,
+    /// Whether UFO is actively running
+    is_ufo_running: bool,
 }
 
 impl MyApp {
@@ -485,6 +488,8 @@ impl MyApp {
             toasts: VecDeque::new(),
             job_tx,
             job_rx,
+            ufo_logs: Vec::new(),
+            is_ufo_running: false,
             pending_python: None,
             app_paths,
             run_workspace,
@@ -1540,7 +1545,11 @@ impl MyApp {
 impl MyApp {
     fn handle_job_result(&mut self, ctx: &egui::Context, res: JobResult) {
         match res {
+            JobResult::UfoLog(line) => {
+                self.ufo_logs.push(line);
+            }
             JobResult::UfoAutoEditResult(val) => {
+                self.is_ufo_running = false;
                 self.in_flight = self.in_flight.saturating_sub(1);
                 self.progress = None;
                 
@@ -1550,6 +1559,7 @@ impl MyApp {
                     format!("UFO Auto-Edit Complete (Task: {})", task_id),
                 );
             }
+
             JobResult::McpRenderComplete { .. } => {
                 self.in_flight = self.in_flight.saturating_sub(1);
                 self.progress = None;
@@ -1858,7 +1868,7 @@ impl MyApp {
                         Some(p) if p.label == label => p.started_at,
                         _ => std::time::Instant::now(),
                     };
-                    self.progress = Some(ProgressState {
+                        self.progress = Some(ProgressState {
                         label,
                         fraction,
                         started_at,
@@ -1866,6 +1876,10 @@ impl MyApp {
                 }
             }
             JobResult::Error { job_label, message } => {
+                if job_label == "ufo_dispatch" {
+                    self.is_ufo_running = false;
+                }
+                self.in_flight = self.in_flight.saturating_sub(1);
                 self.progress = None;
                 if matches!(
                     job_label.as_str(),
@@ -2489,6 +2503,28 @@ impl MyApp {
             ..Default::default()
         };
 
+        // Streaming Logs Drawer (if UFO is running or logs exist)
+        if !self.ufo_logs.is_empty() {
+            egui::TopBottomPanel::top("ufo_logs_panel")
+                .resizable(true)
+                .min_height(100.0)
+                .max_height(300.0)
+                .frame(egui::Frame::none().fill(egui::Color32::from_gray(30)).inner_margin(8.0))
+                .show(ctx, |ui| {
+                    ui.label(egui::RichText::new("UFO Agent Logs").strong().color(egui::Color32::LIGHT_GREEN));
+                    egui::ScrollArea::vertical().stick_to_bottom(true).show(ui, |ui| {
+                        let text = self.ufo_logs.join("\n");
+                        ui.add(
+                            egui::TextEdit::multiline(&mut text.as_str())
+                                .font(egui::TextStyle::Monospace)
+                                .text_color(egui::Color32::from_gray(200))
+                                .desired_width(f32::INFINITY)
+                                .interactive(false)
+                        );
+                    });
+                });
+        }
+
         // 1. Top Bar: Upload Dropzone & History Thumbnails
         egui::TopBottomPanel::top("edit_top_bar")
             .frame(frame)
@@ -2531,14 +2567,45 @@ impl MyApp {
 
                     if auto_edit_btn.clicked() {
                         if self.current_pdf_path.exists() {
+                            let mut context = format!("BankFidelity State Context:\n");
+                            context.push_str(&format!("Total Transactions loaded: {}\n", self.workflow_transactions.len()));
+                            if let Some(err) = &self.last_imbalance {
+                                context.push_str(&format!("Current Error: Statement is out of balance. Difference: {:.2}\n", err));
+                            } else if let Some(verification) = &self.last_verification {
+                                context.push_str(&format!("Verification State: {:#?}\n", verification));
+                            }
+                            
+                            self.ufo_logs.clear();
+                            self.is_ufo_running = true;
                             if let Err(e) = self.dispatch_workflow_job(Job::UfoAutoEdit {
                                 path: self.current_pdf_path.clone(),
+                                context,
                             }) {
                                 tracing::error!("Failed to dispatch Auto-Edit: {}", e);
                             }
                             self.in_flight += 1;
                         } else {
                             self.toast(ToastKind::Warn, "Please open a statement first.");
+                        }
+                    }
+
+                    if self.is_ufo_running {
+                        ui.add_space(10.0);
+                        let cancel_btn = ui.add_sized(
+                            [120.0, 58.0],
+                            egui::Button::new(
+                                egui::RichText::new("🛑 Cancel")
+                                    .size(15.0)
+                                    .strong()
+                                    .color(egui::Color32::WHITE),
+                            )
+                            .fill(egui::Color32::from_rgb(220, 50, 50)),
+                        );
+
+                        if cancel_btn.clicked() {
+                            let _ = self.dispatch_workflow_job(Job::CancelUfo);
+                            self.is_ufo_running = false;
+                            self.toast(ToastKind::Warn, "UFO Task Cancelled.");
                         }
                     }
 
