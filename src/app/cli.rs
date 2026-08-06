@@ -1208,7 +1208,7 @@ pub fn run_inner(
             
             // Depending on the command, dispatch a job. For AiEdit, we dispatch AiCommand.
             let job = match cmd {
-                crate::app::nlp_router::NlpCommand::AiEdit { instruction, provider } => {
+                crate::app::nlp_router::NlpCommand::AiEdit { instruction, provider: _ } => {
                     Job::AiCommand {
                         prompt: instruction,
                         path,

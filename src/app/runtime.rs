@@ -6930,7 +6930,6 @@ async fn process_job_inner(
             }
         }
         Job::TypstReconstruct { input, output } => {
-            let engine_for_typst = engine_for_tokio.clone();
             let tx = result_tx_clone.clone();
             tokio::task::spawn(async move {
                 if !input.exists() {
@@ -6941,7 +6940,7 @@ async fn process_job_inner(
                     return;
                 }
                 
-                let mut statement = crate::ai::document_ai::BankStatement {
+                let statement = crate::ai::document_ai::BankStatement {
                     bank_name: None,
                     account_number: None,
                     opening_balance: rust_decimal::Decimal::new(0, 2),
