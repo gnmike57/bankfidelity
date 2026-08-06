@@ -109,7 +109,7 @@ pub fn parse(input: &str) -> NlpCommand {
 
     // ── Categorize ────────────────────────────────────────────────────────────
     if matches_any(&s, &["categorize", "classify", "label transactions", "tag transactions"]) {
-        let provider = detect_provider(&s).unwrap_or_else(|| "gemini".to_string());
+        let provider = detect_provider(&s).unwrap_or_else(|| "local-llm".to_string());
         return NlpCommand::Categorize { provider };
     }
 
@@ -128,7 +128,7 @@ pub fn parse(input: &str) -> NlpCommand {
     let edit_verbs = ["change", "replace", "set", "update", "edit", "modify", "add", "remove",
                       "delete", "insert", "rename", "fix", "correct", "adjust", "rewrite"];
     if edit_verbs.iter().any(|v| s.contains(v)) {
-        let provider = detect_provider(&s).unwrap_or_else(|| "gemini".to_string());
+        let provider = detect_provider(&s).unwrap_or_else(|| "local-llm".to_string());
         return NlpCommand::AiEdit {
             instruction: input.trim().to_string(),
             provider,

@@ -263,6 +263,7 @@ pub struct MyApp {
     pub last_imbalance: Option<rust_decimal::Decimal>,
     pub in_flight: usize,
     pub active_workflow_job_id: Option<JobId>,
+    pub ai_explanation: Option<String>,
     pub settings: AppSettings,
     toasts: VecDeque<Toast>,
 
@@ -480,6 +481,7 @@ impl MyApp {
             last_imbalance: None,
             in_flight: 0,
             active_workflow_job_id: None,
+            ai_explanation: None,
             toasts: VecDeque::new(),
             job_tx,
             job_rx,
@@ -1538,6 +1540,11 @@ impl MyApp {
 impl MyApp {
     fn handle_job_result(&mut self, ctx: &egui::Context, res: JobResult) {
         match res {
+            JobResult::ImbalanceExplained { explanation } => {
+                self.in_flight = self.in_flight.saturating_sub(1);
+                self.progress = None;
+                self.ai_explanation = Some(explanation);
+            }
             JobResult::WatchdogEvent(event) => {
                 match event {
                     crate::app::watchdog::WatchdogEvent::StallDetected(_timeout) => {
@@ -3941,6 +3948,41 @@ impl MyApp {
                         changed, p.final_imbalance
                     ),
                 );
+
+                if !p.balanced {
+                    if ui.button("🧠 Ask Local AI to Explain").clicked() {
+                        let opening_balance = self.workflow_validation.as_ref().map(|v| v.opening_balance.to_string().parse::<f64>().unwrap_or(0.0)).unwrap_or(0.0);
+                        let closing_balance = self.workflow_validation.as_ref().map(|v| v.closing_balance.to_string().parse::<f64>().unwrap_or(0.0)).unwrap_or(0.0);
+                        let imbalance_f64 = p.final_imbalance.to_string().parse::<f64>().unwrap_or(0.0);
+                        
+                        if let Err(e) = self.job_tx.send(crate::app::runtime::Job::ExplainImbalance {
+                            transactions_json: serde_json::to_string(&self.workflow_transactions).unwrap_or_default(),
+                            opening_balance,
+                            closing_balance,
+                            imbalance: imbalance_f64,
+                        }) {
+                            tracing::error!("Runtime disconnected: {}", e);
+                        }
+                        self.in_flight += 1;
+                        self.ai_explanation = None;
+                    }
+                }
+
+                let mut clear_explanation = false;
+                if let Some(explanation) = &self.ai_explanation {
+                    ui.add_space(4.0);
+                    ui.group(|ui| {
+                        ui.label(egui::RichText::new("Local AI Forensics").strong().color(self.settings.theme.palette().success));
+                        ui.label(explanation);
+                        if ui.button("Dismiss").clicked() {
+                            clear_explanation = true;
+                        }
+                    });
+                }
+                if clear_explanation {
+                    self.ai_explanation = None;
+                }
+
                 if let Some(msg) = &p.auto_correction_message {
                     ui.small(msg);
                 }

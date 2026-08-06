@@ -1,35 +1,66 @@
 use std::process::Command;
-use serde_json::Value;
+use serde_json::{json, Value};
+use std::time::SystemTime;
 
 pub struct UfoClient;
 
 impl UfoClient {
-    /// Dispatches a UI automation task to Microsoft UFO via the Python bridge.
-    pub fn dispatch_task(task: &str, app: &str) -> Result<Value, String> {
-        let script = r#"
-import sys
-import json
-try:
-    from python.ufo_integration import run_ufo_task
-    result = run_ufo_task(sys.argv[1], sys.argv[2])
-    print(json.dumps(result))
-except Exception as e:
-    print(json.dumps({"status": "error", "message": str(e)}))
-        "#;
-        
+    /// Dispatches a UI automation task to Microsoft UFO directly.
+    /// Injects BankFidelity state context to maximize common understanding.
+    pub fn dispatch_task(request: &str) -> Result<Value, String> {
+        let home_dir = dirs::home_dir().unwrap_or_default();
+        let ufo_dir = home_dir.join("UFO");
+            
+        if !ufo_dir.exists() {
+            return Ok(json!({
+                "status": "error",
+                "message": format!("UFO framework not found at {:?}. Please setup UFO.", ufo_dir)
+            }));
+        }
+
+        // Generate a task ID
+        let timestamp = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap_or_default().as_secs();
+        let task_id = format!("bankfidelity_{}", timestamp);
+
+        // Construct the contextual request to maximize common understanding
+        let context_prompt = format!(
+            "{}\n\n[BANKFIDELITY CONTEXT]\nActive Directory: {:?}\nApp State: BankFidelity Local LLM Orchestrator Pipeline Running", 
+            request, 
+            std::env::current_dir().unwrap_or_default()
+        );
+
         let output = Command::new("python")
-            .arg("-c")
-            .arg(script)
-            .arg(task)
-            .arg(app)
-            .current_dir(std::env::current_dir().unwrap_or_default())
+            .arg("-m")
+            .arg("ufo")
+            .arg("--task")
+            .arg(&task_id)
+            .arg("--request")
+            .arg(&context_prompt)
+            .current_dir(&ufo_dir)
             .output()
-            .map_err(|e| format!("Failed to invoke python: {}", e))?;
-            
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let parsed: Value = serde_json::from_str(&stdout)
-            .map_err(|e| format!("Failed to parse UFO output: {} - Output: {}", e, stdout))?;
-            
-        Ok(parsed)
+            .map_err(|e| format!("Failed to execute UFO python process: {}", e))?;
+
+        let stderr_str = String::from_utf8_lossy(&output.stderr);
+        
+        // Try to read the output.md
+        let log_path = ufo_dir.join("logs").join(&task_id).join("output.md");
+        let ufo_result = if log_path.exists() {
+            std::fs::read_to_string(&log_path).unwrap_or_else(|_| "Failed to read output.md".into())
+        } else {
+            "UFO did not generate an output.md file.".into()
+        };
+
+        if !output.status.success() {
+            return Ok(json!({
+                "status": "error",
+                "message": format!("UFO task failed. StdErr: {}\n\nLog Output: {}", stderr_str, ufo_result)
+            }));
+        }
+
+        Ok(json!({
+            "status": "success",
+            "output": ufo_result,
+            "task_id": task_id
+        }))
     }
 }

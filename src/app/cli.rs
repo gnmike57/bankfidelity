@@ -41,12 +41,19 @@ pub enum Commands {
 
     /// Dispatch a UI automation task to Microsoft UFO
     Ufo {
-        /// The instruction for UFO (e.g. "download bank statement")
+        /// The instruction for UFO (e.g. "download bank statement from chrome")
         #[arg(short, long)]
-        task: String,
-        /// The target app (e.g. "chrome")
-        #[arg(short, long, default_value_t = String::from("chrome"))]
-        app: String,
+        request: String,
+    },
+
+    /// Chat with the Local LLM orchestrator to perform edits or commands via natural language
+    Chat {
+        /// The natural language instruction (e.g., "shift dates by 5 days")
+        #[arg(short, long)]
+        instruction: String,
+        /// Optional target PDF for context
+        #[arg(short = 't', long)]
+        target_pdf: Option<PathBuf>,
     },
 
     /// Run headless and expose an HTTP health surface (for containers /
@@ -1155,14 +1162,53 @@ pub fn run_inner(
             crate::ai::mcp::McpServer::start();
             Ok(exit_code::SUCCESS)
         }
-        Commands::Ufo { task, app } => {
-            match crate::ai::ufo::UfoClient::dispatch_task(&task, &app) {
+        Commands::Ufo { request } => {
+            match crate::ai::ufo::UfoClient::dispatch_task(&request) {
                 Ok(result) => {
                     println!("UFO Task Result:\n{}", serde_json::to_string_pretty(&result).unwrap_or_default());
                     Ok(exit_code::SUCCESS)
                 }
                 Err(e) => {
                     tracing::error!("UFO dispatch failed: {}", e);
+                    Ok(exit_code::GENERAL)
+                }
+            }
+        }
+        Commands::Chat { instruction, target_pdf } => {
+            println!("🤖 Parsing instruction: \"{}\"", instruction);
+            let cmd = crate::app::nlp_router::parse(&instruction);
+            println!("🧠 Parsed Intent: {}", cmd.describe());
+            
+            let path = target_pdf.unwrap_or_else(|| PathBuf::from("statement.pdf"));
+            
+            // Depending on the command, dispatch a job. For AiEdit, we dispatch AiCommand.
+            let job = match cmd {
+                crate::app::nlp_router::NlpCommand::AiEdit { instruction, provider } => {
+                    Job::AiCommand {
+                        prompt: instruction,
+                        path,
+                    }
+                }
+                // For simplicity, we just route everything complex to AiCommand here, or handle directly.
+                // But nlp_router directly returns a mapped NlpCommand. 
+                // However, the runtime currently handles AiEdit via NlpCommand natively inside AiCommand dispatcher.
+                // Wait, runtime matches NlpCommand inside process_job_inner only if we send an `AiCommand` that parses it again?
+                // Actually, `Job::AiCommand` in runtime calls `nlp_router::parse` itself!
+                _ => Job::AiCommand { prompt: instruction.clone(), path },
+            };
+
+            let _ = job_tx.send_headless(job);
+            match wait_for_terminal_result(&job_rx) {
+                Ok(JobResult::NaturalLanguageEditReady(txs)) => {
+                    println!("✅ Local LLM modified {} transactions successfully.", txs.len());
+                    Ok(exit_code::SUCCESS)
+                }
+                Ok(other) => {
+                    println!("✅ Command completed with result: {:?}", other);
+                    Ok(exit_code::SUCCESS)
+                }
+                Err((lbl, msg)) => {
+                    tracing::error!("❌ [{}] {}", lbl, msg);
                     Ok(exit_code::GENERAL)
                 }
             }

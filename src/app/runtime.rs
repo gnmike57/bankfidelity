@@ -853,6 +853,12 @@ pub enum Job {
         pdfrest_key: Option<String>,
         auto_match_dpi: bool,
     },
+    ExplainImbalance {
+        transactions_json: String,
+        opening_balance: f64,
+        closing_balance: f64,
+        imbalance: f64,
+    },
 
     /// Cancel a previously-enqueued job by its [`JobId`]. Best-effort; the
     /// task may have already finished. The runtime drops the token, so any
@@ -1014,6 +1020,7 @@ impl Job {
             Self::Cancel { .. } => "cancel",
             Self::SubmitBugReport { .. } => "submit_bug_report",
             Self::TypstReconstruct { .. } => "typst_reconstruct",
+            Self::ExplainImbalance { .. } => "explain_imbalance",
             Self::ReloadConfig => "reload_config",
             Self::ValidateCredentials => "validate_credentials",
             Self::BalanceAndApplyAll { .. } => "balance_and_apply_all",
@@ -1138,6 +1145,9 @@ pub enum JobResult {
     ProposedChangesApplied {
         changes_applied: usize,
         failures: Vec<String>,
+    },
+    ImbalanceExplained {
+        explanation: String,
     },
     /// Emitted after a [`Job::ReloadConfig`]: reports whether the reloaded
     /// config has working AI credentials so the GUI can update its status line.
@@ -1997,6 +2007,27 @@ async fn process_job_inner(
                     let _ = result_tx_clone.send(JobResult::Pong);
                 }
             }
+        }
+        Job::ExplainImbalance { transactions_json, opening_balance, closing_balance, imbalance } => {
+            let client = crate::ai::local_llm::LocalLlmClient::new();
+            let result_tx = result_tx_clone.clone();
+            tokio::spawn(async move {
+                let _ = result_tx.send(JobResult::Progress {
+                    label: "Asking local Qwen 7B to explain the math error...".into(),
+                    fraction: 0.1,
+                });
+                match client.explain_imbalance(&transactions_json, opening_balance, closing_balance, imbalance).await {
+                    Ok(explanation) => {
+                        let _ = result_tx.send(JobResult::ImbalanceExplained { explanation });
+                    }
+                    Err(e) => {
+                        let _ = result_tx.send(JobResult::Error {
+                            job_label: "explain_imbalance".into(),
+                            message: format!("Local LLM Error: {e}"),
+                        });
+                    }
+                }
+            });
         }
         Job::SubmitBugReport {
             description,
@@ -4707,15 +4738,13 @@ async fn process_job_inner(
                             message: format!("__DISPATCH:StressTest:{}", test_type),
                         });
                     }
-                    // AI-assisted edit: FinancialNlpEngine deterministic first-pass, Gemini fallback
-                    NlpCommand::AiEdit { instruction, provider: _ } => {
+                    // AI-assisted edit: FinancialNlpEngine deterministic first-pass, LLM fallback
+                    NlpCommand::AiEdit { instruction, provider } => {
                         let _ = res_tx.send(JobResult::Progress {
                             label: "Analysing financial intent…".into(),
                             fraction: 0.2,
                         });
-                        // Step 1: Try deterministic FinancialNlpEngine (handles payee scaling,
-                        // salary doubling, balance cascade, etc. without an API call)
-                        // Extract transactions via offline parser (requires PdfEngine)
+                        // Step 1: Try deterministic FinancialNlpEngine
                         let txs: Vec<crate::engine::model::Transaction> = {
                             use crate::engine::offline_parser::parse_statement_offline;
                             parse_statement_offline(&path, engine_ref.clone())
@@ -4733,35 +4762,57 @@ async fn process_job_inner(
                             let _ = res_tx.send(JobResult::NaturalLanguageEditReady(result.transactions));
                             return;
                         }
-                        // Step 2: Gemini fallback for complex or ambiguous intents
-                        let _ = res_tx.send(JobResult::Progress {
-                            label: "Sending to Gemini for complex edit…".into(),
-                            fraction: 0.4,
-                        });
-                        let gemini = match crate::ai::gemini_client::GeminiClient::from_app_config_async(&cfg).await {
-                            Ok(c) => c,
-                            Err(e) => {
-                                let _ = res_tx.send(JobResult::Error {
-                                    job_label: "ai_command".into(),
-                                    message: format!("AI provider unavailable: {e}. Run 'verify-api-keys' to check your keys."),
-                                });
-                                return;
+                        // Step 2: LLM fallback for complex or ambiguous intents
+                        if provider == "local-llm" {
+                            let _ = res_tx.send(JobResult::Progress {
+                                label: "Sending to Local LLM (Qwen 7B) for edit…".into(),
+                                fraction: 0.4,
+                            });
+                            let client = crate::ai::local_llm::LocalLlmClient::new();
+                            match client.apply_natural_language_edit(&instruction, &txs).await {
+                                Ok(updated) => {
+                                    let _ = res_tx.send(JobResult::Progress {
+                                        label: "Local AI edit ready — awaiting confirmation".into(),
+                                        fraction: 1.0,
+                                    });
+                                    let _ = res_tx.send(JobResult::NaturalLanguageEditReady(updated));
+                                }
+                                Err(e) => {
+                                    let _ = res_tx.send(JobResult::Error {
+                                        job_label: "ai_command".into(),
+                                        message: format!("Local AI edit failed: {e}"),
+                                    });
+                                }
                             }
-                        };
-                        // Pass real transactions so Gemini has full context
-                        match gemini.apply_natural_language_edit(&instruction, &txs).await {
-                            Ok(updated) => {
-                                let _ = res_tx.send(JobResult::Progress {
-                                    label: "AI edit ready — awaiting confirmation".into(),
-                                    fraction: 1.0,
-                                });
-                                let _ = res_tx.send(JobResult::NaturalLanguageEditReady(updated));
-                            }
-                            Err(e) => {
-                                let _ = res_tx.send(JobResult::Error {
-                                    job_label: "ai_command".into(),
-                                    message: format!("AI edit failed: {e}"),
-                                });
+                        } else {
+                            let _ = res_tx.send(JobResult::Progress {
+                                label: "Sending to Gemini for complex edit…".into(),
+                                fraction: 0.4,
+                            });
+                            let gemini = match crate::ai::gemini_client::GeminiClient::from_app_config_async(&cfg).await {
+                                Ok(c) => c,
+                                Err(e) => {
+                                    let _ = res_tx.send(JobResult::Error {
+                                        job_label: "ai_command".into(),
+                                        message: format!("AI provider unavailable: {e}. Run 'verify-api-keys' to check your keys."),
+                                    });
+                                    return;
+                                }
+                            };
+                            match gemini.apply_natural_language_edit(&instruction, &txs).await {
+                                Ok(updated) => {
+                                    let _ = res_tx.send(JobResult::Progress {
+                                        label: "AI edit ready — awaiting confirmation".into(),
+                                        fraction: 1.0,
+                                    });
+                                    let _ = res_tx.send(JobResult::NaturalLanguageEditReady(updated));
+                                }
+                                Err(e) => {
+                                    let _ = res_tx.send(JobResult::Error {
+                                        job_label: "ai_command".into(),
+                                        message: format!("AI edit failed: {e}"),
+                                    });
+                                }
                             }
                         }
                     }

@@ -7,6 +7,7 @@ pub mod llamaparse;
 pub mod openai_client;
 pub mod ufo;
 pub mod mcp;
+pub mod local_llm;
 
 pub mod pdfrest;
 pub mod python_protocol;
