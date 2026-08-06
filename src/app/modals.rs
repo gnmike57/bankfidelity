@@ -125,7 +125,9 @@ impl AppModals for MyApp {
         
         let frame = egui::Frame::window(&ctx.style())
             .shadow(egui::epaint::Shadow {
-                extrusion: 32.0,
+                offset: egui::vec2(0.0, 8.0),
+                blur: 16.0,
+                spread: 0.0,
                 color: egui::Color32::from_black_alpha(220),
             })
             .inner_margin(egui::Margin::same(20.0));
