@@ -122,9 +122,18 @@ pub(crate) trait AppModals {
 impl AppModals for MyApp {
     fn draw_settings_modal(&mut self, ctx: &egui::Context) {
         let mut open = self.active_modal == ActiveModal::Settings;
-        egui::Window::new("⚙️ Settings & Tools")
+        
+        let frame = egui::Frame::window(&ctx.style())
+            .shadow(egui::epaint::Shadow {
+                extrusion: 32.0,
+                color: egui::Color32::from_black_alpha(220),
+            })
+            .inner_margin(egui::Margin::same(20.0));
+
+        egui::Window::new("⚙ Settings & Tools")
                 .open(&mut open)
-                .default_size(egui::vec2(420.0, 600.0))
+                .frame(frame)
+                .default_size(egui::vec2(460.0, 640.0))
                 .vscroll(true)
                 .show(ctx, |ui| {
                         // Backend Preferences panel at the top - most important

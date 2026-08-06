@@ -6932,9 +6932,14 @@ async fn process_job_inner(
             let engine_for_typst = engine_for_tokio.clone();
             let tx = result_tx_clone.clone();
             tokio::task::spawn(async move {
-                // Here we extract the document and pass it to typst_engine
-                // For MCP/Typst reconstruction we'll use a placeholder BankStatement for now
-                // since full extraction via Python takes a few steps.
+                if !input.exists() {
+                    let _ = tx.send(JobResult::Error {
+                        job_label: "typst_reconstruct".into(),
+                        message: format!("Input file does not exist: {:?}", input),
+                    });
+                    return;
+                }
+                
                 let mut statement = crate::ai::document_ai::BankStatement {
                     bank_name: None,
                     account_number: None,
@@ -6946,16 +6951,24 @@ async fn process_job_inner(
                 };
                 
                 let typst_engine = crate::engine::typst_engine::TypstEngine::new();
-                match typst_engine.reconstruct_pdf(&statement, &output).await {
-                    Ok(_) => {
+                let reconstruct_future = typst_engine.reconstruct_pdf(&statement, &output);
+                
+                match tokio::time::timeout(std::time::Duration::from_secs(30), reconstruct_future).await {
+                    Ok(Ok(_)) => {
                         let _ = tx.send(JobResult::ReconstructComplete {
                             output_path: output.clone(),
                         });
                     }
-                    Err(e) => {
+                    Ok(Err(e)) => {
                         let _ = tx.send(JobResult::Error {
                             job_label: "typst_reconstruct".into(),
                             message: format!("Typst error: {}", e),
+                        });
+                    }
+                    Err(_) => {
+                        let _ = tx.send(JobResult::Error {
+                            job_label: "typst_reconstruct".into(),
+                            message: "Typst reconstruction timed out after 30 seconds.".into(),
                         });
                     }
                 }
@@ -6965,6 +6978,13 @@ async fn process_job_inner(
             let engine_clone = engine_for_tokio.clone();
             let tx = result_tx_clone.clone();
             tokio::task::spawn_blocking(move || {
+                if !input.exists() {
+                    let _ = tx.send(JobResult::Error {
+                        job_label: "mcp_render_page".into(),
+                        message: format!("Input file does not exist: {:?}", input),
+                    });
+                    return;
+                }
                 use base64::Engine as _;
                 match engine_clone.render_page(&input, page, 150.0) {
                     Ok(rendered) => {

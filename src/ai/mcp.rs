@@ -251,7 +251,25 @@ impl McpServer {
                 }
             }
             "resources/list" => {
-                let brain_dir = "C:/Users/zbook/.gemini/antigravity-ide/brain/e7e6cf9f-8c56-43f7-8528-1d362f4a7acb";
+                let home_dir = dirs::home_dir().unwrap_or_default();
+                let brain_base = home_dir.join(".gemini").join("antigravity").join("brain");
+                
+                let mut brain_dir = brain_base.to_string_lossy().to_string();
+                if let Ok(entries) = std::fs::read_dir(&brain_base) {
+                    let mut latest_time = std::time::SystemTime::UNIX_EPOCH;
+                    for entry in entries.flatten() {
+                        if let Ok(meta) = entry.metadata() {
+                            if meta.is_dir() {
+                                if let Ok(modified) = meta.modified() {
+                                    if modified > latest_time {
+                                        latest_time = modified;
+                                        brain_dir = entry.path().to_string_lossy().replace("\\", "/");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 json!({
                     "jsonrpc": "2.0",
                     "id": req.id,
@@ -278,10 +296,29 @@ impl McpServer {
                 if uri.starts_with("pdf-page://") {
                     let path_and_query = uri.trim_start_matches("pdf-page://");
                     let mut parts = path_and_query.split("?page=");
-                    let path = parts.next().unwrap_or("");
+                    let path = parts.next().unwrap_or("").trim();
                     let page: usize = parts.next().and_then(|s| s.parse().ok()).unwrap_or(1);
                     
-                    let mut cmd = std::process::Command::new(std::env::current_exe().unwrap_or_default());
+                    if path.is_empty() {
+                        return json!({
+                            "jsonrpc": "2.0",
+                            "id": req.id,
+                            "error": { "code": -32602, "message": "Invalid URI format: missing PDF path" }
+                        });
+                    }
+
+                    let exe = match std::env::current_exe() {
+                        Ok(exe_path) => exe_path,
+                        Err(e) => {
+                            return json!({
+                                "jsonrpc": "2.0",
+                                "id": req.id,
+                                "error": { "code": -32603, "message": format!("Internal error: could not determine executable path: {}", e) }
+                            });
+                        }
+                    };
+
+                    let mut cmd = std::process::Command::new(exe);
                     cmd.arg("mcp-render-page").arg("--input").arg(path).arg("--page").arg(page.to_string());
                     
                     match cmd.output() {
