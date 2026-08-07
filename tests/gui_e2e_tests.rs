@@ -253,6 +253,43 @@ fn test_gui_ufo_dispatch_error_clears_busy_flags() {
 }
 
 #[test]
+fn test_gui_ufo_user_cancel_single_in_flight_decrement() {
+    // Cancel clears busy UI immediately but must not free in_flight itself;
+    // the inevitable post-kill Error/UfoAutoEditResult frees exactly once.
+    let (mut app, result_tx) = make_headless_app();
+    let ctx = egui::Context::default();
+
+    app.is_ufo_running = true;
+    app.in_flight = 1;
+    app.ufo_user_cancelled = true;
+    app.is_ufo_running = false; // cancel button path
+    app.progress = None;
+
+    assert_eq!(
+        app.in_flight, 1,
+        "cancel path must leave in_flight for the terminal result"
+    );
+
+    result_tx
+        .send(JobResult::Error {
+            job_label: "ufo_dispatch".into(),
+            message: "UFO Auto-Edit failed: exit=1 (killed)".into(),
+        })
+        .expect("send post-cancel error");
+    pump(&mut app, &ctx);
+
+    assert!(!app.is_ufo_running);
+    assert!(
+        !app.ufo_user_cancelled,
+        "cancel flag cleared on terminal result"
+    );
+    assert_eq!(
+        app.in_flight, 0,
+        "post-cancel Error must free exactly one in_flight slot (no double-count)"
+    );
+}
+
+#[test]
 fn test_gui_ufo_log_stream_preserves_order() {
     let (mut app, result_tx) = make_headless_app();
     let ctx = egui::Context::default();

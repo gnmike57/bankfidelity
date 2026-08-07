@@ -151,7 +151,9 @@ fn significant_tokens(normalized: &str) -> Vec<String> {
                     t,
                     "cr" | "dr" | "aud" | "usd" | "the" | "and" | "to" | "for" | "of"
                 )
-                && !t.chars().all(|c| c.is_ascii_digit() || c == '/' || c == '-')
+                && !t
+                    .chars()
+                    .all(|c| c.is_ascii_digit() || c == '/' || c == '-')
         })
         .map(str::to_string)
         .collect()

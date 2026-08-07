@@ -137,15 +137,23 @@ fn windows_python_install_candidates() -> Vec<PathBuf> {
         roots.push(PathBuf::from(program_files_x86));
     }
     if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
-        roots.push(PathBuf::from(local_app_data).join("Programs").join("Python"));
+        roots.push(
+            PathBuf::from(local_app_data)
+                .join("Programs")
+                .join("Python"),
+        );
     }
 
     for root in roots {
         // Direct install roots: C:\Program Files\Python3xx\python.exe
-        if root.file_name().and_then(|name| name.to_str()).is_some_and(|name| {
-            name.eq_ignore_ascii_case("Python")
-                || name.to_ascii_lowercase().starts_with("python")
-        }) {
+        if root
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| {
+                name.eq_ignore_ascii_case("Python")
+                    || name.to_ascii_lowercase().starts_with("python")
+            })
+        {
             push_python_exe_if_present(&mut candidates, &root.join("python.exe"));
         }
 

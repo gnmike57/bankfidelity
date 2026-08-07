@@ -524,7 +524,10 @@ fn text_identity_matches(target_text: &str, old_text: &str) -> bool {
     if !old_is_day_mon {
         return false;
     }
-    if !target.to_ascii_lowercase().starts_with(&old.to_ascii_lowercase()) {
+    if !target
+        .to_ascii_lowercase()
+        .starts_with(&old.to_ascii_lowercase())
+    {
         return false;
     }
     let suffix = target[old.len()..].trim();

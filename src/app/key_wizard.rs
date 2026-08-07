@@ -157,7 +157,9 @@ impl KeyWizardState {
         state
     }
 
-    pub fn total_steps() -> usize { 4 }
+    pub fn total_steps() -> usize {
+        4
+    }
 
     pub fn step_title(&self) -> &'static str {
         match self.step {
@@ -171,10 +173,14 @@ impl KeyWizardState {
 
     pub fn is_complete(&self) -> bool {
         // Minimum: passphrase set + at least one AI provider key
-        let has_passphrase = self.values.get("DUAL_CORE_PASSPHRASE")
-            .map(|v| v.len() >= 16).unwrap_or(false);
+        let has_passphrase = self
+            .values
+            .get("DUAL_CORE_PASSPHRASE")
+            .map(|v| v.len() >= 16)
+            .unwrap_or(false);
         let has_ai = ["GEMINI_API_KEY", "MISTRAL_API_KEY", "OPENROUTER_API_KEY"]
-            .iter().any(|k| self.values.get(*k).map(|v| !v.is_empty()).unwrap_or(false));
+            .iter()
+            .any(|k| self.values.get(*k).map(|v| !v.is_empty()).unwrap_or(false));
         has_passphrase && has_ai
     }
 
@@ -186,7 +192,8 @@ impl KeyWizardState {
             String::new()
         };
 
-        let mut lines: Vec<String> = existing.lines()
+        let mut lines: Vec<String> = existing
+            .lines()
             .filter(|l| {
                 let key = l.split('=').next().unwrap_or("").trim();
                 !self.values.contains_key(key)
@@ -201,7 +208,9 @@ impl KeyWizardState {
         }
 
         // Add GEMINI_AUTH_MODE if Gemini key is set
-        if self.values.contains_key("GEMINI_API_KEY") && !lines.iter().any(|l| l.starts_with("GEMINI_AUTH_MODE=")) {
+        if self.values.contains_key("GEMINI_API_KEY")
+            && !lines.iter().any(|l| l.starts_with("GEMINI_AUTH_MODE="))
+        {
             lines.push("GEMINI_AUTH_MODE=api_key".to_string());
         }
 
@@ -213,17 +222,27 @@ impl KeyWizardState {
 mod tests {
     use super::*;
 
-
     #[test]
     fn test_wizard_completeness_check() {
         let mut state = KeyWizardState::new();
         assert!(!state.is_complete(), "Should not be complete with no keys");
 
-        state.values.insert("DUAL_CORE_PASSPHRASE".into(), "my-secure-passphrase-here".into());
-        assert!(!state.is_complete(), "Should not be complete with only passphrase");
+        state.values.insert(
+            "DUAL_CORE_PASSPHRASE".into(),
+            "my-secure-passphrase-here".into(),
+        );
+        assert!(
+            !state.is_complete(),
+            "Should not be complete with only passphrase"
+        );
 
-        state.values.insert("GEMINI_API_KEY".into(), "AIzaTestKey".into());
-        assert!(state.is_complete(), "Should be complete with passphrase + Gemini key");
+        state
+            .values
+            .insert("GEMINI_API_KEY".into(), "AIzaTestKey".into());
+        assert!(
+            state.is_complete(),
+            "Should be complete with passphrase + Gemini key"
+        );
     }
 
     #[test]

@@ -126,8 +126,6 @@ fn test_all_au_transfer_pairs() {
 
     for (_si, source) in pdfs.iter().enumerate() {
         for (_ti, target) in pdfs.iter().enumerate() {
-
-
             let source = source.clone();
             let target = target.clone();
             let cfg = cfg.clone();
@@ -136,13 +134,13 @@ fn test_all_au_transfer_pairs() {
                 let pair_start = Instant::now();
 
                 // Each pair gets its own Runtime to avoid state leaks.
-                let tmp = std::path::PathBuf::from("C:\\bankfidelity\\bankfidelity\\stress_test_outputs");
+                let tmp =
+                    std::path::PathBuf::from("C:\\bankfidelity\\bankfidelity\\stress_test_outputs");
                 std::fs::create_dir_all(&tmp).unwrap();
                 let audit = AuditLog::open(&tmp).unwrap();
                 let (_runtime, job_tx, job_rx) = Runtime::start(audit, cfg);
 
-                let output =
-                    tmp.join(format!("{}__to__{}.pdf", stem(&source), stem(&target)));
+                let output = tmp.join(format!("{}__to__{}.pdf", stem(&source), stem(&target)));
 
                 // Send the transfer job
                 job_tx

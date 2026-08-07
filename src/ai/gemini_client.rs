@@ -1113,16 +1113,14 @@ impl GeminiClient {
         if self.api_key.is_empty() {
             return Ok(ValidationResponse::Approved); // Auto-approve if no Gemini API key (offline mode)
         }
-        
+
         let prompt = "You are a micro-typographical visual layout verifier.
 Look at these 300 DPI PNG proofs. The red text shows where the new edits will be placed. The yellow highlight is the bounding box.
 Verify if the red text perfectly aligns with the surrounding text baselines and margins.
 If flawless, reply exactly 'APPROVED'.
 If misaligned, reply with JSON specifying the required shift in points: {\"nudges\": [{\"index\": 0, \"dx\": 0.0, \"dy\": 1.5}]}";
 
-        let mut parts = vec![
-            serde_json::json!({ "text": prompt })
-        ];
+        let mut parts = vec![serde_json::json!({ "text": prompt })];
 
         for png_bytes in proof_pngs {
             let b64 = base64::engine::general_purpose::STANDARD.encode(png_bytes);
@@ -1143,7 +1141,10 @@ If misaligned, reply with JSON specifying the required shift in points: {\"nudge
         });
 
         let resp = self.post_generate_pro(&payload).await?;
-        let resp_json: serde_json::Value = resp.json().await.map_err(|e| GeminiError::InvalidResponse(e.to_string()))?;
+        let resp_json: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| GeminiError::InvalidResponse(e.to_string()))?;
         if let Some(candidates) = resp_json["candidates"].as_array() {
             if let Some(first) = candidates.first() {
                 if let Some(parts) = first["content"]["parts"].as_array() {
@@ -1156,12 +1157,19 @@ If misaligned, reply with JSON specifying the required shift in points: {\"nudge
                             // Extract JSON if it's wrapped in markdown blocks
                             let mut json_str = text.trim();
                             if json_str.starts_with("```json") {
-                                json_str = json_str.trim_start_matches("```json").trim_end_matches("```").trim();
+                                json_str = json_str
+                                    .trim_start_matches("```json")
+                                    .trim_end_matches("```")
+                                    .trim();
                             } else if json_str.starts_with("```") {
-                                json_str = json_str.trim_start_matches("```").trim_end_matches("```").trim();
+                                json_str = json_str
+                                    .trim_start_matches("```")
+                                    .trim_end_matches("```")
+                                    .trim();
                             }
-                            
-                            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(json_str) {
+
+                            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(json_str)
+                            {
                                 if let Some(nudges_array) = parsed["nudges"].as_array() {
                                     let mut nudges = Vec::new();
                                     for n in nudges_array {
@@ -1186,7 +1194,7 @@ If misaligned, reply with JSON specifying the required shift in points: {\"nudge
                 }
             }
         }
-        
+
         Ok(ValidationResponse::RejectedWithNudges(vec![]))
     }
 

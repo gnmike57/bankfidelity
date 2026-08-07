@@ -407,9 +407,7 @@ impl LlamaParseClient {
 /// Page markers (`Page N`, `# Page N`) advance a 0-based page counter so
 /// multi-page statements keep correct identities for transfer/geometry merge.
 /// Empty-date description rows append onto the previous transaction (multi-line).
-fn parse_markdown_to_statement_inner(
-    markdown: &str,
-) -> Result<BankStatement, LlamaParseError> {
+fn parse_markdown_to_statement_inner(markdown: &str) -> Result<BankStatement, LlamaParseError> {
     let mut transactions: Vec<crate::engine::model::Transaction> = Vec::new();
     let mut in_table = false;
     let mut line_on_page = 0usize;
@@ -421,18 +419,15 @@ fn parse_markdown_to_statement_inner(
     let mut found_opening = false;
     let mut found_closing = false;
 
-    let page_marker = regex::Regex::new(
-        r"(?i)^(?:#{1,6}\s*)?(?:page|pg\.?)\s*(\d+)\s*(?:of\s*\d+)?\s*$",
-    )
-    .expect("page marker regex");
-    let opening_re = regex::Regex::new(
-        r"(?i)(?:opening|beginning)\s+balance[^0-9\-\(]*(-?\$?[\d,]+\.\d{2})",
-    )
-    .expect("opening balance regex");
-    let closing_re = regex::Regex::new(
-        r"(?i)(?:closing|ending)\s+balance[^0-9\-\(]*(-?\$?[\d,]+\.\d{2})",
-    )
-    .expect("closing balance regex");
+    let page_marker =
+        regex::Regex::new(r"(?i)^(?:#{1,6}\s*)?(?:page|pg\.?)\s*(\d+)\s*(?:of\s*\d+)?\s*$")
+            .expect("page marker regex");
+    let opening_re =
+        regex::Regex::new(r"(?i)(?:opening|beginning)\s+balance[^0-9\-\(]*(-?\$?[\d,]+\.\d{2})")
+            .expect("opening balance regex");
+    let closing_re =
+        regex::Regex::new(r"(?i)(?:closing|ending)\s+balance[^0-9\-\(]*(-?\$?[\d,]+\.\d{2})")
+            .expect("closing balance regex");
 
     let parse_dec = |s: &str| -> Option<Decimal> {
         let cleaned = s.replace(['$', ',', ' ', '(', ')'], "");
@@ -505,10 +500,8 @@ fn parse_markdown_to_statement_inner(
                 continue;
             }
 
-            let is_continuation = date.is_empty()
-                && debit.is_none()
-                && credit.is_none()
-                && !desc.is_empty();
+            let is_continuation =
+                date.is_empty() && debit.is_none() && credit.is_none() && !desc.is_empty();
 
             if is_continuation {
                 // Multi-line description wrap (optionally with a balance-only
@@ -575,8 +568,8 @@ fn parse_markdown_to_statement_inner(
     if !found_opening {
         if let Some(first) = transactions.first() {
             if let Some(bal) = first.running_balance {
-                let net = first.debit.unwrap_or(Decimal::ZERO)
-                    - first.credit.unwrap_or(Decimal::ZERO);
+                let net =
+                    first.debit.unwrap_or(Decimal::ZERO) - first.credit.unwrap_or(Decimal::ZERO);
                 opening_balance = bal - net;
             }
         }
@@ -616,9 +609,7 @@ mod tests {
         let stmt = parse_markdown_to_statement_inner(md).expect("parse");
         assert_eq!(stmt.transactions.len(), 2);
         assert!(
-            stmt.transactions[0]
-                .raw_text
-                .contains("Ref 1394711 Osko"),
+            stmt.transactions[0].raw_text.contains("Ref 1394711 Osko"),
             "continuation must append: {:?}",
             stmt.transactions[0].raw_text
         );

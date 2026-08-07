@@ -27,24 +27,40 @@
 //! | Reload keys | "reload keys", "refresh api keys", "update credentials" |
 //! | Stress test | "run stress test", "run transfer matrix", "run xray suite" |
 
-
-
 /// A parsed NLP command ready to be dispatched as a [`Job`].
 #[derive(Debug, Clone)]
 pub enum NlpCommand {
     Undo,
     Redo,
-    Balance { auto_apply: bool, target: Option<f64> },
+    Balance {
+        auto_apply: bool,
+        target: Option<f64>,
+    },
     Verify,
-    Extract { provider: String },
-    Transfer { target_bank: String },
-    AdjustDates { shift_days: i32 },
-    Categorize { provider: String },
+    Extract {
+        provider: String,
+    },
+    Transfer {
+        target_bank: String,
+    },
+    AdjustDates {
+        shift_days: i32,
+    },
+    Categorize {
+        provider: String,
+    },
     Doctor,
     ReloadConfig,
-    StressTest { test_type: String },
-    AiEdit { instruction: String, provider: String },
-    Unknown { raw: String },
+    StressTest {
+        test_type: String,
+    },
+    AiEdit {
+        instruction: String,
+        provider: String,
+    },
+    Unknown {
+        raw: String,
+    },
 }
 
 /// Parse a natural language string into an [`NlpCommand`].
@@ -63,25 +79,53 @@ pub fn parse(input: &str) -> NlpCommand {
     }
 
     // ── Balance ───────────────────────────────────────────────────────────────
-    if matches_any(&s, &["balance", "reconcile", "fix balance", "auto balance", "auto-balance", "smart balance"]) {
+    if matches_any(
+        &s,
+        &[
+            "balance",
+            "reconcile",
+            "fix balance",
+            "auto balance",
+            "auto-balance",
+            "smart balance",
+        ],
+    ) {
         let auto_apply = s.contains("apply") || s.contains("auto") || s.contains("all");
         let target = extract_dollar_amount(&s);
         return NlpCommand::Balance { auto_apply, target };
     }
 
     // ── Verify ────────────────────────────────────────────────────────────────
-    if matches_any(&s, &["verify", "check fidelity", "xray", "x-ray", "visual check", "pixel check", "ssim"]) {
+    if matches_any(
+        &s,
+        &[
+            "verify",
+            "check fidelity",
+            "xray",
+            "x-ray",
+            "visual check",
+            "pixel check",
+            "ssim",
+        ],
+    ) {
         return NlpCommand::Verify;
     }
 
     // ── Extract ───────────────────────────────────────────────────────────────
-    if matches_any(&s, &["extract", "get transactions", "parse", "read transactions"]) {
+    if matches_any(
+        &s,
+        &["extract", "get transactions", "parse", "read transactions"],
+    ) {
         let provider = detect_provider(&s).unwrap_or_else(|| "offline".to_string());
         return NlpCommand::Extract { provider };
     }
 
     // ── Stress test ───────────────────────────────────────────────────────────
-    if s.contains("stress test") || s.contains("transfer matrix") || s.contains("xray suite") || s.contains("run test") {
+    if s.contains("stress test")
+        || s.contains("transfer matrix")
+        || s.contains("xray suite")
+        || s.contains("run test")
+    {
         let test_type = if s.contains("xray") || s.contains("fidelity") {
             "xray_fidelity"
         } else if s.contains("provider") || s.contains("probe") {
@@ -91,7 +135,9 @@ pub fn parse(input: &str) -> NlpCommand {
         } else {
             "transfer_matrix"
         };
-        return NlpCommand::StressTest { test_type: test_type.to_string() };
+        return NlpCommand::StressTest {
+            test_type: test_type.to_string(),
+        };
     }
 
     // ── Transfer ──────────────────────────────────────────────────────────────
@@ -101,32 +147,69 @@ pub fn parse(input: &str) -> NlpCommand {
     }
 
     // ── Date adjustment ───────────────────────────────────────────────────────
-    if s.contains("shift date") || s.contains("move date") || s.contains("adjust date") || s.contains("date forward") || s.contains("date back") {
+    if s.contains("shift date")
+        || s.contains("move date")
+        || s.contains("adjust date")
+        || s.contains("date forward")
+        || s.contains("date back")
+    {
         let days = extract_number(&s).unwrap_or(0) as i32;
-        let shift = if s.contains("back") || s.contains("earlier") || s.contains("minus") { -days } else { days };
+        let shift = if s.contains("back") || s.contains("earlier") || s.contains("minus") {
+            -days
+        } else {
+            days
+        };
         return NlpCommand::AdjustDates { shift_days: shift };
     }
 
     // ── Categorize ────────────────────────────────────────────────────────────
-    if matches_any(&s, &["categorize", "classify", "label transactions", "tag transactions"]) {
+    if matches_any(
+        &s,
+        &[
+            "categorize",
+            "classify",
+            "label transactions",
+            "tag transactions",
+        ],
+    ) {
         let provider = detect_provider(&s).unwrap_or_else(|| "local-llm".to_string());
         return NlpCommand::Categorize { provider };
     }
 
     // ── Doctor / health ───────────────────────────────────────────────────────
-    if matches_any(&s, &["doctor", "health check", "diagnose", "check config", "system check"]) {
+    if matches_any(
+        &s,
+        &[
+            "doctor",
+            "health check",
+            "diagnose",
+            "check config",
+            "system check",
+        ],
+    ) {
         return NlpCommand::Doctor;
     }
 
     // ── Reload config / keys ─────────────────────────────────────────────────
-    if matches_any(&s, &["reload", "refresh keys", "update keys", "reload config", "hot reload"]) {
+    if matches_any(
+        &s,
+        &[
+            "reload",
+            "refresh keys",
+            "update keys",
+            "reload config",
+            "hot reload",
+        ],
+    ) {
         return NlpCommand::ReloadConfig;
     }
 
     // ── AI edit fallback ─────────────────────────────────────────────────────
     // Any instruction that looks like an edit (contains action verbs) goes to AI
-    let edit_verbs = ["change", "replace", "set", "update", "edit", "modify", "add", "remove",
-                      "delete", "insert", "rename", "fix", "correct", "adjust", "rewrite"];
+    let edit_verbs = [
+        "change", "replace", "set", "update", "edit", "modify", "add", "remove", "delete",
+        "insert", "rename", "fix", "correct", "adjust", "rewrite",
+    ];
     if edit_verbs.iter().any(|v| s.contains(v)) {
         let provider = detect_provider(&s).unwrap_or_else(|| "local-llm".to_string());
         return NlpCommand::AiEdit {
@@ -135,7 +218,9 @@ pub fn parse(input: &str) -> NlpCommand {
         };
     }
 
-    NlpCommand::Unknown { raw: input.trim().to_string() }
+    NlpCommand::Unknown {
+        raw: input.trim().to_string(),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -147,11 +232,21 @@ fn matches_any(s: &str, patterns: &[&str]) -> bool {
 }
 
 fn detect_provider(s: &str) -> Option<String> {
-    if s.contains("gemini") { return Some("gemini".to_string()); }
-    if s.contains("mistral") { return Some("mistral".to_string()); }
-    if s.contains("llama") || s.contains("llamaparse") { return Some("llamaparse".to_string()); }
-    if s.contains("local") || s.contains("ollama") { return Some("local-llm".to_string()); }
-    if s.contains("offline") { return Some("offline".to_string()); }
+    if s.contains("gemini") {
+        return Some("gemini".to_string());
+    }
+    if s.contains("mistral") {
+        return Some("mistral".to_string());
+    }
+    if s.contains("llama") || s.contains("llamaparse") {
+        return Some("llamaparse".to_string());
+    }
+    if s.contains("local") || s.contains("ollama") {
+        return Some("local-llm".to_string());
+    }
+    if s.contains("offline") {
+        return Some("offline".to_string());
+    }
     None
 }
 
@@ -204,7 +299,11 @@ fn extract_number(s: &str) -> Option<i64> {
             break;
         }
     }
-    if found { num_str.parse().ok() } else { None }
+    if found {
+        num_str.parse().ok()
+    } else {
+        None
+    }
 }
 
 /// Minimal regex-like find without pulling in the `regex` crate.
@@ -214,7 +313,9 @@ fn regex_find(s: &str, pattern: &str) -> Option<String> {
     if pattern.contains("\\$") {
         if let Some(pos) = s.find('$') {
             let rest = &s[pos + 1..];
-            let end = rest.find(|c: char| !c.is_ascii_digit() && c != ',' && c != '.').unwrap_or(rest.len());
+            let end = rest
+                .find(|c: char| !c.is_ascii_digit() && c != ',' && c != '.')
+                .unwrap_or(rest.len());
             return Some(rest[..end].to_string());
         }
     }
@@ -232,12 +333,18 @@ impl NlpCommand {
             NlpCommand::Redo => "Redo last undone change".to_string(),
             NlpCommand::Balance { auto_apply, target } => {
                 let t = target.map(|v| format!(" to ${:.2}", v)).unwrap_or_default();
-                let a = if *auto_apply { " (auto-apply)" } else { " (preview)" };
+                let a = if *auto_apply {
+                    " (auto-apply)"
+                } else {
+                    " (preview)"
+                };
                 format!("Balance statement{}{}", t, a)
             }
             NlpCommand::Verify => "Run pixel-perfect fidelity verification".to_string(),
             NlpCommand::Extract { provider } => format!("Extract transactions using {}", provider),
-            NlpCommand::Transfer { target_bank } => format!("Transfer transactions to {}", target_bank),
+            NlpCommand::Transfer { target_bank } => {
+                format!("Transfer transactions to {}", target_bank)
+            }
             NlpCommand::AdjustDates { shift_days } => {
                 if *shift_days >= 0 {
                     format!("Shift all dates forward {} days", shift_days)
@@ -245,12 +352,21 @@ impl NlpCommand {
                     format!("Shift all dates back {} days", shift_days.abs())
                 }
             }
-            NlpCommand::Categorize { provider } => format!("Categorize transactions using {}", provider),
+            NlpCommand::Categorize { provider } => {
+                format!("Categorize transactions using {}", provider)
+            }
             NlpCommand::Doctor => "Run system health check".to_string(),
             NlpCommand::ReloadConfig => "Hot-reload configuration and API keys".to_string(),
             NlpCommand::StressTest { test_type } => format!("Run stress test: {}", test_type),
-            NlpCommand::AiEdit { instruction, provider } => {
-                format!("AI edit via {} — \"{}\"", provider, &instruction[..instruction.len().min(60)])
+            NlpCommand::AiEdit {
+                instruction,
+                provider,
+            } => {
+                format!(
+                    "AI edit via {} — \"{}\"",
+                    provider,
+                    &instruction[..instruction.len().min(60)]
+                )
             }
             NlpCommand::Unknown { raw } => format!("Unknown command: \"{}\"", raw),
         }
@@ -271,8 +387,17 @@ mod tests {
     #[test]
     fn test_balance_with_target() {
         let cmd = parse("balance to $5,432.10");
-        assert!(matches!(cmd, NlpCommand::Balance { target: Some(_), .. }));
-        if let NlpCommand::Balance { target: Some(t), .. } = cmd {
+        assert!(matches!(
+            cmd,
+            NlpCommand::Balance {
+                target: Some(_),
+                ..
+            }
+        ));
+        if let NlpCommand::Balance {
+            target: Some(t), ..
+        } = cmd
+        {
             assert!((t - 5432.10).abs() < 0.01);
         }
     }
@@ -313,8 +438,14 @@ mod tests {
 
     #[test]
     fn test_stress_test_variants() {
-        assert!(matches!(parse("run stress test"), NlpCommand::StressTest { .. }));
-        assert!(matches!(parse("run transfer matrix"), NlpCommand::StressTest { .. }));
+        assert!(matches!(
+            parse("run stress test"),
+            NlpCommand::StressTest { .. }
+        ));
+        assert!(matches!(
+            parse("run transfer matrix"),
+            NlpCommand::StressTest { .. }
+        ));
     }
 
     #[test]

@@ -856,15 +856,12 @@ pub fn transaction_description(
     } else if !date_tokens.is_empty() {
         // Multi-line / preceding-description rows may place the date after
         // free text (e.g. "Withdrawal-Osko … 25/09/23 25.00 576.87").
-        if let Some(start) = tokens
-            .windows(date_tokens.len())
-            .position(|window| {
-                window
-                    .iter()
-                    .zip(date_tokens.iter())
-                    .all(|(raw, date)| raw.eq_ignore_ascii_case(date))
-            })
-        {
+        if let Some(start) = tokens.windows(date_tokens.len()).position(|window| {
+            window
+                .iter()
+                .zip(date_tokens.iter())
+                .all(|(raw, date)| raw.eq_ignore_ascii_case(date))
+        }) {
             tokens.drain(start..start + date_tokens.len());
         }
     }

@@ -8,8 +8,8 @@ use std::time::Duration;
 #[test]
 #[ignore = "Requires active desktop session and compiled binary"]
 fn test_computer_use_framework_bootstrap() {
-    let bin_path = option_env!("CARGO_BIN_EXE_dual-core-pdf-pipeline")
-        .unwrap_or("dual-core-pdf-pipeline");
+    let bin_path =
+        option_env!("CARGO_BIN_EXE_dual-core-pdf-pipeline").unwrap_or("dual-core-pdf-pipeline");
 
     let mut child = Command::new(bin_path)
         .arg("gui")

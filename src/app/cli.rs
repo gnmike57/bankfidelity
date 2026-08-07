@@ -1229,33 +1229,43 @@ pub fn run_inner(
                 }
             }
         }
-        Commands::Chat { instruction, target_pdf } => {
+        Commands::Chat {
+            instruction,
+            target_pdf,
+        } => {
             println!("🤖 Parsing instruction: \"{}\"", instruction);
             let cmd = crate::app::nlp_router::parse(&instruction);
             println!("🧠 Parsed Intent: {}", cmd.describe());
-            
+
             let path = target_pdf.unwrap_or_else(|| PathBuf::from("statement.pdf"));
-            
+
             // Depending on the command, dispatch a job. For AiEdit, we dispatch AiCommand.
             let job = match cmd {
-                crate::app::nlp_router::NlpCommand::AiEdit { instruction, provider: _ } => {
-                    Job::AiCommand {
-                        prompt: instruction,
-                        path,
-                    }
-                }
+                crate::app::nlp_router::NlpCommand::AiEdit {
+                    instruction,
+                    provider: _,
+                } => Job::AiCommand {
+                    prompt: instruction,
+                    path,
+                },
                 // For simplicity, we just route everything complex to AiCommand here, or handle directly.
-                // But nlp_router directly returns a mapped NlpCommand. 
+                // But nlp_router directly returns a mapped NlpCommand.
                 // However, the runtime currently handles AiEdit via NlpCommand natively inside AiCommand dispatcher.
                 // Wait, runtime matches NlpCommand inside process_job_inner only if we send an `AiCommand` that parses it again?
                 // Actually, `Job::AiCommand` in runtime calls `nlp_router::parse` itself!
-                _ => Job::AiCommand { prompt: instruction.clone(), path },
+                _ => Job::AiCommand {
+                    prompt: instruction.clone(),
+                    path,
+                },
             };
 
             let _ = job_tx.send_headless(job);
             match wait_for_terminal_result(&job_rx) {
                 Ok(JobResult::NaturalLanguageEditReady(txs)) => {
-                    println!("✅ Local LLM modified {} transactions successfully.", txs.len());
+                    println!(
+                        "✅ Local LLM modified {} transactions successfully.",
+                        txs.len()
+                    );
                     Ok(exit_code::SUCCESS)
                 }
                 Ok(other) => {

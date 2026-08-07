@@ -158,9 +158,17 @@ fn route(
         // ── Readiness ─────────────────────────────────────────────────────────
         ("GET", "/readyz" | "/ready") => {
             if ping_worker(channel) {
-                ("200 OK", "application/json", r#"{"status":"ready"}"#.to_string())
+                (
+                    "200 OK",
+                    "application/json",
+                    r#"{"status":"ready"}"#.to_string(),
+                )
             } else {
-                ("503 Service Unavailable", "application/json", r#"{"status":"not-ready"}"#.to_string())
+                (
+                    "503 Service Unavailable",
+                    "application/json",
+                    r#"{"status":"not-ready"}"#.to_string(),
+                )
             }
         }
         // ── NLP Chat ──────────────────────────────────────────────────────────
@@ -185,7 +193,11 @@ fn route(
             r#"{"error":"method not allowed"}"#.to_string(),
         ),
         // ── Not found ─────────────────────────────────────────────────────────
-        _ => ("404 Not Found", "application/json", r#"{"error":"not found"}"#.to_string()),
+        _ => (
+            "404 Not Found",
+            "application/json",
+            r#"{"error":"not found"}"#.to_string(),
+        ),
     }
 }
 
@@ -197,12 +209,29 @@ fn handle_chat(body: &str, channel: &RuntimeChannel) -> (&'static str, &'static 
     let message = json_str(body, "message").unwrap_or_default();
     let pdf_path = json_str(body, "pdf_path").unwrap_or_default();
     if message.is_empty() {
-        return ("400 Bad Request", "application/json", r#"{"error":"'message' field is required"}"#.to_string());
+        return (
+            "400 Bad Request",
+            "application/json",
+            r#"{"error":"'message' field is required"}"#.to_string(),
+        );
     }
-    let path = if pdf_path.is_empty() { PathBuf::new() } else { PathBuf::from(&pdf_path) };
-    let ticket = match channel.submit_headless(Job::AiCommand { prompt: message, path }) {
+    let path = if pdf_path.is_empty() {
+        PathBuf::new()
+    } else {
+        PathBuf::from(&pdf_path)
+    };
+    let ticket = match channel.submit_headless(Job::AiCommand {
+        prompt: message,
+        path,
+    }) {
         Ok(t) => t,
-        Err(e) => return ("503 Service Unavailable", "application/json", format!(r#"{{"error":"runtime unavailable: {}"}}"#, e)),
+        Err(e) => {
+            return (
+                "503 Service Unavailable",
+                "application/json",
+                format!(r#"{{"error":"runtime unavailable: {}"}}"#, e),
+            )
+        }
     };
     collect_results(ticket, "chat")
 }
@@ -214,7 +243,13 @@ fn handle_chat(body: &str, channel: &RuntimeChannel) -> (&'static str, &'static 
 fn handle_extract(body: &str, channel: &RuntimeChannel) -> (&'static str, &'static str, String) {
     let pdf_path = match json_str(body, "pdf_path") {
         Some(p) if !p.is_empty() => p,
-        _ => return ("400 Bad Request", "application/json", r#"{"error":"'pdf_path' field is required"}"#.to_string()),
+        _ => {
+            return (
+                "400 Bad Request",
+                "application/json",
+                r#"{"error":"'pdf_path' field is required"}"#.to_string(),
+            )
+        }
     };
     let provider_str = json_str(body, "provider").unwrap_or_else(|| "llamaparse".to_string());
     let parser_mode = match provider_str.to_lowercase().as_str() {
@@ -228,7 +263,13 @@ fn handle_extract(body: &str, channel: &RuntimeChannel) -> (&'static str, &'stat
         parser_mode,
     }) {
         Ok(t) => t,
-        Err(e) => return ("503 Service Unavailable", "application/json", format!(r#"{{"error":"runtime unavailable: {}"}}"#, e)),
+        Err(e) => {
+            return (
+                "503 Service Unavailable",
+                "application/json",
+                format!(r#"{{"error":"runtime unavailable: {}"}}"#, e),
+            )
+        }
     };
     collect_results(ticket, "extract")
 }
@@ -240,10 +281,17 @@ fn handle_extract(body: &str, channel: &RuntimeChannel) -> (&'static str, &'stat
 fn handle_verify(body: &str, channel: &RuntimeChannel) -> (&'static str, &'static str, String) {
     let original = match json_str(body, "original").or_else(|| json_str(body, "pdf_path")) {
         Some(p) if !p.is_empty() => p,
-        _ => return ("400 Bad Request", "application/json", r#"{"error":"'original' or 'pdf_path' field is required"}"#.to_string()),
+        _ => {
+            return (
+                "400 Bad Request",
+                "application/json",
+                r#"{"error":"'original' or 'pdf_path' field is required"}"#.to_string(),
+            )
+        }
     };
     let edited = json_str(body, "edited").unwrap_or_else(|| original.clone());
-    let output_dir = json_str(body, "output_dir").unwrap_or_else(|| "/tmp/bankfidelity_verify".to_string());
+    let output_dir =
+        json_str(body, "output_dir").unwrap_or_else(|| "/tmp/bankfidelity_verify".to_string());
     let _ = std::fs::create_dir_all(&output_dir);
     let ticket = match channel.submit_headless(Job::Verify {
         original: PathBuf::from(&original),
@@ -255,7 +303,13 @@ fn handle_verify(body: &str, channel: &RuntimeChannel) -> (&'static str, &'stati
         auto_match_dpi: true,
     }) {
         Ok(t) => t,
-        Err(e) => return ("503 Service Unavailable", "application/json", format!(r#"{{"error":"runtime unavailable: {}"}}"#, e)),
+        Err(e) => {
+            return (
+                "503 Service Unavailable",
+                "application/json",
+                format!(r#"{{"error":"runtime unavailable: {}"}}"#, e),
+            )
+        }
     };
     collect_results(ticket, "verify")
 }
@@ -267,13 +321,25 @@ fn handle_verify(body: &str, channel: &RuntimeChannel) -> (&'static str, &'stati
 fn handle_balance(body: &str, channel: &RuntimeChannel) -> (&'static str, &'static str, String) {
     let pdf_path = match json_str(body, "pdf_path") {
         Some(p) if !p.is_empty() => p,
-        _ => return ("400 Bad Request", "application/json", r#"{"error":"'pdf_path' field is required"}"#.to_string()),
+        _ => {
+            return (
+                "400 Bad Request",
+                "application/json",
+                r#"{"error":"'pdf_path' field is required"}"#.to_string(),
+            )
+        }
     };
     let ticket = match channel.submit_headless(Job::BalanceStatement {
         path: PathBuf::from(&pdf_path),
     }) {
         Ok(t) => t,
-        Err(e) => return ("503 Service Unavailable", "application/json", format!(r#"{{"error":"runtime unavailable: {}"}}"#, e)),
+        Err(e) => {
+            return (
+                "503 Service Unavailable",
+                "application/json",
+                format!(r#"{{"error":"runtime unavailable: {}"}}"#, e),
+            )
+        }
     };
     collect_results(ticket, "balance")
 }
@@ -285,20 +351,39 @@ fn handle_balance(body: &str, channel: &RuntimeChannel) -> (&'static str, &'stat
 fn handle_transfer(body: &str, channel: &RuntimeChannel) -> (&'static str, &'static str, String) {
     let source = match json_str(body, "source_pdf").or_else(|| json_str(body, "pdf_path")) {
         Some(p) if !p.is_empty() => p,
-        _ => return ("400 Bad Request", "application/json", r#"{"error":"'source_pdf' field is required"}"#.to_string()),
+        _ => {
+            return (
+                "400 Bad Request",
+                "application/json",
+                r#"{"error":"'source_pdf' field is required"}"#.to_string(),
+            )
+        }
     };
     let target = match json_str(body, "target_pdf") {
         Some(p) if !p.is_empty() => p,
-        _ => return ("400 Bad Request", "application/json", r#"{"error":"'target_pdf' field is required"}"#.to_string()),
+        _ => {
+            return (
+                "400 Bad Request",
+                "application/json",
+                r#"{"error":"'target_pdf' field is required"}"#.to_string(),
+            )
+        }
     };
-    let output = json_str(body, "output_pdf").unwrap_or_else(|| "/tmp/bankfidelity_transfer_out.pdf".to_string());
+    let output = json_str(body, "output_pdf")
+        .unwrap_or_else(|| "/tmp/bankfidelity_transfer_out.pdf".to_string());
     let ticket = match channel.submit_headless(Job::TransferTransactions {
         source_pdf: PathBuf::from(&source),
         target_pdf: PathBuf::from(&target),
         output_pdf: PathBuf::from(&output),
     }) {
         Ok(t) => t,
-        Err(e) => return ("503 Service Unavailable", "application/json", format!(r#"{{"error":"runtime unavailable: {}"}}"#, e)),
+        Err(e) => {
+            return (
+                "503 Service Unavailable",
+                "application/json",
+                format!(r#"{{"error":"runtime unavailable: {}"}}"#, e),
+            )
+        }
     };
     collect_results(ticket, "transfer")
 }
@@ -319,11 +404,20 @@ fn handle_keys_get() -> (&'static str, &'static str, String) {
         ("groq", "GROQ_API_KEY"),
         ("mindee", "MINDEE_API_KEY"),
     ];
-    let entries: Vec<String> = providers.iter().map(|(name, env_var)| {
-        let configured = std::env::var(env_var).map(|v| !v.trim().is_empty()).unwrap_or(false);
-        format!(r#"{{"provider":"{name}","configured":{configured}}}"#)
-    }).collect();
-    ("200 OK", "application/json", format!(r#"{{"providers":[{}]}}"#, entries.join(",")))
+    let entries: Vec<String> = providers
+        .iter()
+        .map(|(name, env_var)| {
+            let configured = std::env::var(env_var)
+                .map(|v| !v.trim().is_empty())
+                .unwrap_or(false);
+            format!(r#"{{"provider":"{name}","configured":{configured}}}"#)
+        })
+        .collect();
+    (
+        "200 OK",
+        "application/json",
+        format!(r#"{{"providers":[{}]}}"#, entries.join(",")),
+    )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -332,12 +426,22 @@ fn handle_keys_get() -> (&'static str, &'static str, String) {
 
 fn handle_keys_post(body: &str, channel: &RuntimeChannel) -> (&'static str, &'static str, String) {
     let allowed = [
-        "GEMINI_API_KEY", "GEMINI_AUTH_MODE", "PYMUPDF_PRO_KEY",
-        "LLAMAPARSE_API_KEY", "PDFREST_API_KEY", "MISTRAL_API_KEY",
-        "MISTRAL_MODEL", "OPENROUTER_API_KEY", "OPENROUTER_MODEL",
-        "DOCUMENT_AI_API_KEY", "DOCUMENT_AI_PROJECT_ID", "DOCUMENT_AI_LOCATION",
-        "DOCUMENT_AI_PROCESSOR_ID", "GOOGLE_APPLICATION_CREDENTIALS",
-        "GROQ_API_KEY", "MINDEE_API_KEY",
+        "GEMINI_API_KEY",
+        "GEMINI_AUTH_MODE",
+        "PYMUPDF_PRO_KEY",
+        "LLAMAPARSE_API_KEY",
+        "PDFREST_API_KEY",
+        "MISTRAL_API_KEY",
+        "MISTRAL_MODEL",
+        "OPENROUTER_API_KEY",
+        "OPENROUTER_MODEL",
+        "DOCUMENT_AI_API_KEY",
+        "DOCUMENT_AI_PROJECT_ID",
+        "DOCUMENT_AI_LOCATION",
+        "DOCUMENT_AI_PROCESSOR_ID",
+        "GOOGLE_APPLICATION_CREDENTIALS",
+        "GROQ_API_KEY",
+        "MINDEE_API_KEY",
     ];
     let mut updated: Vec<String> = Vec::new();
     for key in &allowed {
@@ -352,10 +456,18 @@ fn handle_keys_post(body: &str, channel: &RuntimeChannel) -> (&'static str, &'st
         }
     }
     if updated.is_empty() {
-        return ("400 Bad Request", "application/json", r#"{"error":"no recognised key fields in request body"}"#.to_string());
+        return (
+            "400 Bad Request",
+            "application/json",
+            r#"{"error":"no recognised key fields in request body"}"#.to_string(),
+        );
     }
     let _ = channel.send(Job::ReloadConfig);
-    ("200 OK", "application/json", format!(r#"{{"ok":true,"updated":{}}}"#, json_arr(&updated)))
+    (
+        "200 OK",
+        "application/json",
+        format!(r#"{{"ok":true,"updated":{}}}"#, json_arr(&updated)),
+    )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -364,8 +476,16 @@ fn handle_keys_post(body: &str, channel: &RuntimeChannel) -> (&'static str, &'st
 
 fn handle_reload(channel: &RuntimeChannel) -> (&'static str, &'static str, String) {
     match channel.send(Job::ReloadConfig) {
-        Ok(_) => ("200 OK", "application/json", r#"{"ok":true,"message":"ReloadConfig dispatched"}"#.to_string()),
-        Err(e) => ("503 Service Unavailable", "application/json", format!(r#"{{"error":"runtime unavailable: {}"}}"#, e)),
+        Ok(_) => (
+            "200 OK",
+            "application/json",
+            r#"{"ok":true,"message":"ReloadConfig dispatched"}"#.to_string(),
+        ),
+        Err(e) => (
+            "503 Service Unavailable",
+            "application/json",
+            format!(r#"{{"error":"runtime unavailable: {}"}}"#, e),
+        ),
     }
 }
 
@@ -385,8 +505,14 @@ fn collect_results(ticket: JobTicket, job_name: &str) -> (&'static str, &'static
             break;
         }
         match ticket.recv_timeout(remaining.min(Duration::from_secs(2))) {
-            Ok(JobResult::Progress { label, .. }) => { messages.push(label); }
-            Ok(JobResult::Error { message, .. }) => { ok = false; messages.push(message); break; }
+            Ok(JobResult::Progress { label, .. }) => {
+                messages.push(label);
+            }
+            Ok(JobResult::Error { message, .. }) => {
+                ok = false;
+                messages.push(message);
+                break;
+            }
             Ok(JobResult::NaturalLanguageEditReady(edits)) => {
                 messages.push(format!("{} proposed change(s) ready", edits.len()));
                 break;
@@ -396,11 +522,21 @@ fn collect_results(ticket: JobTicket, job_name: &str) -> (&'static str, &'static
                 break;
             }
             Ok(JobResult::VerificationReport(r)) => {
-                messages.push(format!("verification {}", if r.mandatory_local_pass() { "PASS" } else { "FAIL" }));
+                messages.push(format!(
+                    "verification {}",
+                    if r.mandatory_local_pass() {
+                        "PASS"
+                    } else {
+                        "FAIL"
+                    }
+                ));
                 break;
             }
             Ok(JobResult::BalanceProposed { imbalance, changes }) => {
-                messages.push(format!("balance: imbalance={imbalance}, {} change(s) proposed", changes.len()));
+                messages.push(format!(
+                    "balance: imbalance={imbalance}, {} change(s) proposed",
+                    changes.len()
+                ));
                 break;
             }
             Ok(JobResult::ConfigReloaded { .. }) => {
@@ -418,21 +554,33 @@ fn collect_results(ticket: JobTicket, job_name: &str) -> (&'static str, &'static
                 messages.push(format!("workflow complete: {}", summary.completion_summary));
                 break;
             }
-            Ok(JobResult::ProposedChangesApplied { changes_applied, .. }) => {
+            Ok(JobResult::ProposedChangesApplied {
+                changes_applied, ..
+            }) => {
                 messages.push(format!("{} change(s) applied", changes_applied));
                 break;
             }
             Ok(JobResult::ApiKeysVerified(report)) => {
-                messages.push(format!("api keys verified: {} provider(s) checked", report.results.len()));
+                messages.push(format!(
+                    "api keys verified: {} provider(s) checked",
+                    report.results.len()
+                ));
                 break;
             }
 
-            Ok(_) => {}  // Progress or other non-terminal variants — keep looping
+            Ok(_) => {} // Progress or other non-terminal variants — keep looping
             Err(_) => break,
         }
     }
-    let status = if ok { "200 OK" } else { "500 Internal Server Error" };
-    let body = format!(r#"{{"ok":{ok},"job":"{job_name}","messages":{}}}"#, json_arr(&messages));
+    let status = if ok {
+        "200 OK"
+    } else {
+        "500 Internal Server Error"
+    };
+    let body = format!(
+        r#"{{"ok":{ok},"job":"{job_name}","messages":{}}}"#,
+        json_arr(&messages)
+    );
     (status, "application/json", body)
 }
 
@@ -473,14 +621,17 @@ fn json_str(json: &str, key: &str) -> Option<String> {
 }
 
 fn json_arr(items: &[String]) -> String {
-    let inner: Vec<String> = items.iter().map(|s| {
-        let e = s
-            .replace('\\', "\\\\")
-            .replace('"', "\\\"")
-            .replace('\n', "\\n")
-            .replace('\r', "\\r");
-        format!("\"{e}\"")
-    }).collect();
+    let inner: Vec<String> = items
+        .iter()
+        .map(|s| {
+            let e = s
+                .replace('\\', "\\\\")
+                .replace('"', "\\\"")
+                .replace('\n', "\\n")
+                .replace('\r', "\\r");
+            format!("\"{e}\"")
+        })
+        .collect();
     format!("[{}]", inner.join(","))
 }
 
@@ -488,20 +639,27 @@ fn upsert_env_file(path: &std::path::Path, pairs: &[(&str, String)]) -> std::io:
     use std::io::BufRead;
     let existing: Vec<String> = if path.exists() {
         let f = std::fs::File::open(path)?;
-        std::io::BufReader::new(f).lines().collect::<Result<_, _>>()?
+        std::io::BufReader::new(f)
+            .lines()
+            .collect::<Result<_, _>>()?
     } else {
         Vec::new()
     };
-    let mut output: Vec<String> = existing.into_iter().map(|line| {
-        let t = line.trim();
-        if t.starts_with('#') || !t.contains('=') { return line; }
-        let k = t.split('=').next().unwrap_or("").trim();
-        if let Some((_, v)) = pairs.iter().find(|(pk, _)| *pk == k) {
-            format!("{}={}", k, v)
-        } else {
-            line
-        }
-    }).collect();
+    let mut output: Vec<String> = existing
+        .into_iter()
+        .map(|line| {
+            let t = line.trim();
+            if t.starts_with('#') || !t.contains('=') {
+                return line;
+            }
+            let k = t.split('=').next().unwrap_or("").trim();
+            if let Some((_, v)) = pairs.iter().find(|(pk, _)| *pk == k) {
+                format!("{}={}", k, v)
+            } else {
+                line
+            }
+        })
+        .collect();
     for (key, val) in pairs {
         let present = output.iter().any(|l| {
             let t = l.trim();

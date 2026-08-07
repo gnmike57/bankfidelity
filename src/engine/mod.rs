@@ -19,6 +19,7 @@ pub mod statement;
 
 pub mod categorization;
 pub mod consensus;
+pub mod financial_nlp;
 pub mod pro_edit;
 pub mod transfer;
 pub mod transfer_test_harness;
@@ -28,4 +29,3 @@ pub mod verification_content;
 pub mod verification_structural;
 pub mod verification_v2;
 pub mod workflow;
-pub mod financial_nlp;

@@ -24,7 +24,7 @@ impl McpServer {
 
         // Send initialization capability (MCP handshake)
         // Usually, the client sends "initialize", but we just listen for standard JSON-RPC.
-        
+
         for line in stdin.lock().lines() {
             let line = match line {
                 Ok(l) => l,
@@ -42,7 +42,11 @@ impl McpServer {
                     }
                 }
                 Err(e) => {
-                    tracing::warn!("MCP Server received malformed payload: '{}' - Error: {}", line, e);
+                    tracing::warn!(
+                        "MCP Server received malformed payload: '{}' - Error: {}",
+                        line,
+                        e
+                    );
                 }
             }
         }
@@ -199,64 +203,121 @@ impl McpServer {
                 let default_args = json!({});
                 let args = params.get("arguments").unwrap_or(&default_args);
 
-                let mut cmd = std::process::Command::new(std::env::current_exe().unwrap_or_default());
+                let mut cmd =
+                    std::process::Command::new(std::env::current_exe().unwrap_or_default());
 
                 match name {
                     "balance_statement" => {
                         cmd.arg("balance");
-                        if let Some(i) = args.get("input").and_then(|v| v.as_str()) { cmd.arg("--input").arg(i); }
-                        if let Some(o) = args.get("output").and_then(|v| v.as_str()) { cmd.arg("--output").arg(o); }
-                        if args.get("auto_approve").and_then(|v| v.as_bool()).unwrap_or(false) {
+                        if let Some(i) = args.get("input").and_then(|v| v.as_str()) {
+                            cmd.arg("--input").arg(i);
+                        }
+                        if let Some(o) = args.get("output").and_then(|v| v.as_str()) {
+                            cmd.arg("--output").arg(o);
+                        }
+                        if args
+                            .get("auto_approve")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(false)
+                        {
                             cmd.arg("--auto-approve");
                         }
                     }
                     "modify_text" => {
                         cmd.arg("text");
-                        if let Some(i) = args.get("input").and_then(|v| v.as_str()) { cmd.arg("--input").arg(i); }
-                        if let Some(o) = args.get("output").and_then(|v| v.as_str()) { cmd.arg("--output").arg(o); }
-                        if let Some(old) = args.get("old").and_then(|v| v.as_str()) { cmd.arg("--old").arg(old); }
-                        if let Some(new) = args.get("new").and_then(|v| v.as_str()) { cmd.arg("--new").arg(new); }
-                        if let Some(b) = args.get("bbox").and_then(|v| v.as_str()) { cmd.arg("--bbox").arg(b); }
-                        if let Some(p) = args.get("page").and_then(|v| v.as_u64()) { cmd.arg("--page").arg(p.to_string()); }
+                        if let Some(i) = args.get("input").and_then(|v| v.as_str()) {
+                            cmd.arg("--input").arg(i);
+                        }
+                        if let Some(o) = args.get("output").and_then(|v| v.as_str()) {
+                            cmd.arg("--output").arg(o);
+                        }
+                        if let Some(old) = args.get("old").and_then(|v| v.as_str()) {
+                            cmd.arg("--old").arg(old);
+                        }
+                        if let Some(new) = args.get("new").and_then(|v| v.as_str()) {
+                            cmd.arg("--new").arg(new);
+                        }
+                        if let Some(b) = args.get("bbox").and_then(|v| v.as_str()) {
+                            cmd.arg("--bbox").arg(b);
+                        }
+                        if let Some(p) = args.get("page").and_then(|v| v.as_u64()) {
+                            cmd.arg("--page").arg(p.to_string());
+                        }
                     }
                     "extract_data" => {
                         cmd.arg("extract");
-                        if let Some(i) = args.get("input").and_then(|v| v.as_str()) { cmd.arg("--input").arg(i); }
-                        if let Some(o) = args.get("output").and_then(|v| v.as_str()) { cmd.arg("--output").arg(o); }
+                        if let Some(i) = args.get("input").and_then(|v| v.as_str()) {
+                            cmd.arg("--input").arg(i);
+                        }
+                        if let Some(o) = args.get("output").and_then(|v| v.as_str()) {
+                            cmd.arg("--output").arg(o);
+                        }
                     }
                     "verify_layout" => {
                         cmd.arg("verify");
-                        if let Some(orig) = args.get("original").and_then(|v| v.as_str()) { cmd.arg("--original").arg(orig); }
-                        if let Some(edit) = args.get("edited").and_then(|v| v.as_str()) { cmd.arg("--edited").arg(edit); }
-                        if let Some(out) = args.get("output_dir").and_then(|v| v.as_str()) { cmd.arg("--output-dir").arg(out); }
+                        if let Some(orig) = args.get("original").and_then(|v| v.as_str()) {
+                            cmd.arg("--original").arg(orig);
+                        }
+                        if let Some(edit) = args.get("edited").and_then(|v| v.as_str()) {
+                            cmd.arg("--edited").arg(edit);
+                        }
+                        if let Some(out) = args.get("output_dir").and_then(|v| v.as_str()) {
+                            cmd.arg("--output-dir").arg(out);
+                        }
                     }
                     "extract_batch" => {
                         cmd.arg("extract-batch");
-                        if let Some(i) = args.get("input_dir").and_then(|v| v.as_str()) { cmd.arg("--input-dir").arg(i); }
-                        if let Some(o) = args.get("output_dir").and_then(|v| v.as_str()) { cmd.arg("--output-dir").arg(o); }
-                        if let Some(c) = args.get("max_concurrency").and_then(|v| v.as_u64()) { cmd.arg("--max-concurrency").arg(c.to_string()); }
-                        if let Some(r) = args.get("retries").and_then(|v| v.as_u64()) { cmd.arg("--retries").arg(r.to_string()); }
+                        if let Some(i) = args.get("input_dir").and_then(|v| v.as_str()) {
+                            cmd.arg("--input-dir").arg(i);
+                        }
+                        if let Some(o) = args.get("output_dir").and_then(|v| v.as_str()) {
+                            cmd.arg("--output-dir").arg(o);
+                        }
+                        if let Some(c) = args.get("max_concurrency").and_then(|v| v.as_u64()) {
+                            cmd.arg("--max-concurrency").arg(c.to_string());
+                        }
+                        if let Some(r) = args.get("retries").and_then(|v| v.as_u64()) {
+                            cmd.arg("--retries").arg(r.to_string());
+                        }
                     }
                     "typst_reconstruct" => {
                         cmd.arg("typst-reconstruct");
-                        if let Some(i) = args.get("input").and_then(|v| v.as_str()) { cmd.arg("--input").arg(i); }
-                        if let Some(o) = args.get("output").and_then(|v| v.as_str()) { cmd.arg("--output").arg(o); }
+                        if let Some(i) = args.get("input").and_then(|v| v.as_str()) {
+                            cmd.arg("--input").arg(i);
+                        }
+                        if let Some(o) = args.get("output").and_then(|v| v.as_str()) {
+                            cmd.arg("--output").arg(o);
+                        }
                     }
                     "local_ai_chat" => {
                         cmd.arg("chat");
-                        if let Some(i) = args.get("instruction").and_then(|v| v.as_str()) { cmd.arg("--instruction").arg(i); }
-                        if let Some(t) = args.get("target_pdf").and_then(|v| v.as_str()) { cmd.arg("--target-pdf").arg(t); }
+                        if let Some(i) = args.get("instruction").and_then(|v| v.as_str()) {
+                            cmd.arg("--instruction").arg(i);
+                        }
+                        if let Some(t) = args.get("target_pdf").and_then(|v| v.as_str()) {
+                            cmd.arg("--target-pdf").arg(t);
+                        }
                     }
                     "transfer_transactions" => {
                         cmd.arg("transfer-transactions");
-                        if let Some(s) = args.get("source").and_then(|v| v.as_str()) { cmd.arg("--source-pdf").arg(s); }
-                        if let Some(t) = args.get("target").and_then(|v| v.as_str()) { cmd.arg("--target-pdf").arg(t); }
-                        if let Some(o) = args.get("output").and_then(|v| v.as_str()) { cmd.arg("--output").arg(o); }
+                        if let Some(s) = args.get("source").and_then(|v| v.as_str()) {
+                            cmd.arg("--source-pdf").arg(s);
+                        }
+                        if let Some(t) = args.get("target").and_then(|v| v.as_str()) {
+                            cmd.arg("--target-pdf").arg(t);
+                        }
+                        if let Some(o) = args.get("output").and_then(|v| v.as_str()) {
+                            cmd.arg("--output").arg(o);
+                        }
                     }
                     "export_history" => {
                         cmd.arg("export-history");
-                        if let Some(i) = args.get("input").and_then(|v| v.as_str()) { cmd.arg("--input").arg(i); }
-                        if let Some(o) = args.get("output_dir").and_then(|v| v.as_str()) { cmd.arg("--output-dir").arg(o); }
+                        if let Some(i) = args.get("input").and_then(|v| v.as_str()) {
+                            cmd.arg("--input").arg(i);
+                        }
+                        if let Some(o) = args.get("output_dir").and_then(|v| v.as_str()) {
+                            cmd.arg("--output-dir").arg(o);
+                        }
                     }
                     _ => {
                         return json!({
@@ -277,7 +338,12 @@ impl McpServer {
                         let result_text = if output.status.success() {
                             format!("Success.\nStdout:\n{}\nStderr:\n{}", stdout, stderr)
                         } else {
-                            format!("Failed with exit code {}.\nStdout:\n{}\nStderr:\n{}", output.status.code().unwrap_or(-1), stdout, stderr)
+                            format!(
+                                "Failed with exit code {}.\nStdout:\n{}\nStderr:\n{}",
+                                output.status.code().unwrap_or(-1),
+                                stdout,
+                                stderr
+                            )
                         };
 
                         json!({
@@ -324,7 +390,7 @@ impl McpServer {
             "prompts/get" => {
                 let params = req.params.unwrap_or(json!({}));
                 let name = params.get("name").and_then(|n| n.as_str()).unwrap_or("");
-                
+
                 if name == "bankfidelity_agent_instructions" {
                     json!({
                         "jsonrpc": "2.0",
@@ -353,7 +419,7 @@ impl McpServer {
             "resources/list" => {
                 let home_dir = dirs::home_dir().unwrap_or_default();
                 let brain_base = home_dir.join(".gemini").join("antigravity").join("brain");
-                
+
                 let mut brain_dir = brain_base.to_string_lossy().to_string();
                 if let Ok(entries) = std::fs::read_dir(&brain_base) {
                     let mut latest_time = std::time::SystemTime::UNIX_EPOCH;
@@ -363,7 +429,8 @@ impl McpServer {
                                 if let Ok(modified) = meta.modified() {
                                     if modified > latest_time {
                                         latest_time = modified;
-                                        brain_dir = entry.path().to_string_lossy().replace("\\", "/");
+                                        brain_dir =
+                                            entry.path().to_string_lossy().replace("\\", "/");
                                     }
                                 }
                             }
@@ -392,13 +459,13 @@ impl McpServer {
             "resources/read" => {
                 let params = req.params.unwrap_or(json!({}));
                 let uri = params.get("uri").and_then(|u| u.as_str()).unwrap_or("");
-                
+
                 if uri.starts_with("pdf-page://") {
                     let path_and_query = uri.trim_start_matches("pdf-page://");
                     let mut parts = path_and_query.split("?page=");
                     let path = parts.next().unwrap_or("").trim();
                     let page: usize = parts.next().and_then(|s| s.parse().ok()).unwrap_or(1);
-                    
+
                     if path.is_empty() {
                         return json!({
                             "jsonrpc": "2.0",
@@ -419,11 +486,16 @@ impl McpServer {
                     };
 
                     let mut cmd = std::process::Command::new(exe);
-                    cmd.arg("mcp-render-page").arg("--input").arg(path).arg("--page").arg(page.to_string());
-                    
+                    cmd.arg("mcp-render-page")
+                        .arg("--input")
+                        .arg(path)
+                        .arg("--page")
+                        .arg(page.to_string());
+
                     match cmd.output() {
                         Ok(output) if output.status.success() => {
-                            let base64_png = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                            let base64_png =
+                                String::from_utf8_lossy(&output.stdout).trim().to_string();
                             json!({
                                 "jsonrpc": "2.0",
                                 "id": req.id,

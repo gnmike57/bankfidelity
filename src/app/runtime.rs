@@ -780,7 +780,10 @@ fn python_input_sha256(path: &str) -> Result<String, String> {
 #[derive(Debug)]
 pub enum Job {
     Ping,
-    UfoAutoEdit { path: PathBuf, context: String },
+    UfoAutoEdit {
+        path: PathBuf,
+        context: String,
+    },
     CancelUfo,
     Python(PythonJob, oneshot::Sender<PythonJobResult>),
     LoadDocument {
@@ -2144,7 +2147,12 @@ Additional Context:\n{context}",
                 }
             });
         }
-        Job::ExplainImbalance { transactions_json, opening_balance, closing_balance, imbalance } => {
+        Job::ExplainImbalance {
+            transactions_json,
+            opening_balance,
+            closing_balance,
+            imbalance,
+        } => {
             let client = crate::ai::local_llm::LocalLlmClient::new();
             let result_tx = result_tx_clone.clone();
             tokio::spawn(async move {
@@ -2152,7 +2160,15 @@ Additional Context:\n{context}",
                     label: "Asking local Qwen 7B to explain the math error...".into(),
                     fraction: 0.1,
                 });
-                match client.explain_imbalance(&transactions_json, opening_balance, closing_balance, imbalance).await {
+                match client
+                    .explain_imbalance(
+                        &transactions_json,
+                        opening_balance,
+                        closing_balance,
+                        imbalance,
+                    )
+                    .await
+                {
                     Ok(explanation) => {
                         let _ = result_tx.send(JobResult::ImbalanceExplained { explanation });
                     }
@@ -3469,35 +3485,46 @@ Additional Context:\n{context}",
                     let total_edits = batch_edits.len();
                     let mut edits_applied = 0usize;
                     if total_edits > 0 {
-                        let mut affected_pages: std::collections::BTreeSet<usize> = std::collections::BTreeSet::new();
+                        let mut affected_pages: std::collections::BTreeSet<usize> =
+                            std::collections::BTreeSet::new();
                         for edit in &batch_edits {
                             if let Some(page) = edit["page"].as_u64() {
                                 affected_pages.insert(page as usize);
                             }
                         }
 
-                        let gemini_client = match crate::ai::gemini_client::GeminiClient::from_app_config_async(&cfg).await {
-                            Ok(c) => c,
-                            Err(e) => {
-                                tracing::warn!("[TRANSFER] Failed to init GeminiClient for visual review, skipping review: {e}");
-                                let _ = res_tx.send(JobResult::TransferFailed {
-                                    stage: "AiVisualReview".into(),
-                                    message: format!("AI visual reviewer unavailable: {e}"),
-                                });
-                                return;
-                            }
-                        };
+                        let gemini_client =
+                            match crate::ai::gemini_client::GeminiClient::from_app_config_async(
+                                &cfg,
+                            )
+                            .await
+                            {
+                                Ok(c) => c,
+                                Err(e) => {
+                                    tracing::warn!("[TRANSFER] Failed to init GeminiClient for visual review, skipping review: {e}");
+                                    let _ = res_tx.send(JobResult::TransferFailed {
+                                        stage: "AiVisualReview".into(),
+                                        message: format!("AI visual reviewer unavailable: {e}"),
+                                    });
+                                    return;
+                                }
+                            };
 
                         let max_retries = 3;
                         let mut approved = false;
                         for retry_idx in 0..max_retries {
                             // ======= STAGE 5a: GeneratePreview ========
                             send_progress(&res_tx, TransferStage::GeneratePreview);
-                            tracing::info!("[TRANSFER] Stage 5a: Generating visual preview (Attempt {})", retry_idx + 1);
-                            let edits_json_str = serde_json::to_string(&batch_edits).unwrap_or_default();
-                            let visual_proof_pdf = output_pdf.with_extension(format!("proof_v{}.pdf", retry_idx));
+                            tracing::info!(
+                                "[TRANSFER] Stage 5a: Generating visual preview (Attempt {})",
+                                retry_idx + 1
+                            );
+                            let edits_json_str =
+                                serde_json::to_string(&batch_edits).unwrap_or_default();
+                            let visual_proof_pdf =
+                                output_pdf.with_extension(format!("proof_v{}.pdf", retry_idx));
                             generated_visual_proof_path = Some(visual_proof_pdf.clone());
-                            
+
                             let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
                             if let Err(e) = py_tx.send((
                                 PythonJob::GenerateVisualProof {
@@ -3513,27 +3540,36 @@ Additional Context:\n{context}",
                                 });
                                 return;
                             }
-                            
+
                             let mut proof_pngs = Vec::new();
                             match reply_rx.await {
                                 Ok(PythonJobResult::Json(_raw)) => {
                                     // Generate PNG proofs for Gemini (all affected pages)
                                     for &page_num in &affected_pages {
-                                        let (png_reply_tx, png_reply_rx) = tokio::sync::oneshot::channel();
+                                        let (png_reply_tx, png_reply_rx) =
+                                            tokio::sync::oneshot::channel();
                                         let _ = py_tx.send((
                                             PythonJob::RenderPageToPng {
-                                                pdf_path: visual_proof_pdf.to_string_lossy().to_string(),
+                                                pdf_path: visual_proof_pdf
+                                                    .to_string_lossy()
+                                                    .to_string(),
                                                 page_num,
                                                 dpi: 300.0,
                                             },
                                             png_reply_tx,
                                         ));
-                                        
-                                        if let Ok(PythonJobResult::Json(png_raw)) = png_reply_rx.await {
-                                            let parsed: serde_json::Value = serde_json::from_str(&png_raw).unwrap_or_default();
+
+                                        if let Ok(PythonJobResult::Json(png_raw)) =
+                                            png_reply_rx.await
+                                        {
+                                            let parsed: serde_json::Value =
+                                                serde_json::from_str(&png_raw).unwrap_or_default();
                                             if let Some(b64) = parsed["png_base64"].as_str() {
                                                 use base64::Engine;
-                                                if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(b64) {
+                                                if let Ok(bytes) =
+                                                    base64::engine::general_purpose::STANDARD
+                                                        .decode(b64)
+                                                {
                                                     proof_pngs.push(bytes);
                                                 }
                                             }
@@ -3550,7 +3586,10 @@ Additional Context:\n{context}",
                                 other => {
                                     let _ = res_tx.send(JobResult::TransferFailed {
                                         stage: "GeneratePreview".into(),
-                                        message: format!("Unexpected result from GenerateVisualProof: {:?}", other),
+                                        message: format!(
+                                            "Unexpected result from GenerateVisualProof: {:?}",
+                                            other
+                                        ),
                                     });
                                     return;
                                 }
@@ -3559,8 +3598,11 @@ Additional Context:\n{context}",
                             // ======= STAGE 5b: AiVisualReview ========
                             if !proof_pngs.is_empty() {
                                 send_progress(&res_tx, TransferStage::AiVisualReview);
-                                tracing::info!("[TRANSFER] Stage 5b: AI visual review of proof (Attempt {})", retry_idx + 1);
-                                
+                                tracing::info!(
+                                    "[TRANSFER] Stage 5b: AI visual review of proof (Attempt {})",
+                                    retry_idx + 1
+                                );
+
                                 match gemini_client.review_visual_proof(&proof_pngs).await {
                                     Ok(crate::ai::gemini_client::ValidationResponse::Approved) => {
                                         tracing::info!("[TRANSFER] AI explicitly approved visual proof.");
@@ -3610,7 +3652,7 @@ Additional Context:\n{context}",
                                 break;
                             }
                         }
-                        
+
                         if !approved {
                             return;
                         }
@@ -4875,7 +4917,10 @@ Additional Context:\n{context}",
                         });
                     }
                     // AI-assisted edit: FinancialNlpEngine deterministic first-pass, LLM fallback
-                    NlpCommand::AiEdit { instruction, provider } => {
+                    NlpCommand::AiEdit {
+                        instruction,
+                        provider,
+                    } => {
                         let _ = res_tx.send(JobResult::Progress {
                             label: "Analysing financial intent…".into(),
                             fraction: 0.2,
@@ -4887,7 +4932,9 @@ Additional Context:\n{context}",
                                 .map(|stmt| stmt.transactions)
                                 .unwrap_or_default()
                         };
-                        use crate::engine::financial_nlp::{parse_financial_intent, apply_financial_intent, FinancialIntent};
+                        use crate::engine::financial_nlp::{
+                            apply_financial_intent, parse_financial_intent, FinancialIntent,
+                        };
                         let intent = parse_financial_intent(&instruction);
                         if intent != FinancialIntent::Unknown {
                             let result = apply_financial_intent(intent, txs.clone());
@@ -4895,7 +4942,8 @@ Additional Context:\n{context}",
                                 label: format!("Deterministic edit applied: {}", result.summary),
                                 fraction: 1.0,
                             });
-                            let _ = res_tx.send(JobResult::NaturalLanguageEditReady(result.transactions));
+                            let _ = res_tx
+                                .send(JobResult::NaturalLanguageEditReady(result.transactions));
                             return;
                         }
                         // Step 2: LLM fallback for complex or ambiguous intents
@@ -4911,7 +4959,8 @@ Additional Context:\n{context}",
                                         label: "Local AI edit ready — awaiting confirmation".into(),
                                         fraction: 1.0,
                                     });
-                                    let _ = res_tx.send(JobResult::NaturalLanguageEditReady(updated));
+                                    let _ =
+                                        res_tx.send(JobResult::NaturalLanguageEditReady(updated));
                                 }
                                 Err(e) => {
                                     let _ = res_tx.send(JobResult::Error {
@@ -4925,23 +4974,29 @@ Additional Context:\n{context}",
                                 label: "Sending to Gemini for complex edit…".into(),
                                 fraction: 0.4,
                             });
-                            let gemini = match crate::ai::gemini_client::GeminiClient::from_app_config_async(&cfg).await {
-                                Ok(c) => c,
-                                Err(e) => {
-                                    let _ = res_tx.send(JobResult::Error {
+                            let gemini =
+                                match crate::ai::gemini_client::GeminiClient::from_app_config_async(
+                                    &cfg,
+                                )
+                                .await
+                                {
+                                    Ok(c) => c,
+                                    Err(e) => {
+                                        let _ = res_tx.send(JobResult::Error {
                                         job_label: "ai_command".into(),
                                         message: format!("AI provider unavailable: {e}. Run 'verify-api-keys' to check your keys."),
                                     });
-                                    return;
-                                }
-                            };
+                                        return;
+                                    }
+                                };
                             match gemini.apply_natural_language_edit(&instruction, &txs).await {
                                 Ok(updated) => {
                                     let _ = res_tx.send(JobResult::Progress {
                                         label: "AI edit ready — awaiting confirmation".into(),
                                         fraction: 1.0,
                                     });
-                                    let _ = res_tx.send(JobResult::NaturalLanguageEditReady(updated));
+                                    let _ =
+                                        res_tx.send(JobResult::NaturalLanguageEditReady(updated));
                                 }
                                 Err(e) => {
                                     let _ = res_tx.send(JobResult::Error {
@@ -7171,7 +7226,10 @@ Additional Context:\n{context}",
                 tracing::debug!(job.id = id, "[runtime] cancel for unknown job");
             }
         }
-        Job::TypstReconstruct { input: _, output: _ } => {
+        Job::TypstReconstruct {
+            input: _,
+            output: _,
+        } => {
             // Typst rebuild is an export-style path that cannot preserve
             // edit-in-place visual fidelity. Keep the job for API stability
             // but fail closed with a clear reason (same gate as workflow finalize).
@@ -7198,7 +7256,8 @@ Additional Context:\n{context}",
                 use base64::Engine as _;
                 match engine_clone.render_page(&input, page, 150.0) {
                     Ok(rendered) => {
-                        let base64_png = base64::engine::general_purpose::STANDARD.encode(&rendered.png_bytes);
+                        let base64_png =
+                            base64::engine::general_purpose::STANDARD.encode(&rendered.png_bytes);
                         let _ = tx.send(JobResult::McpRenderComplete { base64_png });
                     }
                     Err(e) => {
@@ -9792,17 +9851,17 @@ mod tests {
             .ends_gui_tracked_job(),
             "DocumentLoaded chains into parse; must keep GUI wait open"
         );
-        assert!(!JobResult::WorkflowVisualAttempt(
-            crate::engine::workflow::VisualAttempt {
+        assert!(
+            !JobResult::WorkflowVisualAttempt(crate::engine::workflow::VisualAttempt {
                 attempt: 1,
                 max_attempts: 3,
                 diff_score: 0.01,
                 threshold: 0.02,
                 only_intended: true,
                 message: "mid".into(),
-            }
-        )
-        .ends_gui_tracked_job());
+            })
+            .ends_gui_tracked_job()
+        );
 
         // Success / failure payloads that complete a user wait
         assert!(JobResult::PageRendered {
@@ -9815,8 +9874,10 @@ mod tests {
         }
         .ends_gui_tracked_job());
         assert!(JobResult::TransactionsExtracted(vec![]).ends_gui_tracked_job());
-        assert!(JobResult::UfoAutoEditResult(serde_json::json!({"status":"success"}))
-            .ends_gui_tracked_job());
+        assert!(
+            JobResult::UfoAutoEditResult(serde_json::json!({"status":"success"}))
+                .ends_gui_tracked_job()
+        );
         assert!(JobResult::Error {
             job_label: "x".into(),
             message: "y".into(),

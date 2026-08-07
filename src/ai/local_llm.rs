@@ -128,14 +128,18 @@ impl LocalLlmClient {
         let text = json_resp["choices"][0]["message"]["content"]
             .as_str()
             .unwrap_or("[]");
-        
+
         let cleaned = text.trim();
         let cleaned = if cleaned.starts_with("```json") {
-            cleaned.trim_start_matches("```json").trim_end_matches("```").trim()
+            cleaned
+                .trim_start_matches("```json")
+                .trim_end_matches("```")
+                .trim()
         } else {
             cleaned
         };
 
-        serde_json::from_str(cleaned).map_err(|e| LocalLlmError::InvalidResponse(format!("Failed to parse JSON: {}", e)))
+        serde_json::from_str(cleaned)
+            .map_err(|e| LocalLlmError::InvalidResponse(format!("Failed to parse JSON: {}", e)))
     }
 }

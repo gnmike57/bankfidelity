@@ -49,7 +49,11 @@ impl PythonOperation {
     pub fn mutates_document(self) -> bool {
         matches!(
             self,
-            Self::ReplaceTextInRect | Self::ApplyManyEdits | Self::ClonePages | Self::RemovePages | Self::GenerateVisualProof
+            Self::ReplaceTextInRect
+                | Self::ApplyManyEdits
+                | Self::ClonePages
+                | Self::RemovePages
+                | Self::GenerateVisualProof
         )
     }
 }

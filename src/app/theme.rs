@@ -132,10 +132,10 @@ impl Theme {
             egui::TextStyle::Small,
             egui::FontId::new(12.0, egui::FontFamily::Proportional),
         );
-        
+
         // Micro-animations
         style.animation_time = 0.15; // Smooth 150ms transitions for hovers and expansions
-        
+
         ctx.set_style(style);
     }
 }

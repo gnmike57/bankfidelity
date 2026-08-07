@@ -14,9 +14,7 @@ use uiautomation::UIAutomation;
 /// Canonical window title prefix from `src/app/gui.rs` viewport builder.
 const WINDOW_TITLE_PREFIX: &str = "Bank Statement Fidelity Editor";
 
-fn try_find_main_window(
-    automation: &UIAutomation,
-) -> Result<uiautomation::UIElement, String> {
+fn try_find_main_window(automation: &UIAutomation) -> Result<uiautomation::UIElement, String> {
     let root = automation
         .get_root_element()
         .map_err(|e| format!("root element: {e}"))?;
@@ -82,7 +80,10 @@ fn test_rust_uiautomation_e2e() {
     let bin_path = env!("CARGO_BIN_EXE_dual-core-pdf-pipeline");
     let mut child = match Command::new(bin_path)
         .arg("gui")
-        .env("DUAL_CORE_PASSPHRASE", "uiautomation-e2e-passphrase-12345678")
+        .env(
+            "DUAL_CORE_PASSPHRASE",
+            "uiautomation-e2e-passphrase-12345678",
+        )
         .spawn()
     {
         Ok(c) => c,

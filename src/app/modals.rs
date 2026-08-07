@@ -122,7 +122,7 @@ pub(crate) trait AppModals {
 impl AppModals for MyApp {
     fn draw_settings_modal(&mut self, ctx: &egui::Context) {
         let mut open = self.active_modal == ActiveModal::Settings;
-        
+
         let frame = egui::Frame::window(&ctx.style())
             .shadow(egui::epaint::Shadow {
                 offset: egui::vec2(0.0, 8.0),

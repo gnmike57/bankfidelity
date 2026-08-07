@@ -1893,7 +1893,7 @@ impl MyApp {
                         Some(p) if p.label == label => p.started_at,
                         _ => std::time::Instant::now(),
                     };
-                        self.progress = Some(ProgressState {
+                    self.progress = Some(ProgressState {
                         label,
                         fraction,
                         started_at,
@@ -1934,44 +1934,62 @@ impl MyApp {
                                 let _ = self.job_tx.send(crate::app::runtime::Job::Redo);
                             }
                             "Balance" => {
-                                let _ = self.job_tx.send(crate::app::runtime::Job::BalanceStatement {
-                                    path: std::path::PathBuf::from(&self.input_path)
-                                });
+                                let _ =
+                                    self.job_tx
+                                        .send(crate::app::runtime::Job::BalanceStatement {
+                                            path: std::path::PathBuf::from(&self.input_path),
+                                        });
                             }
                             "Verify" => {
-                                let _ = self.job_tx.send(crate::app::runtime::Job::ValidateCredentials);
+                                let _ = self
+                                    .job_tx
+                                    .send(crate::app::runtime::Job::ValidateCredentials);
                             }
                             "Extract" => {
-                                let _ = self.job_tx.send(crate::app::runtime::Job::ExtractTransactions {
-                                    path: std::path::PathBuf::from(&self.input_path),
-                                    parser_mode: crate::app::config::DocumentParserMode::LlamaParse,
-                                });
+                                let _ = self.job_tx.send(
+                                    crate::app::runtime::Job::ExtractTransactions {
+                                        path: std::path::PathBuf::from(&self.input_path),
+                                        parser_mode:
+                                            crate::app::config::DocumentParserMode::LlamaParse,
+                                    },
+                                );
                             }
                             "Transfer" => {
                                 // Transfer via GUI requires selecting source/target PDFs first
                             }
                             "AdjustDates" => {
-                                let _ = self.job_tx.send(crate::app::runtime::Job::NaturalLanguageEdit {
-                                    prompt: format!("Shift dates by {}", parts.get(2).unwrap_or(&"0")),
-                                    transactions: self.workflow_transactions.clone(),
-                                });
+                                let _ = self.job_tx.send(
+                                    crate::app::runtime::Job::NaturalLanguageEdit {
+                                        prompt: format!(
+                                            "Shift dates by {}",
+                                            parts.get(2).unwrap_or(&"0")
+                                        ),
+                                        transactions: self.workflow_transactions.clone(),
+                                    },
+                                );
                             }
                             "Categorize" => {
-                                let _ = self.job_tx.send(crate::app::runtime::Job::CategorizeTransactions {
-                                    transactions: self.workflow_transactions.clone(),
-                                });
+                                let _ = self.job_tx.send(
+                                    crate::app::runtime::Job::CategorizeTransactions {
+                                        transactions: self.workflow_transactions.clone(),
+                                    },
+                                );
                             }
                             "Doctor" => {
-                                let _ = self.job_tx.send(crate::app::runtime::Job::ValidateCredentials);
+                                let _ = self
+                                    .job_tx
+                                    .send(crate::app::runtime::Job::ValidateCredentials);
                             }
                             "ReloadConfig" => {
                                 let _ = self.job_tx.send(crate::app::runtime::Job::ReloadConfig);
                             }
                             "StressTest" => {
-                                let _ = self.job_tx.send(crate::app::runtime::Job::RunTransferTests {
-                                    statements: vec![],
-                                    max_iterations: 1,
-                                });
+                                let _ =
+                                    self.job_tx
+                                        .send(crate::app::runtime::Job::RunTransferTests {
+                                            statements: vec![],
+                                            max_iterations: 1,
+                                        });
                             }
                             _ => {}
                         }
@@ -2538,19 +2556,29 @@ impl MyApp {
                 .resizable(true)
                 .min_height(100.0)
                 .max_height(300.0)
-                .frame(egui::Frame::none().fill(egui::Color32::from_gray(30)).inner_margin(8.0))
+                .frame(
+                    egui::Frame::none()
+                        .fill(egui::Color32::from_gray(30))
+                        .inner_margin(8.0),
+                )
                 .show(ctx, |ui| {
-                    ui.label(egui::RichText::new("UFO Agent Logs").strong().color(egui::Color32::LIGHT_GREEN));
-                    egui::ScrollArea::vertical().stick_to_bottom(true).show(ui, |ui| {
-                        let text = self.ufo_logs.join("\n");
-                        ui.add(
-                            egui::TextEdit::multiline(&mut text.as_str())
-                                .font(egui::TextStyle::Monospace)
-                                .text_color(egui::Color32::from_gray(200))
-                                .desired_width(f32::INFINITY)
-                                .interactive(false)
-                        );
-                    });
+                    ui.label(
+                        egui::RichText::new("UFO Agent Logs")
+                            .strong()
+                            .color(egui::Color32::LIGHT_GREEN),
+                    );
+                    egui::ScrollArea::vertical()
+                        .stick_to_bottom(true)
+                        .show(ui, |ui| {
+                            let text = self.ufo_logs.join("\n");
+                            ui.add(
+                                egui::TextEdit::multiline(&mut text.as_str())
+                                    .font(egui::TextStyle::Monospace)
+                                    .text_color(egui::Color32::from_gray(200))
+                                    .desired_width(f32::INFINITY)
+                                    .interactive(false),
+                            );
+                        });
                 });
         }
 

@@ -68,7 +68,9 @@ pub struct ChatRequest {
     pub auto_apply: bool,
 }
 
-fn default_provider() -> String { "gemini".to_string() }
+fn default_provider() -> String {
+    "gemini".to_string()
+}
 
 /// Job dispatch request body for the `/job` endpoint.
 #[derive(Debug, serde::Deserialize)]
@@ -102,9 +104,19 @@ pub struct ApiResponse<T: serde::Serialize> {
 
 impl<T: serde::Serialize> ApiResponse<T> {
     pub fn ok(data: T) -> Self {
-        Self { status: "ok".into(), data: Some(data), error: None, job_id: None }
+        Self {
+            status: "ok".into(),
+            data: Some(data),
+            error: None,
+            job_id: None,
+        }
     }
     pub fn err(msg: impl Into<String>) -> ApiResponse<serde_json::Value> {
-        ApiResponse { status: "error".into(), data: None, error: Some(msg.into()), job_id: None }
+        ApiResponse {
+            status: "error".into(),
+            data: None,
+            error: Some(msg.into()),
+            job_id: None,
+        }
     }
 }

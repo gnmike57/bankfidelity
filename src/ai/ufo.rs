@@ -87,9 +87,7 @@ impl UfoClient {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .map_err(|e| {
-                format!("Failed to execute UFO python process ({python_cmd}): {e}")
-            })?;
+            .map_err(|e| format!("Failed to execute UFO python process ({python_cmd}): {e}"))?;
 
         UFO_ACTIVE_PID.store(child.id(), std::sync::atomic::Ordering::SeqCst);
 
@@ -129,10 +127,7 @@ impl UfoClient {
         UFO_ACTIVE_PID.store(0, std::sync::atomic::Ordering::SeqCst);
         let _ = stderr_thread.join();
 
-        let stderr_str = stderr_buf
-            .lock()
-            .map(|s| s.clone())
-            .unwrap_or_default();
+        let stderr_str = stderr_buf.lock().map(|s| s.clone()).unwrap_or_default();
 
         let log_path = ufo_dir.join("logs").join(&task_id).join("output.md");
         let ufo_result = if log_path.exists() {

@@ -36,12 +36,12 @@ fn rows_match(left: &Transaction, right: &Transaction) -> bool {
         (Some(left), Some(right)) => left.round_dp(2) == right.round_dp(2),
         _ => true, // Tolerate missing running balance in one of the sources
     };
-    
+
     // Fallback: If both action and balance match, but date differs slightly due to OCR, still consider it a match
     if action_matches && balance_matches {
         return true;
     }
-    
+
     action_matches && balance_matches && date_matches
 }
 

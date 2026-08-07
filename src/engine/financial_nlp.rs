@@ -58,22 +58,13 @@ pub enum FinancialIntent {
         is_income: bool,
     },
     /// Rename a payee/description across all matching transactions.
-    RenamePayee {
-        from: String,
-        to: String,
-    },
+    RenamePayee { from: String, to: String },
     /// Remove all transactions matching a payee.
-    RemoveTransactions {
-        payee: String,
-    },
+    RemoveTransactions { payee: String },
     /// Scale all income transactions by a factor.
-    ScaleAllIncome {
-        factor: Decimal,
-    },
+    ScaleAllIncome { factor: Decimal },
     /// Scale all expense transactions by a factor.
-    ScaleAllExpenses {
-        factor: Decimal,
-    },
+    ScaleAllExpenses { factor: Decimal },
     /// Add a new transaction.
     AddTransaction {
         date: String,
@@ -199,8 +190,17 @@ pub fn parse_financial_intent(instruction: &str) -> FinancialIntent {
 fn try_parse_scale_income(lower: &str, original: &str) -> Option<FinancialIntent> {
     // Income vocabulary: pay, salary, wage, income, earnings, deposit, credit
     let income_words = [
-        "pay", "salary", "wage", "wages", "income", "earnings", "deposit",
-        "payroll", "remuneration", "stipend", "allowance",
+        "pay",
+        "salary",
+        "wage",
+        "wages",
+        "income",
+        "earnings",
+        "deposit",
+        "payroll",
+        "remuneration",
+        "stipend",
+        "allowance",
     ];
     let has_income_word = income_words.iter().any(|w| lower.contains(w));
     if !has_income_word {
@@ -216,8 +216,17 @@ fn try_parse_scale_income(lower: &str, original: &str) -> Option<FinancialIntent
 fn try_parse_scale_expense(lower: &str, original: &str) -> Option<FinancialIntent> {
     // Expense vocabulary: rent, mortgage, bill, expense, payment, fee, cost
     let expense_words = [
-        "rent", "mortgage", "bill", "expense", "expenses", "payment",
-        "fee", "cost", "subscription", "insurance", "utilities",
+        "rent",
+        "mortgage",
+        "bill",
+        "expense",
+        "expenses",
+        "payment",
+        "fee",
+        "cost",
+        "subscription",
+        "insurance",
+        "utilities",
     ];
     // Must also have a scaling word
     let has_expense_word = expense_words.iter().any(|w| lower.contains(w));
@@ -227,12 +236,14 @@ fn try_parse_scale_expense(lower: &str, original: &str) -> Option<FinancialInten
 
     // Check for scaling intent (not just any sentence mentioning rent)
     let scaling_words = [
-        "double", "triple", "halve", "half", "increase", "decrease",
-        "reduce", "cut", "multiply", "scale", "boost", "lower", "raise",
+        "double", "triple", "halve", "half", "increase", "decrease", "reduce", "cut", "multiply",
+        "scale", "boost", "lower", "raise",
     ];
     let has_scale = scaling_words.iter().any(|w| lower.contains(w))
         || lower.contains('%')
-        || lower.contains("x2") || lower.contains("x3") || lower.contains("x0.");
+        || lower.contains("x2")
+        || lower.contains("x3")
+        || lower.contains("x0.");
 
     if !has_scale {
         return None;
@@ -258,7 +269,11 @@ fn try_parse_set_amount(lower: &str, original: &str) -> Option<FinancialIntent> 
     let income_words = ["pay", "salary", "wage", "income", "deposit", "earnings"];
     let is_income = income_words.iter().any(|w| lower.contains(w));
 
-    Some(FinancialIntent::SetAmount { payee, amount, is_income })
+    Some(FinancialIntent::SetAmount {
+        payee,
+        amount,
+        is_income,
+    })
 }
 
 fn try_parse_rename(lower: &str, original: &str) -> Option<FinancialIntent> {
@@ -267,24 +282,38 @@ fn try_parse_rename(lower: &str, original: &str) -> Option<FinancialIntent> {
     let has_rename = rename_words.iter().any(|w| lower.starts_with(w));
 
     // Also handle "change X to Y" but only when NOT a set-amount pattern
-    let has_change_to = lower.starts_with("change") && lower.contains(" to ")
-        && !lower.contains('$') && !lower.contains('%');
+    let has_change_to = lower.starts_with("change")
+        && lower.contains(" to ")
+        && !lower.contains('$')
+        && !lower.contains('%');
 
     if !has_rename && !has_change_to {
         return None;
     }
 
     // Extract "from" and "to" names
-    let separator = if lower.contains(" to ") { " to " } else { " with " };
+    let separator = if lower.contains(" to ") {
+        " to "
+    } else {
+        " with "
+    };
     let verb_end = ["rename ", "replace ", "change "]
         .iter()
         .find_map(|v| lower.find(v).map(|p| p + v.len()))?;
 
     let rest = &original[verb_end..];
     let sep_pos = lower[verb_end..].find(separator)?;
-    let from = rest[..sep_pos].trim().trim_matches('\'').trim_matches('"').to_string();
+    let from = rest[..sep_pos]
+        .trim()
+        .trim_matches('\'')
+        .trim_matches('"')
+        .to_string();
     let to_start = sep_pos + separator.len();
-    let to = rest[to_start..].trim().trim_matches('\'').trim_matches('"').to_string();
+    let to = rest[to_start..]
+        .trim()
+        .trim_matches('\'')
+        .trim_matches('"')
+        .to_string();
 
     if from.is_empty() || to.is_empty() {
         return None;
@@ -316,7 +345,14 @@ fn try_parse_remove(lower: &str, _original: &str) -> Option<FinancialIntent> {
         }
     }
     // Strip trailing "transactions", "payments", "entries"
-    let strip = [" transactions", " payments", " entries", " transaction", " payment", " entry"];
+    let strip = [
+        " transactions",
+        " payments",
+        " entries",
+        " transaction",
+        " payment",
+        " entry",
+    ];
     for s in &strip {
         if rest.ends_with(s) {
             rest = &rest[..rest.len() - s.len()];
@@ -333,10 +369,14 @@ fn try_parse_remove(lower: &str, _original: &str) -> Option<FinancialIntent> {
 
 fn try_parse_scale_all(lower: &str, _original: &str) -> Option<FinancialIntent> {
     // "increase all income by 10%" / "reduce all expenses by 5%"
-    let has_all = lower.contains("all income") || lower.contains("all salary")
-        || lower.contains("all wages") || lower.contains("all deposits");
-    let has_all_exp = lower.contains("all expense") || lower.contains("all payments")
-        || lower.contains("all spending") || lower.contains("all costs");
+    let has_all = lower.contains("all income")
+        || lower.contains("all salary")
+        || lower.contains("all wages")
+        || lower.contains("all deposits");
+    let has_all_exp = lower.contains("all expense")
+        || lower.contains("all payments")
+        || lower.contains("all spending")
+        || lower.contains("all costs");
 
     if !has_all && !has_all_exp {
         return None;
@@ -428,7 +468,8 @@ fn extract_percentage(s: &str) -> Option<f64> {
     if let Some(pos) = s.find('%') {
         // Walk backwards to find the number
         let before = &s[..pos];
-        let num_start = before.rfind(|c: char| !c.is_ascii_digit() && c != '.' && c != ' ')
+        let num_start = before
+            .rfind(|c: char| !c.is_ascii_digit() && c != '.' && c != ' ')
             .map(|p| p + 1)
             .unwrap_or(0);
         let num_str = before[num_start..].trim();
@@ -439,7 +480,9 @@ fn extract_percentage(s: &str) -> Option<f64> {
 
 fn parse_leading_number(s: &str) -> Option<f64> {
     let s = s.trim();
-    let end = s.find(|c: char| !c.is_ascii_digit() && c != '.').unwrap_or(s.len());
+    let end = s
+        .find(|c: char| !c.is_ascii_digit() && c != '.')
+        .unwrap_or(s.len());
     s[..end].parse::<f64>().ok()
 }
 
@@ -455,7 +498,8 @@ pub fn extract_payee_name(lower: &str, original: &str) -> Option<String> {
     if let Some(pos) = lower.find("'s ") {
         // Walk backwards to find the start of the name
         let before = &lower[..pos];
-        let name_start = before.rfind(|c: char| [' ', '\t'].contains(&c))
+        let name_start = before
+            .rfind(|c: char| [' ', '\t'].contains(&c))
             .map(|p| p + 1)
             .unwrap_or(0);
         let name_lower = &lower[name_start..pos];
@@ -471,7 +515,9 @@ pub fn extract_payee_name(lower: &str, original: &str) -> Option<String> {
         if let Some(pos) = lower.find(prep) {
             let rest = &lower[pos + prep.len()..];
             let orig_rest = &original[pos + prep.len()..];
-            let end = rest.find(|c: char| [' ', '\'', ','].contains(&c)).unwrap_or(rest.len());
+            let end = rest
+                .find(|c: char| [' ', '\'', ','].contains(&c))
+                .unwrap_or(rest.len());
             let name = orig_rest[..end].trim().to_string();
             if !name.is_empty() && !is_stop_word(&name.to_lowercase()) {
                 return Some(name);
@@ -485,8 +531,20 @@ pub fn extract_payee_name(lower: &str, original: &str) -> Option<String> {
 fn is_stop_word(s: &str) -> bool {
     matches!(
         s,
-        "my" | "the" | "a" | "an" | "all" | "this" | "that" | "their"
-            | "her" | "his" | "its" | "our" | "your" | "every" | "each"
+        "my" | "the"
+            | "a"
+            | "an"
+            | "all"
+            | "this"
+            | "that"
+            | "their"
+            | "her"
+            | "his"
+            | "its"
+            | "our"
+            | "your"
+            | "every"
+            | "each"
     )
 }
 
@@ -531,7 +589,13 @@ pub fn normalise_payee(raw_text: &str) -> String {
         }
     }
     // Trim common prefixes
-    let prefixes = ["direct credit ", "direct debit ", "osko payment ", "bpay ", "eftpos "];
+    let prefixes = [
+        "direct credit ",
+        "direct debit ",
+        "osko payment ",
+        "bpay ",
+        "eftpos ",
+    ];
     for prefix in &prefixes {
         if result.starts_with(prefix) {
             result = result[prefix.len()..].trim().to_string();
@@ -546,10 +610,7 @@ pub fn normalise_payee(raw_text: &str) -> String {
 /// 1. Exact match (case-insensitive)
 /// 2. Contains match
 /// 3. First-name match (for personal names like "Maree")
-pub fn find_matching_transactions(
-    transactions: &[Transaction],
-    payee: &str,
-) -> Vec<usize> {
+pub fn find_matching_transactions(transactions: &[Transaction], payee: &str) -> Vec<usize> {
     let payee_lower = payee.to_lowercase();
     let mut matches = Vec::new();
 
@@ -650,27 +711,29 @@ pub fn apply_financial_intent(
         FinancialIntent::ScaleExpense { payee, factor } => {
             apply_scale_expense(transactions, payee, factor)
         }
-        FinancialIntent::SetAmount { payee, amount, is_income } => {
-            apply_set_amount(transactions, payee, amount, is_income)
-        }
-        FinancialIntent::RenamePayee { from, to } => {
-            apply_rename_payee(transactions, &from, &to)
-        }
+        FinancialIntent::SetAmount {
+            payee,
+            amount,
+            is_income,
+        } => apply_set_amount(transactions, payee, amount, is_income),
+        FinancialIntent::RenamePayee { from, to } => apply_rename_payee(transactions, &from, &to),
         FinancialIntent::RemoveTransactions { payee } => {
             apply_remove_transactions(transactions, &payee)
         }
-        FinancialIntent::ScaleAllIncome { factor } => {
-            apply_scale_all_income(transactions, factor)
-        }
+        FinancialIntent::ScaleAllIncome { factor } => apply_scale_all_income(transactions, factor),
         FinancialIntent::ScaleAllExpenses { factor } => {
             apply_scale_all_expenses(transactions, factor)
         }
-        FinancialIntent::AddTransaction { date, description, amount, is_income } => {
-            apply_add_transaction(transactions, date, description, amount, is_income)
-        }
+        FinancialIntent::AddTransaction {
+            date,
+            description,
+            amount,
+            is_income,
+        } => apply_add_transaction(transactions, date, description, amount, is_income),
         FinancialIntent::Unknown => FinancialEditResult {
             transactions,
-            summary: "Intent not recognised by financial NLP engine — routing to AI provider.".to_string(),
+            summary: "Intent not recognised by financial NLP engine — routing to AI provider."
+                .to_string(),
             rows_changed: 0,
             balance_cascaded: false,
         },
@@ -876,10 +939,7 @@ fn apply_rename_payee(
     }
 }
 
-fn apply_remove_transactions(
-    transactions: Vec<Transaction>,
-    payee: &str,
-) -> FinancialEditResult {
+fn apply_remove_transactions(transactions: Vec<Transaction>, payee: &str) -> FinancialEditResult {
     let indices_to_remove: std::collections::HashSet<usize> =
         find_matching_transactions(&transactions, payee)
             .into_iter()
@@ -1042,7 +1102,14 @@ mod tests {
     use super::*;
     use rust_decimal_macros::dec;
 
-    fn make_tx(page: usize, line: usize, desc: &str, debit: Option<f64>, credit: Option<f64>, balance: f64) -> Transaction {
+    fn make_tx(
+        page: usize,
+        line: usize,
+        desc: &str,
+        debit: Option<f64>,
+        credit: Option<f64>,
+        balance: f64,
+    ) -> Transaction {
         Transaction {
             page,
             line_on_page: line,
@@ -1064,7 +1131,14 @@ mod tests {
             make_tx(1, 1, "OPENING BALANCE", None, None, 1000.00),
             make_tx(1, 2, "MAREE SMITH PAYROLL", Some(2500.00), None, 3500.00),
             make_tx(1, 3, "WOOLWORTHS SUPERMARKET", None, Some(150.00), 3350.00),
-            make_tx(1, 4, "RENT PAYMENT REAL ESTATE", None, Some(1200.00), 2150.00),
+            make_tx(
+                1,
+                4,
+                "RENT PAYMENT REAL ESTATE",
+                None,
+                Some(1200.00),
+                2150.00,
+            ),
             make_tx(1, 5, "MAREE SMITH PAYROLL", Some(2500.00), None, 4650.00),
             make_tx(1, 6, "NETFLIX SUBSCRIPTION", None, Some(22.99), 4627.01),
             make_tx(1, 7, "MAREE SMITH PAYROLL", Some(2500.00), None, 7127.01),
@@ -1077,25 +1151,37 @@ mod tests {
         let txns = sample_transactions();
         let result = parse_and_apply("double Maree's pay", txns).expect("should parse");
 
-        assert_eq!(result.rows_changed, 3, "should change all 3 Maree payroll rows");
+        assert_eq!(
+            result.rows_changed, 3,
+            "should change all 3 Maree payroll rows"
+        );
         assert!(result.balance_cascaded, "balance should be cascaded");
 
         // Each pay should now be $5000
-        let maree_rows: Vec<_> = result.transactions.iter()
+        let maree_rows: Vec<_> = result
+            .transactions
+            .iter()
             .filter(|t| t.raw_text.to_lowercase().contains("maree"))
             .collect();
         assert_eq!(maree_rows.len(), 3);
         for row in &maree_rows {
-            assert_eq!(row.debit, Some(dec!(5000.00)), "each pay should be doubled to $5000");
+            assert_eq!(
+                row.debit,
+                Some(dec!(5000.00)),
+                "each pay should be doubled to $5000"
+            );
         }
 
         // Verify balance cascade is mathematically correct
         let mut expected_balance = dec!(1000.00); // opening
-        for tx in &result.transactions[1..] { // skip opening row
+        for tx in &result.transactions[1..] {
+            // skip opening row
             expected_balance = (expected_balance + tx.net_delta()).round_dp(2);
             assert_eq!(
-                tx.running_balance, Some(expected_balance),
-                "balance cascade incorrect at row: {}", tx.raw_text
+                tx.running_balance,
+                Some(expected_balance),
+                "balance cascade incorrect at row: {}",
+                tx.raw_text
             );
         }
     }
@@ -1142,7 +1228,10 @@ mod tests {
 
     #[test]
     fn test_extract_payee_from_prep() {
-        let p = extract_payee_name("increase income from woolworths", "increase income from Woolworths");
+        let p = extract_payee_name(
+            "increase income from woolworths",
+            "increase income from Woolworths",
+        );
         assert_eq!(p, Some("Woolworths".to_string()));
     }
 
@@ -1186,7 +1275,12 @@ mod tests {
     fn test_parse_set_amount_intent() {
         let intent = parse_financial_intent("set Maree's pay to $3000");
         assert!(matches!(intent, FinancialIntent::SetAmount { .. }));
-        if let FinancialIntent::SetAmount { payee, amount, is_income } = intent {
+        if let FinancialIntent::SetAmount {
+            payee,
+            amount,
+            is_income,
+        } = intent
+        {
             assert_eq!(payee, Some("Maree".to_string()));
             assert_eq!(amount, dec!(3000));
             assert!(is_income);
@@ -1246,9 +1340,13 @@ mod tests {
     #[test]
     fn test_remove_netflix() {
         let txns = sample_transactions();
-        let result = parse_and_apply("remove all Netflix transactions", txns).expect("should parse");
+        let result =
+            parse_and_apply("remove all Netflix transactions", txns).expect("should parse");
         assert_eq!(result.rows_changed, 1);
-        assert!(!result.transactions.iter().any(|t| t.raw_text.to_lowercase().contains("netflix")));
+        assert!(!result
+            .transactions
+            .iter()
+            .any(|t| t.raw_text.to_lowercase().contains("netflix")));
     }
 
     // ── Rename payee ──────────────────────────────────────────────────────────
@@ -1257,8 +1355,14 @@ mod tests {
         let txns = sample_transactions();
         let result = parse_and_apply("rename Woolworths to Coles", txns).expect("should parse");
         assert_eq!(result.rows_changed, 1);
-        assert!(result.transactions.iter().any(|t| t.raw_text.contains("Coles")));
-        assert!(!result.transactions.iter().any(|t| t.raw_text.to_lowercase().contains("woolworths")));
+        assert!(result
+            .transactions
+            .iter()
+            .any(|t| t.raw_text.contains("Coles")));
+        assert!(!result
+            .transactions
+            .iter()
+            .any(|t| t.raw_text.to_lowercase().contains("woolworths")));
     }
 
     // ── Scale all income ──────────────────────────────────────────────────────
@@ -1267,7 +1371,9 @@ mod tests {
         let txns = sample_transactions();
         let result = parse_and_apply("increase all income by 10%", txns).expect("should parse");
         // 3 Maree payroll rows, each $2500 → $2750
-        let maree_rows: Vec<_> = result.transactions.iter()
+        let maree_rows: Vec<_> = result
+            .transactions
+            .iter()
             .filter(|t| t.raw_text.to_lowercase().contains("maree"))
             .collect();
         for row in &maree_rows {

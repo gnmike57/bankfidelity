@@ -71,8 +71,7 @@ pub fn parse_statement_offline(
                     .partial_cmp(&b.bbox[0])
                     .unwrap_or(std::cmp::Ordering::Equal)
             } else {
-                y_a.partial_cmp(&y_b)
-                    .unwrap_or(std::cmp::Ordering::Equal)
+                y_a.partial_cmp(&y_b).unwrap_or(std::cmp::Ordering::Equal)
             }
         });
 

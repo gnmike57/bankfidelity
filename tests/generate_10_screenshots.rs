@@ -1,7 +1,7 @@
+use image::ImageFormat;
 use pdfium_render::prelude::*;
 use std::fs;
 use std::path::PathBuf;
-use image::ImageFormat;
 
 #[test]
 fn generate_10_screenshots_for_user() -> Result<(), Box<dyn std::error::Error>> {
@@ -16,18 +16,18 @@ fn generate_10_screenshots_for_user() -> Result<(), Box<dyn std::error::Error>> 
         .or_else(|_| Pdfium::bind_to_library("pdfium.dll"))
         .or_else(|_| Pdfium::bind_to_system_library())
         .unwrap();
-    
+
     let pdfium = Pdfium::new(bind);
 
     let doc = pdfium.load_pdf_from_file("AU Bank Statements/anz_example.pdf", None)?;
     let page = doc.pages().get(0)?;
-    
+
     // Render at high DPI (e.g. 300) to simulate zoomed in fidelity pixel inspection
     let render_config = PdfRenderConfig::new().set_target_width(2000); // High res
 
     let bitmap = page.render_with_config(&render_config)?;
     let img = bitmap.as_image();
-    
+
     // Output 10 screenshots
     for i in 1..=10 {
         let out_path = dir.join(format!("screenshot_{}.png", i));
