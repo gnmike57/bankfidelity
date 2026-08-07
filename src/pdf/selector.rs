@@ -289,13 +289,16 @@ impl PdfEngine for PdfEngineSelector {
         }
         let mut blocks = self.dispatch_read(|engine| engine.get_text_blocks(path, page))?;
         if blocks.is_empty() && self.current_mode() == crate::app::config::PdfEngineMode::DualConcurrent {
-            if let Ok(fallback_blocks) = self.fallback.get_text_blocks(path, page) {
+            let fallback_res = self.fallback.get_text_blocks(path, page);
+            println!("DEBUG: fallback_res for page {} is {:?}", page, fallback_res.as_ref().map(|b| b.len()));
+            if let Ok(fallback_blocks) = fallback_res {
                 if !fallback_blocks.is_empty() {
                     tracing::warn!("Primary engine returned 0 blocks, but fallback found {} blocks. Using fallback.", fallback_blocks.len());
                     blocks = fallback_blocks;
                 }
             }
         }
+        println!("DEBUG: PdfEngineSelector returning {} blocks for page {}", blocks.len(), page);
         if let Ok(mut cache) = self.caches.blocks.lock() {
             cache.put(key, blocks.clone());
         }
