@@ -75,8 +75,12 @@ fn test_headless_server_e2e() {
     let root_resp = reqwest::blocking::get(format!("{base}/")).expect("Failed to fetch /");
     assert_eq!(root_resp.status(), 200);
     let html = root_resp.text().unwrap();
-    assert!(html.contains("<!DOCTYPE html>"));
-    assert!(html.contains("Headless Backend Mode"));
+    assert!(html.contains("<!DOCTYPE html>"), "expected HTML document");
+    assert!(
+        html.contains("BankFidelity") && html.contains("Headless API"),
+        "landing page should identify the headless API; got: {}",
+        &html[..html.len().min(200)]
+    );
 
     // Cleanup: explicitly dropping the handles here ends the test scope.
     // The worker thread exits when its job_rx sender (owned by the server

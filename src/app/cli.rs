@@ -1146,7 +1146,17 @@ pub fn run_inner(
 
     match cli.command {
         Commands::TypstReconstruct { input, output } => {
-            tracing::info!("Running dynamic declarative Typst reflowing.");
+            // Fail-closed path: runtime rejects edit-in-place Typst rebuilds.
+            // Surface that clearly for CLI/MCP callers (UFO included).
+            if !input.exists() {
+                eprintln!("❌ Input PDF not found: {}", input.display());
+                return Ok(exit_code::NOT_FOUND);
+            }
+            tracing::info!(
+                "Typst reconstruct requested (input={}, output={})",
+                input.display(),
+                output.display()
+            );
             let _ = job_tx.send_headless(Job::TypstReconstruct {
                 input: input.clone(),
                 output: output.clone(),
@@ -1156,12 +1166,16 @@ pub fn run_inner(
                     tracing::info!("Reconstruction successful! Saved to {:?}", output_path);
                     Ok(exit_code::SUCCESS)
                 }
+                Ok(JobResult::Error { job_label, message }) => {
+                    eprintln!("❌ Typst reconstruct blocked ({job_label}): {message}");
+                    Ok(exit_code::GENERAL)
+                }
                 Ok(other) => {
                     tracing::error!("Unexpected terminal result: {:?}", other);
                     Ok(exit_code::GENERAL)
                 }
                 Err((label, err)) => {
-                    tracing::error!("Job '{}' failed: {}", label, err);
+                    eprintln!("❌ Job '{label}' failed: {err}");
                     Ok(exit_code::GENERAL)
                 }
             }

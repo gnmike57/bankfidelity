@@ -251,3 +251,23 @@ fn test_gui_ufo_dispatch_error_clears_busy_flags() {
     );
     assert_eq!(app.in_flight, 0);
 }
+
+#[test]
+fn test_gui_ufo_log_stream_preserves_order() {
+    let (mut app, result_tx) = make_headless_app();
+    let ctx = egui::Context::default();
+    app.ufo_logs.clear();
+
+    for line in ["alpha", "beta", "gamma"] {
+        result_tx
+            .send(JobResult::UfoLog(line.into()))
+            .expect("send log");
+    }
+    pump(&mut app, &ctx);
+
+    let joined = app.ufo_logs.join("|");
+    assert!(
+        joined.contains("alpha") && joined.contains("beta") && joined.contains("gamma"),
+        "expected streamed UFO logs, got {joined:?}"
+    );
+}

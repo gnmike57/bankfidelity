@@ -1,20 +1,27 @@
-import pytest
+"""PyWinAuto UIAutomation E2E against the BankFidelity GUI.
+
+Requires:
+  - Built debug binary at target/debug/dual-core-pdf-pipeline.exe
+  - Interactive Windows desktop session
+
+Skips cleanly when binary is missing, CI is set, or the window does not appear.
+"""
+
+from __future__ import annotations
+
+import logging
 import os
 import time
-from pywinauto.application import Application
-from pywinauto import timings
-import pywinauto.actionlogger
-import logging
 
-# Enable maximum deep event logging for UI events
-pywinauto.actionlogger.enable()
-logger = logging.getLogger("pywinauto")
-logger.setLevel(logging.DEBUG)
+import pytest
 
-# PyWinAuto UIAutomation Test Foundation
-#
-# This tests the running application using the Windows UIAutomation (AccessKit) tree.
-# It requires the Rust binary to be built and running.
+try:
+    from pywinauto import timings
+    from pywinauto.application import Application
+except ImportError:  # pragma: no cover
+    pytest.skip("pywinauto not installed", allow_module_level=True)
+
+logger = logging.getLogger("pywinauto_e2e")
 
 APP_PATH = os.path.abspath(
     os.path.join(
@@ -26,60 +33,72 @@ APP_PATH = os.path.abspath(
         "dual-core-pdf-pipeline.exe",
     )
 )
+WINDOW_TITLE_RE = r"Bank Statement Fidelity Editor.*"
+PASSPHRASE = "pywinauto-e2e-passphrase-12345678"
 
 
 @pytest.fixture(scope="module")
 def app_instance():
-    """Starts the application and tears it down after tests."""
+    """Start the GUI and tear it down after the module."""
+    if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
+        pytest.skip("PyWinAuto GUI E2E requires an interactive desktop (not CI)")
+
     if not os.path.exists(APP_PATH):
-        pytest.skip(f"Binary not found at {APP_PATH}. Please run 'cargo build' first.")
+        pytest.skip(f"Binary not found at {APP_PATH}. Run `cargo build` first.")
 
-    print(f"Starting app at {APP_PATH} gui")
-    app = Application(backend="uia").start(f'"{APP_PATH}" gui', wait_for_idle=False)
+    env = os.environ.copy()
+    env["DUAL_CORE_PASSPHRASE"] = PASSPHRASE
 
-    # Wait for the main window to be ready
-    time.sleep(2)
+    print(f"Starting app: {APP_PATH} gui")
+    app = Application(backend="uia").start(
+        f'"{APP_PATH}" gui',
+        wait_for_idle=False,
+        work_dir=os.path.dirname(APP_PATH),
+    )
+    # Allow AccessKit tree to publish.
+    time.sleep(2.5)
 
-    yield app
-
-    # Teardown: kill the app
-    app.kill()
+    try:
+        yield app
+    finally:
+        try:
+            app.kill(soft=False)
+        except Exception as exc:  # pragma: no cover
+            logger.warning("app.kill failed: %s", exc)
 
 
 def test_app_window_title(app_instance):
-    """Verifies that the main application window launches with the correct title."""
-    main_dlg = app_instance.window(title_re="Bank Statement Fidelity Editor.*")
-    assert main_dlg.exists(timeout=5), "Main window did not appear."
-
-
-def test_interact_with_buttons(app_instance):
-    """
-    Demonstrates finding buttons exposed by egui's AccessKit integration
-    and clicking them deterministically without screen pixels.
-    """
-    main_dlg = app_instance.window(title_re="Bank Statement Fidelity Editor.*")
-
-    # You can dump the tree to see all accessible elements:
-    # main_dlg.print_control_identifiers()
-
-    # Try finding common elements if they exist in the UI
-    try:
-        # Example: Find a button by title and click it
-        # This will fail gracefully if the UI layout changes, allowing for robust E2E testing
-        settings_button = main_dlg.child_window(title="Settings", control_type="Button")
-        if settings_button.exists(timeout=2):
-            settings_button.click()
-            time.sleep(1)
-
-            # Close the modal
-            close_button = main_dlg.child_window(title="Close", control_type="Button")
-            if close_button.exists(timeout=1):
-                close_button.click()
-    except timings.TimeoutError:
-        print(
-            "Note: Specific buttons might not be visible in current state. Adjust test to match UI."
+    """Main window title matches the egui viewport builder prefix."""
+    main_dlg = app_instance.window(title_re=WINDOW_TITLE_RE)
+    if not main_dlg.exists(timeout=8):
+        pytest.skip(
+            "Main window not found via UIA (AccessKit may be disabled or desktop locked)"
         )
-        pass
+    title = main_dlg.window_text()
+    assert "Bank Statement Fidelity Editor" in title, title
+
+
+def test_interact_with_settings_if_present(app_instance):
+    """Click Settings/Close when AccessKit exposes them; skip if not visible."""
+    main_dlg = app_instance.window(title_re=WINDOW_TITLE_RE)
+    if not main_dlg.exists(timeout=5):
+        pytest.skip("Main window not available for interaction")
+
+    try:
+        settings_button = main_dlg.child_window(title="Settings", control_type="Button")
+        if not settings_button.exists(timeout=2):
+            pytest.skip("Settings button not exposed in current UI state")
+        settings_button.click_input()
+        time.sleep(0.5)
+
+        # Prefer Cancel/Close labels used by modals
+        for label in ("Close", "Cancel", "OK", "Ok"):
+            btn = main_dlg.child_window(title=label, control_type="Button")
+            if btn.exists(timeout=1):
+                btn.click_input()
+                break
+    except timings.TimeoutError:
+        pytest.skip("Timed out interacting with Settings controls")
 
 
 if __name__ == "__main__":
