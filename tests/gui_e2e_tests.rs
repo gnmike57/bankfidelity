@@ -271,3 +271,59 @@ fn test_gui_ufo_log_stream_preserves_order() {
         "expected streamed UFO logs, got {joined:?}"
     );
 }
+
+#[test]
+fn test_gui_in_flight_single_decrement_on_page_render() {
+    let (mut app, result_tx) = make_headless_app();
+    let ctx = egui::Context::default();
+
+    app.in_flight = 1;
+    result_tx
+        .send(JobResult::PageRendered {
+            png_bytes: vec![],
+            page: 0,
+            dpi: 150.0,
+            tag: "current".into(),
+            width_pts: 612.0,
+            height_pts: 792.0,
+        })
+        .expect("send page rendered");
+    pump(&mut app, &ctx);
+    assert_eq!(
+        app.in_flight, 0,
+        "PageRendered must free exactly one in_flight slot"
+    );
+
+    // Error must also free exactly once (no double-decrement via handler).
+    app.in_flight = 2;
+    result_tx
+        .send(JobResult::Error {
+            job_label: "render_page".into(),
+            message: "boom".into(),
+        })
+        .expect("send error");
+    pump(&mut app, &ctx);
+    assert_eq!(app.in_flight, 1, "Error must free exactly one slot");
+}
+
+#[test]
+fn test_gui_document_loaded_does_not_free_wait_until_parse() {
+    let (mut app, result_tx) = make_headless_app();
+    let ctx = egui::Context::default();
+
+    app.in_flight = 1;
+    app.input_path = "examples/sample.pdf".into();
+    result_tx
+        .send(JobResult::DocumentLoaded {
+            layout_json: "{}".into(),
+            total_pages: 2,
+        })
+        .expect("send loaded");
+    pump(&mut app, &ctx);
+    // DocumentLoaded keeps the wait open for the auto-chained parse.
+    assert!(
+        app.in_flight >= 1,
+        "DocumentLoaded must not clear the open-document wait; got {}",
+        app.in_flight
+    );
+}

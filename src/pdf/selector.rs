@@ -287,7 +287,15 @@ impl PdfEngine for PdfEngineSelector {
                 return Ok(hit.clone());
             }
         }
-        let blocks = self.dispatch_read(|engine| engine.get_text_blocks(path, page))?;
+        let mut blocks = self.dispatch_read(|engine| engine.get_text_blocks(path, page))?;
+        if blocks.is_empty() && self.current_mode() == crate::app::config::PdfEngineMode::DualConcurrent {
+            if let Ok(fallback_blocks) = self.fallback.get_text_blocks(path, page) {
+                if !fallback_blocks.is_empty() {
+                    tracing::warn!("Primary engine returned 0 blocks, but fallback found {} blocks. Using fallback.", fallback_blocks.len());
+                    blocks = fallback_blocks;
+                }
+            }
+        }
         if let Ok(mut cache) = self.caches.blocks.lock() {
             cache.put(key, blocks.clone());
         }

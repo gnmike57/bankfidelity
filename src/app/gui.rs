@@ -1396,11 +1396,15 @@ impl MyApp {
         }
 
         // ---- 1. Drain runtime results --------------------------------------
+        // Single ownership of `in_flight` decrements for completed jobs:
+        // use `ends_gui_tracked_job` (not only strict `is_terminal`) so success
+        // payloads like PageRendered / TransactionsExtracted free the wait
+        // slot exactly once. Handlers must not double-decrement.
         loop {
             match self.job_rx.try_recv() {
                 Ok(res) => {
                     self.last_runtime_activity = std::time::Instant::now();
-                    if res.is_terminal() && self.in_flight > 0 {
+                    if res.ends_gui_tracked_job() && self.in_flight > 0 {
                         self.in_flight -= 1;
                     }
                     self.handle_job_result(ctx, res);
@@ -1550,7 +1554,6 @@ impl MyApp {
             }
             JobResult::UfoAutoEditResult(val) => {
                 self.is_ufo_running = false;
-                self.in_flight = self.in_flight.saturating_sub(1);
                 self.progress = None;
 
                 let status = val["status"].as_str().unwrap_or("unknown");
@@ -1573,11 +1576,9 @@ impl MyApp {
             }
 
             JobResult::McpRenderComplete { .. } => {
-                self.in_flight = self.in_flight.saturating_sub(1);
                 self.progress = None;
             }
             JobResult::ImbalanceExplained { explanation } => {
-                self.in_flight = self.in_flight.saturating_sub(1);
                 self.progress = None;
                 self.ai_explanation = Some(explanation);
             }
@@ -1641,7 +1642,9 @@ impl MyApp {
                 self.status = format!("Loaded {total_pages} page(s)");
                 self.toast(ToastKind::Success, format!("Loaded {total_pages} pages"));
                 self.request_render("current");
-                self.in_flight += 1;
+                // Keep the original open_pdf in_flight wait open across the
+                // auto-chained parse (DocumentLoaded is non-ending). Do not +1
+                // again here or the counter permanently drifts.
                 self.workflow_edits.clear();
                 self.workflow_preview = None;
                 self.workflow_visual = None;
@@ -1656,6 +1659,8 @@ impl MyApp {
                     ignore_offline_fallback: false,
                 }) {
                     tracing::error!("Runtime disconnected: {}", e);
+                    // Parse never started: free the open_pdf wait slot.
+                    self.in_flight = self.in_flight.saturating_sub(1);
                 }
             }
             JobResult::HistoryUpdated { history } => {
@@ -1798,7 +1803,6 @@ impl MyApp {
                 );
             }
             JobResult::TransactionsExtracted(txs) => {
-                self.in_flight = self.in_flight.saturating_sub(1);
                 self.toast(
                     ToastKind::Success,
                     format!("Extracted {} transactions", txs.len()),
@@ -1808,7 +1812,6 @@ impl MyApp {
                 self.last_runtime_activity = std::time::Instant::now();
             }
             JobResult::NaturalLanguageEditReady(txs) => {
-                self.in_flight = self.in_flight.saturating_sub(1);
                 self.toast(
                     ToastKind::Success,
                     format!("Applied AI edit to {} transactions", txs.len()),
@@ -1891,7 +1894,7 @@ impl MyApp {
                 if job_label == "ufo_dispatch" {
                     self.is_ufo_running = false;
                 }
-                self.in_flight = self.in_flight.saturating_sub(1);
+                // in_flight decremented once in the drain loop via ends_gui_tracked_job
                 self.progress = None;
                 if matches!(
                     job_label.as_str(),
@@ -2192,7 +2195,6 @@ impl MyApp {
             } => {
                 use crate::app::runtime::OperationDisposition;
                 self.progress = None;
-                self.in_flight = self.in_flight.saturating_sub(1);
                 let (kind, prefix) = match disposition {
                     OperationDisposition::Succeeded => (ToastKind::Success, "Completed"),
                     OperationDisposition::NoOp => (ToastKind::Info, "No changes"),
@@ -2211,7 +2213,6 @@ impl MyApp {
             }
             JobResult::TransferComplete(result) => {
                 self.progress = None;
-                self.in_flight = self.in_flight.saturating_sub(1);
                 let msg = format!(
                     "✓ Transfer complete: {} txns -> output, math: {}, visual: {} (AI Layout: {}), ({:.1}s)",
                     result.source_tx_count,
@@ -2330,7 +2331,6 @@ impl MyApp {
                 self.toast(ToastKind::Error, &msg);
             }
             JobResult::NuclearFallbackRequired(msg) => {
-                self.in_flight = self.in_flight.saturating_sub(1);
                 self.status = format!(
                     "Fidelity workflow stopped without replacing the document: {}",
                     msg

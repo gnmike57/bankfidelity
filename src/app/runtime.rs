@@ -1265,9 +1265,73 @@ impl JobResult {
         }
     }
 
-    /// True only for results that definitively end a tracked job lifecycle.
+    /// True only for results that definitively end a tracked job lifecycle
+    /// from the runtime `TerminalTracker` perspective (strict).
     pub fn is_terminal(&self) -> bool {
         self.disposition().is_some()
+    }
+
+    /// True when this result should free one GUI `in_flight` wait slot.
+    ///
+    /// Broader than [`Self::is_terminal`]: many jobs complete with a success
+    /// payload (e.g. `PageRendered`, `TransactionsExtracted`) that is not a
+    /// `TerminalTracker` terminal event but still ends the user wait.
+    /// Intermediate stream events (`Progress`, `UfoLog`, side-effect fonts)
+    /// must return false.
+    pub fn ends_gui_tracked_job(&self) -> bool {
+        match self {
+            // Intermediate / side-channel — never free a wait slot.
+            Self::Progress { .. }
+            | Self::UfoLog(_)
+            | Self::WatchdogEvent(_)
+            | Self::FontAnalysisReady(_)
+            | Self::FontCascadeUsed(_)
+            | Self::HistoryUpdated { .. }
+            | Self::WorkflowStageChanged { .. }
+            | Self::WorkflowVisualAttempt(_)
+            | Self::AiConfirmationNeeded(_)
+            | Self::InteractiveFallbackRequired(_)
+            | Self::DocAiVersionsListed(_)
+            | Self::DocAiVersionOperationStarted { .. }
+            | Self::ApiKeysVerified(_)
+            // DocumentLoaded auto-chains into parse; keep the same wait open.
+            | Self::DocumentLoaded { .. } => false,
+
+            // Failures and explicit terminals.
+            Self::Error { .. }
+            | Self::Cancelled { .. }
+            | Self::TimedOut { .. }
+            | Self::WorkflowFailed(_)
+            | Self::TransferFailed { .. }
+            | Self::JobCompleted { .. }
+            | Self::NuclearFallbackRequired(_)
+            // Success payloads that complete a user-dispatched job.
+            | Self::Pong
+            | Self::UfoAutoEditResult(_)
+            | Self::McpRenderComplete { .. }
+            | Self::PageRendered { .. }
+            | Self::ChangeApplied { .. }
+            | Self::FontCompleted(_)
+            | Self::ChangeHistoryExported { .. }
+            | Self::TransactionsExtracted(_)
+            | Self::NaturalLanguageEditReady(_)
+            | Self::CategorizationReady(_)
+            | Self::VerificationReport(_)
+            | Self::BalanceProposed { .. }
+            | Self::ProposedChangesApplied { .. }
+            | Self::ConfigReloaded { .. }
+            | Self::ImbalanceExplained { .. }
+            | Self::ReconstructComplete { .. }
+            | Self::BugReportSubmitted
+            | Self::WorkflowParseValidated { .. }
+            | Self::WorkflowPreviewBuilt(_)
+            | Self::VisualAlternativesReady(_)
+            | Self::WorkflowComplete(_)
+            | Self::TransferComplete(_)
+            | Self::DatesAdjusted { .. }
+            | Self::TransferTestsComplete(_)
+            | Self::DocAiVersionError(_) => true,
+        }
     }
 
     pub fn completed(
@@ -9709,6 +9773,84 @@ mod tests {
             assert_eq!(terminal.disposition(), Some(disposition));
             assert!(terminal.is_terminal());
         }
+    }
+
+    #[test]
+    fn ends_gui_tracked_job_frees_success_payloads_but_not_streams() {
+        // Side-channel / intermediate
+        assert!(!JobResult::Progress {
+            label: "x".into(),
+            fraction: 0.5,
+        }
+        .ends_gui_tracked_job());
+        assert!(!JobResult::UfoLog("line".into()).ends_gui_tracked_job());
+        assert!(
+            !JobResult::DocumentLoaded {
+                layout_json: "{}".into(),
+                total_pages: 1,
+            }
+            .ends_gui_tracked_job(),
+            "DocumentLoaded chains into parse; must keep GUI wait open"
+        );
+        assert!(!JobResult::WorkflowVisualAttempt(
+            crate::engine::workflow::VisualAttempt {
+                attempt: 1,
+                max_attempts: 3,
+                diff_score: 0.01,
+                threshold: 0.02,
+                only_intended: true,
+                message: "mid".into(),
+            }
+        )
+        .ends_gui_tracked_job());
+
+        // Success / failure payloads that complete a user wait
+        assert!(JobResult::PageRendered {
+            png_bytes: vec![],
+            page: 0,
+            dpi: 150.0,
+            tag: "current".into(),
+            width_pts: 612.0,
+            height_pts: 792.0,
+        }
+        .ends_gui_tracked_job());
+        assert!(JobResult::TransactionsExtracted(vec![]).ends_gui_tracked_job());
+        assert!(JobResult::UfoAutoEditResult(serde_json::json!({"status":"success"}))
+            .ends_gui_tracked_job());
+        assert!(JobResult::Error {
+            job_label: "x".into(),
+            message: "y".into(),
+        }
+        .ends_gui_tracked_job());
+        assert!(JobResult::WorkflowParseValidated {
+            validation: crate::engine::workflow::ParseValidation {
+                total_pages: 1,
+                transactions_found: 0,
+                opening_balance: rust_decimal::Decimal::ZERO,
+                closing_balance: rust_decimal::Decimal::ZERO,
+                account_number: None,
+                completeness_score: 1.0,
+                completeness_notes: String::new(),
+                missing_rows: Vec::new(),
+            },
+            transactions: Vec::new(),
+        }
+        .ends_gui_tracked_job());
+        // Strict terminal remains a subset for tracker semantics
+        assert!(JobResult::Error {
+            job_label: "x".into(),
+            message: "y".into(),
+        }
+        .is_terminal());
+        assert!(!JobResult::PageRendered {
+            png_bytes: vec![],
+            page: 0,
+            dpi: 150.0,
+            tag: "current".into(),
+            width_pts: 612.0,
+            height_pts: 792.0,
+        }
+        .is_terminal());
     }
 
     #[test]
