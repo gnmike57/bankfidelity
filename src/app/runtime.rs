@@ -6701,7 +6701,7 @@ Additional Context:\n{}",
                         PythonJob::ApplyManyEdits {
                             pdf_path: input.to_string_lossy().to_string(),
                             output_path: scratch.to_string_lossy().to_string(),
-                            edits_json,
+                            edits_json: edits_json.clone(),
                             font_path: None,
                         },
                         reply_tx,
@@ -6756,23 +6756,137 @@ Additional Context:\n{}",
                         });
                     }
                     Ok(PythonJobResult::ApplyReport(report)) => {
+                        let primary_error = format!(
+                            "Exact batch failed: placed {}/{}; {}",
+                            report.placed,
+                            report.requested,
+                            report.warnings.join("; ")
+                        );
+                        tracing::warn!(
+                            %primary_error,
+                            "Python exact batch incomplete; attempting exact-count native fallback"
+                        );
                         let _ = std::fs::remove_file(&scratch);
-                        let _ = res_tx.send(JobResult::Error {
-                            job_label: "apply_proposed_changes".into(),
-                            message: format!(
-                                "Exact batch failed: placed {}/{}; {}",
-                                report.placed,
-                                report.requested,
-                                report.warnings.join("; ")
-                            ),
-                        });
+                        let native_result = tokio::task::spawn_blocking({
+                            let native_in = input.clone();
+                            let native_out = scratch.clone();
+                            let native_json = edits_json.clone();
+                            move || {
+                                let native_engine =
+                                    crate::pdf::native_engine::OxidizePdfEngine::new();
+                                native_engine.apply_many_edits(
+                                    &native_in,
+                                    &native_out,
+                                    &native_json,
+                                    None,
+                                )
+                            }
+                        })
+                        .await;
+                        match native_result {
+                            Ok(Ok(count)) if count == usable.len() && scratch.is_file() => {
+                                let mut barrier = crate::app::commit::FileCommitBarrier::new();
+                                if let Err(error) = barrier.publish(&scratch, &output) {
+                                    let _ = std::fs::remove_file(&scratch);
+                                    let _ = res_tx.send(JobResult::Error {
+                                        job_label: "apply_proposed_changes".into(),
+                                        message: format!("Exact output commit failed: {error}"),
+                                    });
+                                    return;
+                                }
+                                let published_pages = lopdf::Document::load(&output)
+                                    .map(|document| document.get_pages().len());
+                                if !matches!(published_pages, Ok(c) if c == page_count) {
+                                    let _ = res_tx.send(JobResult::Error {
+                                        job_label: "apply_proposed_changes".into(),
+                                        message: "Published exact output failed page-count validation; prior output restored"
+                                            .into(),
+                                    });
+                                    return;
+                                }
+                                barrier.commit();
+                                let _ = std::fs::remove_file(&scratch);
+                                let _ = res_tx.send(JobResult::Progress {
+                                    label: "Exact batch committed (native fallback)".to_string(),
+                                    fraction: 1.0,
+                                });
+                                let _ = res_tx.send(JobResult::ProposedChangesApplied {
+                                    changes_applied: count,
+                                    failures: Vec::new(),
+                                });
+                            }
+                            _ => {
+                                let _ = std::fs::remove_file(&scratch);
+                                let _ = res_tx.send(JobResult::Error {
+                                    job_label: "apply_proposed_changes".into(),
+                                    message: primary_error,
+                                });
+                            }
+                        }
                     }
                     Ok(PythonJobResult::Error(error)) => {
+                        tracing::warn!(
+                            python_error = %error,
+                            "Python actor errored; attempting exact-count native fallback"
+                        );
                         let _ = std::fs::remove_file(&scratch);
-                        let _ = res_tx.send(JobResult::Error {
-                            job_label: "apply_proposed_changes".into(),
-                            message: error,
-                        });
+                        let native_result = tokio::task::spawn_blocking({
+                            let native_in = input.clone();
+                            let native_out = scratch.clone();
+                            let native_json = edits_json.clone();
+                            move || {
+                                let native_engine =
+                                    crate::pdf::native_engine::OxidizePdfEngine::new();
+                                native_engine.apply_many_edits(
+                                    &native_in,
+                                    &native_out,
+                                    &native_json,
+                                    None,
+                                )
+                            }
+                        })
+                        .await;
+
+                        match native_result {
+                            Ok(Ok(count)) if count == usable.len() && scratch.is_file() => {
+                                let mut barrier = crate::app::commit::FileCommitBarrier::new();
+                                if let Err(error) = barrier.publish(&scratch, &output) {
+                                    let _ = std::fs::remove_file(&scratch);
+                                    let _ = res_tx.send(JobResult::Error {
+                                        job_label: "apply_proposed_changes".into(),
+                                        message: format!("Exact output commit failed: {error}"),
+                                    });
+                                    return;
+                                }
+                                let published_pages = lopdf::Document::load(&output)
+                                    .map(|document| document.get_pages().len());
+                                if !matches!(published_pages, Ok(c) if c == page_count) {
+                                    let _ = res_tx.send(JobResult::Error {
+                                        job_label: "apply_proposed_changes".into(),
+                                        message: "Published exact output failed page-count validation; prior output restored"
+                                            .into(),
+                                    });
+                                    return;
+                                }
+                                barrier.commit();
+                                let _ = std::fs::remove_file(&scratch);
+                                let _ = res_tx.send(JobResult::Progress {
+                                    label: "Exact batch committed (native fallback)".to_string(),
+                                    fraction: 1.0,
+                                });
+                                let _ = res_tx.send(JobResult::ProposedChangesApplied {
+                                    changes_applied: count,
+                                    failures: Vec::new(),
+                                });
+                            }
+                            _ => {
+                                let _ = std::fs::remove_file(&scratch);
+                                let _ = res_tx.send(JobResult::Error {
+                                    job_label: "apply_proposed_changes".into(),
+                                    message: error,
+                                });
+                            }
+                        }
                     }
                     other => {
                         let _ = std::fs::remove_file(&scratch);
@@ -6976,12 +7090,16 @@ Additional Context:\n{}",
                 tracing::debug!(job.id = id, "[runtime] cancel for unknown job");
             }
         }
-        Job::TypstReconstruct { input, output } => {
+        Job::TypstReconstruct { input: _, output: _ } => {
+            // Typst rebuild is an export-style path that cannot preserve
+            // edit-in-place visual fidelity. Keep the job for API stability
+            // but fail closed with a clear reason (same gate as workflow finalize).
             let tx = result_tx_clone.clone();
             tokio::task::spawn(async move {
                 let _ = tx.send(JobResult::Error {
-                    job_label: "typst_reconstruct_disabled".into(),
-                    message: "cannot preserve edit-in-place fidelity".into(),
+                    job_label: "typst_reconstruct".into(),
+                    message: "Typst reconstruction cannot preserve edit-in-place fidelity; use PyMuPDF Pro / native edit paths"
+                        .into(),
                 });
             });
         }

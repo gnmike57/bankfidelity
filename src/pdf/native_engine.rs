@@ -506,6 +506,54 @@ fn normalized_text_identity(value: &str) -> String {
     value.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
+/// Match stable edit identity to a PDF operator string.
+/// Supports Bankwest-style year suffixes: old `"01 SEP"` matches target `"01 SEP 23"`.
+fn text_identity_matches(target_text: &str, old_text: &str) -> bool {
+    let target = normalized_text_identity(target_text);
+    let old = normalized_text_identity(old_text);
+    if target.eq_ignore_ascii_case(&old) {
+        return true;
+    }
+    let old_is_day_mon = {
+        let parts: Vec<&str> = old.split_whitespace().collect();
+        parts.len() == 2
+            && parts[0].chars().all(|c| c.is_ascii_digit())
+            && parts[0].len() <= 2
+            && parts[1].len() == 3
+            && parts[1].chars().all(|c| c.is_ascii_alphabetic())
+    };
+    if !old_is_day_mon {
+        return false;
+    }
+    if !target.to_ascii_lowercase().starts_with(&old.to_ascii_lowercase()) {
+        return false;
+    }
+    let suffix = target[old.len()..].trim();
+    matches!(suffix.len(), 2 | 4) && suffix.chars().all(|c| c.is_ascii_digit())
+}
+
+/// When old identity is a day+month prefix of the target, append the preserved year
+/// to `new_text` so the native replace does not orphan the year digits.
+fn expand_new_text_for_date_suffix(target_text: &str, old_text: &str, new_text: &str) -> String {
+    let target = normalized_text_identity(target_text);
+    let old = normalized_text_identity(old_text);
+    if !text_identity_matches(&target, &old) || target.eq_ignore_ascii_case(&old) {
+        return new_text.to_string();
+    }
+    let suffix = target[old.len()..].trim();
+    if !(matches!(suffix.len(), 2 | 4) && suffix.chars().all(|c| c.is_ascii_digit())) {
+        return new_text.to_string();
+    }
+    let new_id = normalized_text_identity(new_text);
+    if new_id
+        .to_ascii_lowercase()
+        .ends_with(&suffix.to_ascii_lowercase())
+    {
+        return new_text.to_string();
+    }
+    format!("{} {}", new_text.trim(), suffix)
+}
+
 fn inherited_page_rotation(doc: &lopdf::Document, page_id: lopdf::ObjectId) -> i32 {
     let mut current = page_id;
     let mut visited = std::collections::HashSet::new();
@@ -1251,14 +1299,24 @@ impl PdfEngine for OxidizePdfEngine {
 
             for edit_index in edit_indices {
                 let edit = &edits[edit_index];
-                let identity = normalized_text_identity(&edit.old_text);
-                let candidates: Vec<&NativeTextTarget> = targets
+                let mut candidates: Vec<&NativeTextTarget> = targets
                     .iter()
                     .filter(|target| {
-                        normalized_text_identity(&target.text) == identity
+                        text_identity_matches(&target.text, &edit.old_text)
                             && bbox_overlap_fraction(edit.rect, target.bbox) >= 0.5
                     })
                     .collect();
+                // Year-suffixed date operators often extend past the semantic
+                // date field rect; allow a looser overlap for day+month identity.
+                if candidates.is_empty() {
+                    candidates = targets
+                        .iter()
+                        .filter(|target| {
+                            text_identity_matches(&target.text, &edit.old_text)
+                                && bbox_overlap_fraction(edit.rect, target.bbox) >= 0.25
+                        })
+                        .collect();
+                }
                 if candidates.is_empty() {
                     return Err(EngineError::ApplyFailed(format!(
                         "edit {edit_index} stable target not found on page {page_index}: old_text={:?}, rect={:?}",
@@ -1271,16 +1329,24 @@ impl PdfEngine for OxidizePdfEngine {
                         candidates.len(), edit.old_text, edit.rect
                     )));
                 }
-                let operation_index = candidates[0].operation_index;
+                let selected = candidates[0];
+                let operation_index = selected.operation_index;
                 if !selected_operations.insert(operation_index) {
                     return Err(EngineError::ApplyFailed(format!(
                         "multiple edits select page {page_index} operation {operation_index}"
                     )));
                 }
-                replacements.push((operation_index, edit_index));
+                replacements.push((
+                    operation_index,
+                    expand_new_text_for_date_suffix(
+                        &selected.text,
+                        &edit.old_text,
+                        &edit.new_text,
+                    ),
+                ));
             }
 
-            for (operation_index, edit_index) in replacements {
+            for (operation_index, replacement_text) in replacements {
                 let operation = content.operations.get_mut(operation_index).ok_or_else(|| {
                     EngineError::ApplyFailed(format!(
                         "resolved operation {operation_index} disappeared on page {page_index}"
@@ -1288,7 +1354,7 @@ impl PdfEngine for OxidizePdfEngine {
                 })?;
                 operation.operator = "Tj".to_string();
                 operation.operands = vec![lopdf::Object::String(
-                    edits[edit_index].new_text.as_bytes().to_vec(),
+                    replacement_text.as_bytes().to_vec(),
                     lopdf::StringFormat::Literal,
                 )];
             }
@@ -1512,6 +1578,30 @@ mod tests {
         assert!(caps.supports_redaction);
         assert!(caps.supports_embedded_fonts);
         assert!(!caps.supports_cjk); // Not yet
+    }
+
+    #[test]
+    fn text_identity_matches_year_suffixed_day_month_dates() {
+        assert!(text_identity_matches("01 SEP 23", "01 SEP"));
+        assert!(text_identity_matches("01 Sep 2023", "01 Sep"));
+        assert!(!text_identity_matches("04 SEP 23", "01 SEP"));
+        assert!(text_identity_matches("01 SEP", "01 SEP"));
+    }
+
+    #[test]
+    fn expand_new_text_preserves_inline_year_suffix() {
+        assert_eq!(
+            expand_new_text_for_date_suffix("01 SEP 23", "01 SEP", "31 JUL"),
+            "31 JUL 23"
+        );
+        assert_eq!(
+            expand_new_text_for_date_suffix("01 SEP 23", "01 SEP", "31 JUL 23"),
+            "31 JUL 23"
+        );
+        assert_eq!(
+            expand_new_text_for_date_suffix("CREDIT INTEREST", "CREDIT INTEREST", "FEE"),
+            "FEE"
+        );
     }
 
     #[test]
