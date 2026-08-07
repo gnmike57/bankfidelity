@@ -4,7 +4,7 @@ Set-StrictMode -Version Latest
 $Root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-Location $Root
 
-$Version = "1.1.1"
+$Version = (Get-Content Cargo.toml | Select-String '^version\s*=\s*"(.*?)"$').Matches.Groups[1].Value
 $Revision = if ($env:GITHUB_SHA) { $env:GITHUB_SHA } else { (git rev-parse HEAD).Trim() }
 $Output = if ($args.Count -gt 0) { $args[0] } else { "target/release/portable/windows-x86_64" }
 
@@ -13,7 +13,8 @@ python scripts/build_portable_bundle.py `
   --platform windows-x86_64 `
   --binary target/release/dual-core-pdf-pipeline.exe `
   --output $Output `
-  --revision $Revision
+  --revision $Revision `
+  --version $Version
 
 $Artifacts = "target/release/artifacts"
 New-Item -ItemType Directory -Force -Path $Artifacts | Out-Null

@@ -208,7 +208,7 @@ def verify_application(
         raise RuntimeError(f"packaged templates are not discoverable:\n{output}")
 
 
-def write_bundle_manifest(bundle_root: Path, platform_key: str, revision: str, pdfium: dict[str, str]) -> None:
+def write_bundle_manifest(bundle_root: Path, platform_key: str, revision: str, pdfium: dict[str, str], args_version: str) -> None:
     files = []
     for path in sorted(bundle_root.rglob("*")):
         if path.is_file() and path.name != "bundle-manifest.json":
@@ -222,7 +222,7 @@ def write_bundle_manifest(bundle_root: Path, platform_key: str, revision: str, p
     manifest = {
         "schema_version": 1,
         "application": APP_NAME,
-        "version": "1.1.1",
+        "version": args_version,
         "revision": revision,
         "platform": platform_key,
         "python": json.loads(PYTHON_ARTIFACTS.read_text(encoding="utf-8"))["python_version"],
@@ -336,13 +336,13 @@ def build(args: argparse.Namespace) -> Path:
             plistlib.dump(info, stream, sort_keys=True)
 
     (resources_directory / "README-FIRST.txt").write_text(
-        "Bank Statement Fidelity Editor 1.1.1\n\n"
+        f"Bank Statement Fidelity Editor {args.version}\n\n"
         "This portable CI artifact contains a pinned Python/PyMuPDF/PyMuPDF Pro runtime and pinned Pdfium. "
         "PyMuPDF Pro operations require a separately configured valid license key. "
         "This artifact is unsigned and not notarized; production distribution requires owner signing credentials.\n",
         encoding="utf-8",
     )
-    write_bundle_manifest(bundle_root, platform_key, args.revision, pdfium)
+    write_bundle_manifest(bundle_root, platform_key, args.revision, pdfium, args.version)
     verify_application(platform_key, destination_binary, resources_directory / "python")
     print(bundle_root)
     return bundle_root
@@ -354,6 +354,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--binary", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--revision", required=True)
+    parser.add_argument("--version", required=True)
     return parser.parse_args()
 
 
