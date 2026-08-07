@@ -173,9 +173,11 @@ fn kill_process_tree(pid: u32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     #[test]
     fn missing_ufo_dir_returns_error_not_ok_json() {
+        let _guard = ENV_LOCK.lock().unwrap();
         // Force a non-existent install path via env override.
         std::env::set_var("BANKFIDELITY_UFO_DIR", "__bankfidelity_missing_ufo_dir__");
         let result = UfoClient::dispatch_task("noop", None::<fn(String)>);
@@ -197,6 +199,7 @@ mod tests {
 
     #[test]
     fn ufo_dir_env_override_is_respected() {
+        let _guard = ENV_LOCK.lock().unwrap();
         std::env::set_var("BANKFIDELITY_UFO_DIR", "D:\\custom\\ufo");
         let dir = UfoClient::ufo_dir();
         std::env::remove_var("BANKFIDELITY_UFO_DIR");

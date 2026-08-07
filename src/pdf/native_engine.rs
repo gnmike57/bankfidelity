@@ -556,19 +556,100 @@ fn expand_new_text_for_date_suffix(target_text: &str, old_text: &str, new_text: 
     format!("{} {}", new_text.trim(), suffix)
 }
 
+/// Area of an axis-aligned rect in top-left page coordinates, or 0 if degenerate.
+fn rect_area(rect: [f32; 4]) -> f32 {
+    let w = (rect[2] - rect[0]).max(0.0);
+    let h = (rect[3] - rect[1]).max(0.0);
+    w * h
+}
+
+/// Intersection area of two axis-aligned rects, or 0 if they do not overlap.
+fn rect_intersection_area(a: [f32; 4], b: [f32; 4]) -> f32 {
+    let inter = [
+        a[0].max(b[0]),
+        a[1].max(b[1]),
+        a[2].min(b[2]),
+        a[3].min(b[3]),
+    ];
+    if inter[2] <= inter[0] || inter[3] <= inter[1] {
+        return 0.0;
+    }
+    (inter[2] - inter[0]) * (inter[3] - inter[1])
+}
+
+/// Python `_span_overlaps_target_rect(..., multiline=True)` parity.
+///
+/// Single-span edits require the target rect to be mostly covered. Multi-line
+/// description rects are taller than any one span, so also accept a span that
+/// is mostly inside the tall edit rect.
+fn span_overlaps_multiline_rect(span_bbox: [f32; 4], edit_rect: [f32; 4]) -> bool {
+    let rect_a = rect_area(edit_rect);
+    if rect_a <= 0.0 {
+        return false;
+    }
+    let inter = rect_intersection_area(span_bbox, edit_rect);
+    if inter <= 0.0 {
+        return false;
+    }
+    // Edit rect mostly covered by this one span (rare for tall multi-line).
+    if inter / rect_a >= 0.5 {
+        return true;
+    }
+    // Span mostly inside the multi-line field rect (common wrap-line case).
+    let span_a = rect_area(span_bbox).max(1e-6);
+    inter / span_a >= 0.5
+}
+
+/// Union bbox of a non-empty target chunk in top-left page coordinates.
+fn union_target_bbox(chunk: &[&NativeTextTarget]) -> [f32; 4] {
+    [
+        chunk
+            .iter()
+            .map(|t| t.bbox[0])
+            .fold(f32::INFINITY, f32::min),
+        chunk
+            .iter()
+            .map(|t| t.bbox[1])
+            .fold(f32::INFINITY, f32::min),
+        chunk
+            .iter()
+            .map(|t| t.bbox[2])
+            .fold(f32::NEG_INFINITY, f32::max),
+        chunk
+            .iter()
+            .map(|t| t.bbox[3])
+            .fold(f32::NEG_INFINITY, f32::max),
+    ]
+}
+
 /// Multi-line descriptions often split across adjacent PDF text operators.
-/// Find a contiguous run of targets (by y then x) whose joined identity matches
-/// `old_text` and whose union bbox overlaps the edit rect.
+///
+/// Mirrors Python `_find_multiline_target_span`:
+/// 1. Keep only spans that overlap the (usually tall) edit rect under the
+///    multi-line overlap rules.
+/// 2. Sort by reading order (y then x).
+/// 3. Scan contiguous windows of 2+ spans whose joined identity matches
+///    `old_text` (prefer shorter windows first, same as Python).
+/// 4. Return the matching run so the apply path can put full `new_text` on
+///    the first operator and blank trailing wrap lines.
 fn find_multiline_native_targets<'a>(
     targets: &'a [NativeTextTarget],
     edit_rect: [f32; 4],
     old_text: &str,
 ) -> Option<Vec<&'a NativeTextTarget>> {
     let identity = normalized_text_identity(old_text);
-    if identity.is_empty() {
+    if identity.is_empty() || rect_area(edit_rect) <= 0.0 {
         return None;
     }
-    let mut ordered: Vec<&NativeTextTarget> = targets.iter().collect();
+
+    // Rect-first filter (Python collects candidates only inside the tall rect).
+    let mut ordered: Vec<&NativeTextTarget> = targets
+        .iter()
+        .filter(|t| span_overlaps_multiline_rect(t.bbox, edit_rect))
+        .collect();
+    if ordered.len() < 2 {
+        return None;
+    }
     ordered.sort_by(|a, b| {
         let ay = (a.bbox[1] + a.bbox[3]) / 2.0;
         let by = (b.bbox[1] + b.bbox[3]) / 2.0;
@@ -580,9 +661,14 @@ fn find_multiline_native_targets<'a>(
                     .unwrap_or(std::cmp::Ordering::Equal)
             })
     });
-    // Prefer shorter runs; scan contiguous windows.
+
+    // Prefer shorter runs; scan contiguous windows among rect-local spans.
+    // Candidates are already rect-filtered, so the practical upper bound is
+    // small — still cap at 12 to avoid O(n²) blowups on dense pages.
+    const MAX_MULTILINE_SPANS: usize = 12;
     for start in 0..ordered.len() {
-        for end in (start + 2)..=ordered.len().min(start + 6) {
+        let max_end = ordered.len().min(start + MAX_MULTILINE_SPANS);
+        for end in (start + 2)..=max_end {
             let chunk = &ordered[start..end];
             let joined = normalized_text_identity(
                 &chunk
@@ -594,27 +680,12 @@ fn find_multiline_native_targets<'a>(
             if !joined.eq_ignore_ascii_case(&identity) {
                 continue;
             }
-            let union = [
-                chunk
-                    .iter()
-                    .map(|t| t.bbox[0])
-                    .fold(f32::INFINITY, f32::min),
-                chunk
-                    .iter()
-                    .map(|t| t.bbox[1])
-                    .fold(f32::INFINITY, f32::min),
-                chunk
-                    .iter()
-                    .map(|t| t.bbox[2])
-                    .fold(f32::NEG_INFINITY, f32::max),
-                chunk
-                    .iter()
-                    .map(|t| t.bbox[3])
-                    .fold(f32::NEG_INFINITY, f32::max),
-            ];
-            if bbox_overlap_fraction(edit_rect, union) >= 0.25 {
-                return Some(chunk.to_vec());
+            // Sanity: union of the matched run must still sit on the edit rect.
+            let union = union_target_bbox(chunk);
+            if rect_intersection_area(edit_rect, union) <= 0.0 {
+                continue;
             }
+            return Some(chunk.to_vec());
         }
     }
     None
@@ -1411,7 +1482,11 @@ impl PdfEngine for OxidizePdfEngine {
                     )));
                 }
 
-                // Multi-line description: join contiguous operators inside rect.
+                // Multi-line description (Python multi-span parity): join
+                // contiguous operators that sit inside the tall field rect.
+                // Place full new_text on the first operator (like Python's
+                // single insert at the first span origin) and blank trailing
+                // wrap operators so stale lines do not remain.
                 if let Some(chunk) =
                     find_multiline_native_targets(&targets, edit.rect, &edit.old_text)
                 {
@@ -1422,8 +1497,6 @@ impl PdfEngine for OxidizePdfEngine {
                                 "multiple edits select page {page_index} operation {operation_index}"
                             )));
                         }
-                        // Put full new text on the first span; blank the rest so
-                        // stale wrap lines do not remain after the rewrite.
                         let replacement = if i == 0 {
                             edit.new_text.clone()
                         } else {
@@ -1698,30 +1771,41 @@ mod tests {
         );
     }
 
+    fn target(op: usize, text: &str, bbox: [f32; 4]) -> NativeTextTarget {
+        NativeTextTarget {
+            operation_index: op,
+            text: text.into(),
+            bbox,
+            font: "Helv".into(),
+            size: 10.0,
+        }
+    }
+
+    #[test]
+    fn span_overlaps_multiline_rect_accepts_span_mostly_inside_tall_field() {
+        // Tall multi-line description field; each wrap line is a small fraction
+        // of the field area but is fully contained — Python multi-line path.
+        let tall_field = [5.0, 90.0, 200.0, 160.0];
+        let wrap_line = [10.0, 100.0, 120.0, 112.0];
+        assert!(span_overlaps_multiline_rect(wrap_line, tall_field));
+        // Completely outside.
+        assert!(!span_overlaps_multiline_rect(
+            [10.0, 300.0, 80.0, 312.0],
+            tall_field
+        ));
+        // Barely grazes the field edge (< 50% of span inside).
+        assert!(!span_overlaps_multiline_rect(
+            [190.0, 100.0, 280.0, 112.0],
+            tall_field
+        ));
+    }
+
     #[test]
     fn multiline_native_targets_join_contiguous_description_spans() {
         let targets = vec![
-            NativeTextTarget {
-                operation_index: 1,
-                text: "Payment to".into(),
-                bbox: [10.0, 100.0, 80.0, 112.0],
-                font: "Helv".into(),
-                size: 10.0,
-            },
-            NativeTextTarget {
-                operation_index: 2,
-                text: "Merchant XYZ".into(),
-                bbox: [10.0, 114.0, 100.0, 126.0],
-                font: "Helv".into(),
-                size: 10.0,
-            },
-            NativeTextTarget {
-                operation_index: 3,
-                text: "Unrelated".into(),
-                bbox: [10.0, 200.0, 80.0, 212.0],
-                font: "Helv".into(),
-                size: 10.0,
-            },
+            target(1, "Payment to", [10.0, 100.0, 80.0, 112.0]),
+            target(2, "Merchant XYZ", [10.0, 114.0, 100.0, 126.0]),
+            target(3, "Unrelated", [10.0, 200.0, 80.0, 212.0]),
         ];
         let found = find_multiline_native_targets(
             &targets,
@@ -1729,6 +1813,108 @@ mod tests {
             "Payment to Merchant XYZ",
         )
         .expect("should join two wrap lines");
+        assert_eq!(found.len(), 2);
+        assert_eq!(found[0].operation_index, 1);
+        assert_eq!(found[1].operation_index, 2);
+    }
+
+    #[test]
+    fn multiline_native_targets_ignore_identical_text_outside_edit_rect() {
+        // Same joined identity appears twice on the page; only the pair
+        // inside the tall field rect may be selected (rect-first parity).
+        let targets = vec![
+            target(1, "Payment to", [10.0, 10.0, 80.0, 22.0]),
+            target(2, "Merchant XYZ", [10.0, 24.0, 100.0, 36.0]),
+            target(10, "Payment to", [10.0, 100.0, 80.0, 112.0]),
+            target(11, "Merchant XYZ", [10.0, 114.0, 100.0, 126.0]),
+        ];
+        let found = find_multiline_native_targets(
+            &targets,
+            [5.0, 95.0, 120.0, 130.0],
+            "Payment to Merchant XYZ",
+        )
+        .expect("should match the in-rect pair, not the distractor above");
+        assert_eq!(found.len(), 2);
+        assert_eq!(found[0].operation_index, 10);
+        assert_eq!(found[1].operation_index, 11);
+    }
+
+    #[test]
+    fn multiline_native_targets_join_three_wrap_lines() {
+        let targets = vec![
+            target(1, "Withdrawal-Osko", [70.0, 100.0, 160.0, 112.0]),
+            target(2, "Payment 1394711", [70.0, 114.0, 180.0, 126.0]),
+            target(3, "Paylive.me", [70.0, 128.0, 140.0, 140.0]),
+            target(4, "Other row", [70.0, 200.0, 140.0, 212.0]),
+        ];
+        let found = find_multiline_native_targets(
+            &targets,
+            [60.0, 95.0, 200.0, 145.0],
+            "Withdrawal-Osko Payment 1394711 Paylive.me",
+        )
+        .expect("should join three wrap lines");
+        assert_eq!(found.len(), 3);
+        assert_eq!(
+            found
+                .iter()
+                .map(|t| t.operation_index)
+                .collect::<Vec<_>>(),
+            vec![1, 2, 3]
+        );
+    }
+
+    #[test]
+    fn multiline_native_targets_case_insensitive_join() {
+        let targets = vec![
+            target(1, "PAYMENT TO", [10.0, 100.0, 80.0, 112.0]),
+            target(2, "merchant xyz", [10.0, 114.0, 100.0, 126.0]),
+        ];
+        let found = find_multiline_native_targets(
+            &targets,
+            [5.0, 95.0, 120.0, 130.0],
+            "Payment to Merchant XYZ",
+        )
+        .expect("joined identity should be case-insensitive");
+        assert_eq!(found.len(), 2);
+    }
+
+    #[test]
+    fn multiline_native_targets_rejects_partial_identity() {
+        let targets = vec![
+            target(1, "Payment to", [10.0, 100.0, 80.0, 112.0]),
+            target(2, "Merchant XYZ", [10.0, 114.0, 100.0, 126.0]),
+        ];
+        assert!(
+            find_multiline_native_targets(
+                &targets,
+                [5.0, 95.0, 120.0, 130.0],
+                "Payment to Merchant XYZ Ref 999",
+            )
+            .is_none(),
+            "must not match when old_text is longer than joined spans"
+        );
+        assert!(
+            find_multiline_native_targets(&targets, [5.0, 95.0, 120.0, 130.0], "Payment to")
+                .is_none(),
+            "single-span identity is not a multi-line match (needs ≥2 spans)"
+        );
+    }
+
+    #[test]
+    fn multiline_native_targets_prefers_shortest_matching_window() {
+        // A, B, C join to a longer string; A, B alone also match a shorter
+        // identity — shortest window (Python scan order) wins for that identity.
+        let targets = vec![
+            target(1, "Alpha", [10.0, 100.0, 50.0, 112.0]),
+            target(2, "Beta", [10.0, 114.0, 50.0, 126.0]),
+            target(3, "Gamma", [10.0, 128.0, 50.0, 140.0]),
+        ];
+        let found = find_multiline_native_targets(
+            &targets,
+            [5.0, 95.0, 80.0, 145.0],
+            "Alpha Beta",
+        )
+        .expect("shortest two-span window should win");
         assert_eq!(found.len(), 2);
         assert_eq!(found[0].operation_index, 1);
         assert_eq!(found[1].operation_index, 2);
