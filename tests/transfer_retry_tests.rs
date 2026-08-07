@@ -162,3 +162,48 @@ fn transaction_description_preserves_merchant_currency_suffix() {
         "Debit Card Purchase Airwallet London Gbr Eur"
     );
 }
+
+#[test]
+fn transaction_description_keeps_preceding_multiline_text_before_date() {
+    let transaction = Transaction {
+        page: 2,
+        line_on_page: 19,
+        date: "25/09/23".into(),
+        // Preceding description appears before the date in raw_text (Westpac).
+        raw_text: "Withdrawal-Osko Payment 1394711 Paylive.me 25/09/23 25.00 576.87".into(),
+        debit: None,
+        credit: Some(dec!(25.00)),
+        running_balance: Some(dec!(576.87)),
+        bbox: None,
+        field_bboxes: FieldBboxes::default(),
+        provenance: Provenance::Computed,
+        category: None,
+        canonical: Default::default(),
+    };
+    assert_eq!(
+        transaction_description(&transaction).unwrap(),
+        "Withdrawal-Osko Payment 1394711 Paylive.me"
+    );
+}
+
+#[test]
+fn transaction_description_stops_on_pure_dotted_leader_token() {
+    let transaction = Transaction {
+        page: 0,
+        line_on_page: 0,
+        date: "01/02/2024".into(),
+        raw_text: "01/02/2024 Merchant Name ............... 10.00 90.00".into(),
+        debit: None,
+        credit: Some(dec!(10.00)),
+        running_balance: Some(dec!(90.00)),
+        bbox: None,
+        field_bboxes: FieldBboxes::default(),
+        provenance: Provenance::Computed,
+        category: None,
+        canonical: Default::default(),
+    };
+    assert_eq!(
+        transaction_description(&transaction).unwrap(),
+        "Merchant Name"
+    );
+}

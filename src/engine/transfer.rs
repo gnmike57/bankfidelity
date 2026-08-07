@@ -842,6 +842,8 @@ pub fn transaction_description(
         .map(str::to_string)
         .collect();
     let date_tokens: Vec<&str> = transaction.date.split_whitespace().collect();
+
+    // Leading date (most single-line rows).
     if !date_tokens.is_empty()
         && tokens.len() >= date_tokens.len()
         && tokens
@@ -851,6 +853,20 @@ pub fn transaction_description(
             .all(|(raw, date)| raw.eq_ignore_ascii_case(date))
     {
         tokens.drain(..date_tokens.len());
+    } else if !date_tokens.is_empty() {
+        // Multi-line / preceding-description rows may place the date after
+        // free text (e.g. "Withdrawal-Osko … 25/09/23 25.00 576.87").
+        if let Some(start) = tokens
+            .windows(date_tokens.len())
+            .position(|window| {
+                window
+                    .iter()
+                    .zip(date_tokens.iter())
+                    .all(|(raw, date)| raw.eq_ignore_ascii_case(date))
+            })
+        {
+            tokens.drain(start..start + date_tokens.len());
+        }
     }
     if date_tokens.len() == 2
         && tokens.first().is_some_and(|token| {
@@ -891,6 +907,10 @@ pub fn transaction_description(
     }
     let mut description_tokens = Vec::new();
     for token in tokens {
+        // Pure dotted-leader tokens (multi-line table fill) terminate the desc.
+        if !token.is_empty() && token.chars().all(|c| c == '.') {
+            break;
+        }
         if let Some(leader_start) = token.find("...") {
             let prefix = token[..leader_start].trim_end_matches('.');
             if !prefix.is_empty() {

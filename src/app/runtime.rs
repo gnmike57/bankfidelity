@@ -6979,45 +6979,10 @@ Additional Context:\n{}",
         Job::TypstReconstruct { input, output } => {
             let tx = result_tx_clone.clone();
             tokio::task::spawn(async move {
-                if !input.exists() {
-                    let _ = tx.send(JobResult::Error {
-                        job_label: "typst_reconstruct".into(),
-                        message: format!("Input file does not exist: {:?}", input),
-                    });
-                    return;
-                }
-                
-                let statement = crate::ai::document_ai::BankStatement {
-                    bank_name: None,
-                    account_number: None,
-                    opening_balance: rust_decimal::Decimal::new(0, 2),
-                    closing_balance: rust_decimal::Decimal::new(0, 2),
-                    transactions: vec![],
-                    total_pages: 1,
-                };
-                
-                let typst_engine = crate::engine::typst_engine::TypstEngine::new();
-                let reconstruct_future = typst_engine.reconstruct_pdf(&statement, &output);
-                
-                match tokio::time::timeout(std::time::Duration::from_secs(30), reconstruct_future).await {
-                    Ok(Ok(_)) => {
-                        let _ = tx.send(JobResult::ReconstructComplete {
-                            output_path: output.clone(),
-                        });
-                    }
-                    Ok(Err(e)) => {
-                        let _ = tx.send(JobResult::Error {
-                            job_label: "typst_reconstruct".into(),
-                            message: format!("Typst error: {}", e),
-                        });
-                    }
-                    Err(_) => {
-                        let _ = tx.send(JobResult::Error {
-                            job_label: "typst_reconstruct".into(),
-                            message: "Typst reconstruction timed out after 30 seconds.".into(),
-                        });
-                    }
-                }
+                let _ = tx.send(JobResult::Error {
+                    job_label: "typst_reconstruct_disabled".into(),
+                    message: "cannot preserve edit-in-place fidelity".into(),
+                });
             });
         }
         Job::McpRenderPage { input, page } => {

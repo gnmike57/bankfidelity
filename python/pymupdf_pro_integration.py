@@ -3238,6 +3238,62 @@ def _extract_kern_map(page, span: dict, font_obj=None) -> dict:
     return kern_map
 
 
+def _rewrite_stream_to_tj_array(page, kerning_values):
+    """Rewrite the last inserted text stream `Tj` into a native `TJ` array.
+
+    Best-effort forensic helper: failures are silent and leave the plain
+    `Tj` insertion intact.
+    """
+    try:
+        contents = page.get_contents()
+        if not contents:
+            return
+        last_xref = contents[-1]
+        stream_bytes = page.parent.xref_stream(last_xref)
+        if not stream_bytes:
+            return
+
+        stream_str = stream_bytes.decode("ascii", errors="ignore")
+        hex_match = re.search(r"<([0-9a-fA-F]+)>\s*Tj", stream_str)
+        if hex_match:
+            hex_data = hex_match.group(1)
+            if len(hex_data) % 4 == 0 and len(hex_data) // 4 == len(kerning_values) + 1:
+                tj_array = "["
+                for i in range(len(kerning_values) + 1):
+                    glyph_hex = hex_data[i * 4 : (i + 1) * 4]
+                    tj_array += f"<{glyph_hex}> "
+                    if i < len(kerning_values) and abs(kerning_values[i]) > 0.1:
+                        tj_array += f"{kerning_values[i]:.2f} "
+                tj_array += "] TJ"
+                new_stream_str = (
+                    stream_str[: hex_match.start()]
+                    + tj_array
+                    + stream_str[hex_match.end() :]
+                )
+                page.parent.update_stream(last_xref, new_stream_str.encode("ascii"))
+                return
+
+        str_match = re.search(r"\((.*?)\)\s*Tj", stream_str)
+        if str_match:
+            text_data = str_match.group(1)
+            if "\\" not in text_data and len(text_data) == len(kerning_values) + 1:
+                tj_array = "["
+                for i in range(len(kerning_values) + 1):
+                    tj_array += f"({text_data[i]}) "
+                    if i < len(kerning_values) and abs(kerning_values[i]) > 0.1:
+                        tj_array += f"{kerning_values[i]:.2f} "
+                tj_array += "] TJ"
+                new_stream_str = (
+                    stream_str[: str_match.start()]
+                    + tj_array
+                    + stream_str[str_match.end() :]
+                )
+                page.parent.update_stream(last_xref, new_stream_str.encode("ascii"))
+                return
+    except Exception:
+        pass
+
+
 def _insert_kerned_text(
     page,
     origin,
@@ -3252,15 +3308,11 @@ def _insert_kerned_text(
     h_scale: float = 1.0,
     writing_dir: tuple = (1.0, 0.0),
 ):
-    """Place each glyph individually so per-pair kerning matches the
-    Applied to every advance so tabular figures squeeze the way the original
-    renderer fit them, instead of relying solely on negative tracking.
+    """Place replacement text with optional per-pair kerning / glyph origins.
 
-    Stage 14d / Item #1: when `per_glyph_origins` is supplied and the new
-    text length matches the original 1:1, place each new glyph at the
-    original character's exact origin so superscript / vertical-shift
-    markers don't drift on edit. Stage B / Item #7 extends this to the
-    matching prefix+suffix run when lengths differ.
+    Stage 14d / Item #1: when `per_glyph_origins` matches the new text 1:1,
+    reuse exact glyph origins. Otherwise emit the full string (preferred)
+    or walk advances with kern_map / extra_spacing / h_scale.
     """
     f = measure_font
     if f is None:
@@ -3286,63 +3338,6 @@ def _insert_kerned_text(
     ox, oy = origin
     chars = list(new_text)
 
-def _rewrite_stream_to_tj_array(page, kerning_values, is_hex=True):
-    """Intercepts the last inserted text stream and converts the `Tj` operator
-    into a native `TJ` array using the HarfBuzz kerning values.
-    
-    This avoids letter-by-letter `Tm` stepping, matching professional layout
-    engines and passing forensic inspection.
-    """
-    try:
-        contents = page.get_contents()
-        if not contents:
-            return
-        last_xref = contents[-1]
-        stream_bytes = page.parent.xref_stream(last_xref)
-        if not stream_bytes:
-            return
-            
-        stream_str = stream_bytes.decode("ascii", errors="ignore")
-        
-        # Handle Hex Encoded CID strings: <00480065...> Tj
-        import re
-        hex_match = re.search(r'<([0-9a-fA-F]+)>\s*Tj', stream_str)
-        if hex_match:
-            hex_data = hex_match.group(1)
-            # CID fonts usually use 4 hex chars per glyph (2 bytes)
-            if len(hex_data) % 4 == 0 and len(hex_data) // 4 == len(kerning_values) + 1:
-                tj_array = "["
-                for i in range(len(kerning_values) + 1):
-                    glyph_hex = hex_data[i*4 : (i+1)*4]
-                    tj_array += f"<{glyph_hex}> "
-                    if i < len(kerning_values) and abs(kerning_values[i]) > 0.1:
-                        tj_array += f"{kerning_values[i]:.2f} "
-                tj_array += "] TJ"
-                new_stream_str = stream_str[:hex_match.start()] + tj_array + stream_str[hex_match.end():]
-                page.parent.update_stream(last_xref, new_stream_str.encode("ascii"))
-                return
-                
-        # Handle Standard String Encoded strings: (Hello) Tj
-        # Note: PyMuPDF escapes parentheses inside strings, e.g., \( or \). 
-        # For a truly robust parser, we'd need a real PDF string tokenizer.
-        # But for standard bank transactions (numbers/dates), a simple match works.
-        str_match = re.search(r'\((.*?)\)\s*Tj', stream_str)
-        if str_match:
-            text_data = str_match.group(1)
-            # Only proceed if there are no escaped characters to keep mapping 1:1
-            if "\\" not in text_data and len(text_data) == len(kerning_values) + 1:
-                tj_array = "["
-                for i in range(len(kerning_values) + 1):
-                    tj_array += f"({text_data[i]}) "
-                    if i < len(kerning_values) and abs(kerning_values[i]) > 0.1:
-                        tj_array += f"{kerning_values[i]:.2f} "
-                tj_array += "] TJ"
-                new_stream_str = stream_str[:str_match.start()] + tj_array + stream_str[str_match.end():]
-                page.parent.update_stream(last_xref, new_stream_str.encode("ascii"))
-                return
-    except Exception:
-        pass
-
     def _emit(ch, x, y):
         try:
             page.insert_text(
@@ -3358,8 +3353,7 @@ def _rewrite_stream_to_tj_array(page, kerning_values, is_hex=True):
         except Exception:
             return False
 
-    # Exact per-glyph origin reuse is valid only when the character sequence
-    # itself is unchanged.
+    # Exact per-glyph origin reuse only when the character sequence is unchanged.
     if (
         per_glyph_origins
         and len(per_glyph_origins) == len(chars)
@@ -3370,17 +3364,12 @@ def _rewrite_stream_to_tj_array(page, kerning_values, is_hex=True):
                 return
         return
 
-    # Calculate optical kerning for the TJ array
-    optical_kerning = _compute_optical_kerning(font_buffer, new_text, kern_map)
-
-    # Convert extra_spacing (in user units) to 1000ths of text space
-    # 1 unit = fontsize. So extra_spacing in 1000ths is (extra_spacing / fontsize) * 1000
+    # Preferred path: one native text operator, then optional TJ rewrite.
+    pair_deltas = []
+    for i in range(max(len(chars) - 1, 0)):
+        pair = (chars[i], chars[i + 1])
+        pair_deltas.append(float((kern_map or {}).get(pair, 0.0)))
     extra_spacing_1000 = -(extra_spacing / max(fontsize, 1.0)) * 1000.0
-
-    # Optimization: If we have HarfBuzz kerning, we try to emit the whole string 
-    # and convert it to a TJ array in the raw stream. This achieves true forensic
-    # perfection (a single native TJ array) while safely letting PyMuPDF handle 
-    # the complex Unicode-to-CID CMap encoding.
     try:
         page.insert_text(
             point=pymupdf.Point(ox, oy),
@@ -3391,40 +3380,54 @@ def _rewrite_stream_to_tj_array(page, kerning_values, is_hex=True):
             render_mode=0,
             overlay=True,
         )
-        
-        # Convert the extra_spacing (condensing) to PDF 1000ths
-        extra_spacing_1000 = -(extra_spacing / max(fontsize, 1.0)) * 1000.0
-        combined_kerning = [k + extra_spacing_1000 for k in optical_kerning]
-        
-        # Rewrite the appended PyMuPDF stream to a native TJ array!
-        _rewrite_stream_to_tj_array(page, combined_kerning)
+        if pair_deltas:
+            combined = [delta + extra_spacing_1000 for delta in pair_deltas]
+            _rewrite_stream_to_tj_array(page, combined)
         return
     except Exception:
         pass
-        
-    # Fallback to visual cursor walking if stream rewriting fails
+
+    # Fallback: walk glyphs with measured advances + pair kerning.
     dx, dy = writing_dir
     cx, cy = float(ox), float(oy)
-    
     for i, ch in enumerate(chars):
         if not _emit(ch, cx, cy):
             return
         if i + 1 >= len(chars):
             break
-            
         try:
             adv = float(f.text_length(ch, fontsize=fontsize)) * h_scale
         except Exception:
             adv = fontsize * 0.5
-            
-        # Convert the PDF 1000ths kerning value back to user units for cursor math
-        # PDF TJ: positive value subtracts from advance (moves left)
-        tj_val = optical_kerning[i] + extra_spacing_1000
-        kerning_user_units = -(tj_val / 1000.0) * fontsize
-        
-        step = adv + kerning_user_units
+        pair_kern = float((kern_map or {}).get((chars[i], chars[i + 1]), 0.0))
+        step = adv + pair_kern + extra_spacing
         cx += dx * step
         cy += dy * step
+
+
+def _expand_date_suffix_edit(old_text: str, new_text: str, span: dict, rect):
+    """When old_text matched a year-suffixed span (e.g. '01 SEP' vs '01 SEP 23'),
+    expand new_text and the edit rect so the year is rewritten with the date.
+    """
+    span_text = str(span.get("text") or "")
+    span_identity = _normalized_text_identity(span_text)
+    old_identity = _normalized_text_identity(old_text)
+    if not old_identity or not span_identity:
+        return old_text, new_text, rect
+    if not re.fullmatch(r"\d{1,2}\s+[A-Za-z]{3}", old_identity):
+        return old_text, new_text, rect
+    if not span_identity.casefold().startswith(old_identity.casefold()):
+        return old_text, new_text, rect
+    suffix = span_identity[len(old_identity) :].strip()
+    if not re.fullmatch(r"(?:\d{2}|\d{4})", suffix):
+        return old_text, new_text, rect
+    new_identity = _normalized_text_identity(new_text)
+    if not new_identity.casefold().endswith(suffix.casefold()):
+        new_text = f"{str(new_text).strip()} {suffix}"
+    bbox = span.get("bbox")
+    if bbox is not None and len(bbox) >= 4:
+        rect = [float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3])]
+    return span_text, new_text, rect
 
 
 def _insert_text_with_placement(
@@ -3797,6 +3800,13 @@ def apply_many_edits(pdf_path: str, output_path: str, edits: list, font_path: st
             )
         else:
             span = candidates[0]
+            # Bankwest-style inline year dates: span is "01 SEP 23" while the
+            # semantic edit identity is "01 SEP". Expand new_text + rect so the
+            # year is rewritten with the date instead of being orphaned.
+            old_text, new_text, rect = _expand_date_suffix_edit(
+                old_text, new_text, span, rect
+            )
+            rect_obj = pymupdf.Rect(rect)
             target_key = (
                 page_num,
                 tuple(float(value) for value in span.get("bbox", ())),
