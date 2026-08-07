@@ -2028,27 +2028,44 @@ async fn process_job_inner(
         Job::UfoAutoEdit { path, context } => {
             let res_tx = result_tx_clone.clone();
             tokio::spawn(async move {
+                if !path.exists() {
+                    let _ = res_tx.send(JobResult::Error {
+                        job_label: "ufo_dispatch".into(),
+                        message: format!(
+                            "UFO Auto-Edit failed: statement not found at {}",
+                            path.display()
+                        ),
+                    });
+                    return;
+                }
+
                 let _ = res_tx.send(JobResult::Progress {
                     label: "Delegating to BankFidelity UFO Orchestrator...".into(),
                     fraction: 0.5,
                 });
-                
+
                 let request = format!(
-                    "Automatically extract, verify, and fully correct the formatting of the bank statement located at: {:?}\n\n\
+                    "Automatically extract, verify, and fully correct the formatting of the bank statement located at: {}\n\n\
 CRITICAL SELF-CORRECTION PROTOCOL:\n\
 1. After making any modification using `modify_text` or `transfer_transactions`, you MUST immediately call the `verify_layout` tool.\n\
 2. If `verify_layout` reports an SSIM drop below 0.999 or any layout shift, you MUST use `local_ai_chat` to consult the local Qwen model for correction strategies.\n\
-3. Revert or adjust the edit until absolute sub-pixel perfection is restored before finishing the task.\n\n\
-Additional Context:\n{}",
-                    path, context
+3. Revert or adjust the edit until absolute sub-pixel perfection is restored before finishing the task.\n\
+4. Do NOT use `typst_reconstruct` for routine edit-in-place recovery; it cannot preserve edit-in-place visual fidelity. Prefer `modify_text` + `verify_layout` (and segmented 3-page mode for long statements).\n\n\
+Additional Context:\n{context}",
+                    path.display()
                 );
-                
+
                 let res_tx_cb = res_tx.clone();
                 let result = tokio::task::spawn_blocking(move || {
-                    crate::ai::ufo::UfoClient::dispatch_task(&request, Some(move |log_line: String| {
-                        let _ = res_tx_cb.send(JobResult::UfoLog(log_line));
-                    }))
-                }).await.unwrap_or_else(|e| Err(format!("Tokio spawn_blocking panicked: {}", e)));
+                    crate::ai::ufo::UfoClient::dispatch_task(
+                        &request,
+                        Some(move |log_line: String| {
+                            let _ = res_tx_cb.send(JobResult::UfoLog(log_line));
+                        }),
+                    )
+                })
+                .await
+                .unwrap_or_else(|e| Err(format!("Tokio spawn_blocking panicked: {e}")));
 
                 match result {
                     Ok(val) => {
@@ -2057,7 +2074,7 @@ Additional Context:\n{}",
                     Err(e) => {
                         let _ = res_tx.send(JobResult::Error {
                             job_label: "ufo_dispatch".into(),
-                            message: format!("UFO Auto-Edit failed: {}", e),
+                            message: format!("UFO Auto-Edit failed: {e}"),
                         });
                     }
                 }

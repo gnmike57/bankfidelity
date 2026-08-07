@@ -1190,11 +1190,27 @@ pub fn run_inner(
         Commands::Ufo { request } => {
             match crate::ai::ufo::UfoClient::dispatch_task(&request, None::<fn(String)>) {
                 Ok(result) => {
-                    println!("UFO Task Result:\n{}", serde_json::to_string_pretty(&result).unwrap_or_default());
-                    Ok(exit_code::SUCCESS)
+                    println!(
+                        "UFO Task Result:\n{}",
+                        serde_json::to_string_pretty(&result).unwrap_or_default()
+                    );
+                    // Defensive: older clients may still embed status:"error" in Ok.
+                    if result.get("status").and_then(|s| s.as_str()) == Some("error") {
+                        tracing::error!(
+                            "UFO returned error status: {}",
+                            result
+                                .get("message")
+                                .and_then(|m| m.as_str())
+                                .unwrap_or("unknown")
+                        );
+                        Ok(exit_code::GENERAL)
+                    } else {
+                        Ok(exit_code::SUCCESS)
+                    }
                 }
                 Err(e) => {
                     tracing::error!("UFO dispatch failed: {}", e);
+                    eprintln!("UFO dispatch failed: {e}");
                     Ok(exit_code::GENERAL)
                 }
             }

@@ -162,6 +162,7 @@ impl PdfEngineSelector {
                             "PyMuPDF engine failed, falling back to Native engine"
                         );
                         let fallback_res = run_safe(&*self.fallback);
+                        println!("SELECTOR FALLBACK TRIGGERED! Error: {:?}", e);
                         match fallback_res {
                             Ok(res) => Ok(res),
                             Err(EngineError::ApplyFailed(ref msg))

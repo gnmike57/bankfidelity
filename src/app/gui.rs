@@ -404,10 +404,10 @@ pub struct MyApp {
     docai_training_status: Option<String>,
     /// Active long-running operation name (training, deploy, etc.)
     docai_active_operation: Option<String>,
-    /// Streaming logs from the UFO process
-    ufo_logs: Vec<String>,
-    /// Whether UFO is actively running
-    is_ufo_running: bool,
+    /// Streaming logs from the UFO process (public for E2E/status surfaces).
+    pub ufo_logs: Vec<String>,
+    /// Whether UFO is actively running (public for E2E and cancel UI state).
+    pub is_ufo_running: bool,
 }
 
 impl MyApp {
@@ -1552,12 +1552,24 @@ impl MyApp {
                 self.is_ufo_running = false;
                 self.in_flight = self.in_flight.saturating_sub(1);
                 self.progress = None;
-                
+
+                let status = val["status"].as_str().unwrap_or("unknown");
                 let task_id = val["task_id"].as_str().unwrap_or("unknown");
-                self.toast(
-                    ToastKind::Success,
-                    format!("UFO Auto-Edit Complete (Task: {})", task_id),
-                );
+                if status == "success" {
+                    self.toast(
+                        ToastKind::Success,
+                        format!("UFO Auto-Edit Complete (Task: {task_id})"),
+                    );
+                } else {
+                    let message = val["message"]
+                        .as_str()
+                        .or_else(|| val["output"].as_str())
+                        .unwrap_or("UFO task finished without success");
+                    self.toast(
+                        ToastKind::Error,
+                        format!("UFO Auto-Edit failed (Task: {task_id}): {message}"),
+                    );
+                }
             }
 
             JobResult::McpRenderComplete { .. } => {
@@ -2568,22 +2580,39 @@ impl MyApp {
                     if auto_edit_btn.clicked() {
                         if self.current_pdf_path.exists() {
                             let mut context = "BankFidelity State Context:\n".to_string();
-                            context.push_str(&format!("Total Transactions loaded: {}\n", self.workflow_transactions.len()));
+                            context.push_str(&format!(
+                                "Total Transactions loaded: {}\n",
+                                self.workflow_transactions.len()
+                            ));
                             if let Some(err) = &self.last_imbalance {
-                                context.push_str(&format!("Current Error: Statement is out of balance. Difference: {:.2}\n", err));
+                                context.push_str(&format!(
+                                    "Current Error: Statement is out of balance. Difference: {:.2}\n",
+                                    err
+                                ));
                             } else if let Some(verification) = &self.last_verification {
-                                context.push_str(&format!("Verification State: {:#?}\n", verification));
+                                context.push_str(&format!(
+                                    "Verification State: {verification:#?}\n"
+                                ));
                             }
-                            
+
                             self.ufo_logs.clear();
-                            self.is_ufo_running = true;
-                            if let Err(e) = self.dispatch_workflow_job(Job::UfoAutoEdit {
+                            match self.dispatch_workflow_job(Job::UfoAutoEdit {
                                 path: self.current_pdf_path.clone(),
                                 context,
                             }) {
-                                tracing::error!("Failed to dispatch Auto-Edit: {}", e);
+                                Ok(_) => {
+                                    self.is_ufo_running = true;
+                                    self.in_flight += 1;
+                                }
+                                Err(e) => {
+                                    self.is_ufo_running = false;
+                                    tracing::error!("Failed to dispatch Auto-Edit: {e}");
+                                    self.toast(
+                                        ToastKind::Error,
+                                        format!("Failed to start UFO Auto-Edit: {e}"),
+                                    );
+                                }
                             }
-                            self.in_flight += 1;
                         } else {
                             self.toast(ToastKind::Warn, "Please open a statement first.");
                         }
@@ -2604,7 +2633,12 @@ impl MyApp {
 
                         if cancel_btn.clicked() {
                             let _ = self.dispatch_workflow_job(Job::CancelUfo);
+                            // Fail-closed local state: cancel is fire-and-forget
+                            // at the process level; clear GUI busy flags now so
+                            // the UI does not stay stuck if no further result arrives.
                             self.is_ufo_running = false;
+                            self.in_flight = self.in_flight.saturating_sub(1);
+                            self.progress = None;
                             self.toast(ToastKind::Warn, "UFO Task Cancelled.");
                         }
                     }
