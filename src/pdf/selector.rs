@@ -288,17 +288,26 @@ impl PdfEngine for PdfEngineSelector {
             }
         }
         let mut blocks = self.dispatch_read(|engine| engine.get_text_blocks(path, page))?;
-        if blocks.is_empty() && self.current_mode() == crate::app::config::PdfEngineMode::DualConcurrent {
-            let fallback_res = self.fallback.get_text_blocks(path, page);
-            println!("DEBUG: fallback_res for page {} is {:?}", page, fallback_res.as_ref().map(|b| b.len()));
-            if let Ok(fallback_blocks) = fallback_res {
-                if !fallback_blocks.is_empty() {
-                    tracing::warn!("Primary engine returned 0 blocks, but fallback found {} blocks. Using fallback.", fallback_blocks.len());
+        // DualConcurrent: if the preferred primary returns no text layer,
+        // try the native fallback once before caching the empty result.
+        if blocks.is_empty()
+            && self.current_mode() == crate::app::config::PdfEngineMode::DualConcurrent
+        {
+            match self.fallback.get_text_blocks(path, page) {
+                Ok(fallback_blocks) if !fallback_blocks.is_empty() => {
+                    tracing::warn!(
+                        page,
+                        count = fallback_blocks.len(),
+                        "Primary text extraction empty; using native fallback blocks"
+                    );
                     blocks = fallback_blocks;
+                }
+                Ok(_) => {}
+                Err(e) => {
+                    tracing::debug!(page, error = %e, "native fallback get_text_blocks failed");
                 }
             }
         }
-        println!("DEBUG: PdfEngineSelector returning {} blocks for page {}", blocks.len(), page);
         if let Ok(mut cache) = self.caches.blocks.lock() {
             cache.put(key, blocks.clone());
         }
