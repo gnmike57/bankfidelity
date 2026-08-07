@@ -1255,12 +1255,39 @@ impl JobResult {
     /// terminal merely because they are not progress messages.
     pub fn disposition(&self) -> Option<OperationDisposition> {
         match self {
-            Self::Error { .. } | Self::WorkflowFailed(_) | Self::TransferFailed { .. } => {
+            Self::Error { .. }
+            | Self::WorkflowFailed(_)
+            | Self::TransferFailed { .. }
+            | Self::DocAiVersionError(_)
+            | Self::NuclearFallbackRequired(_) => {
                 Some(OperationDisposition::Failed)
             }
             Self::Cancelled { .. } => Some(OperationDisposition::Cancelled),
             Self::TimedOut { .. } => Some(OperationDisposition::TimedOut),
-            Self::WorkflowComplete(_) | Self::TransferComplete(_) => {
+            Self::WorkflowComplete(_) 
+            | Self::TransferComplete(_)
+            | Self::Pong
+            | Self::UfoAutoEditResult(_)
+            | Self::McpRenderComplete { .. }
+            | Self::PageRendered { .. }
+            | Self::ChangeApplied { .. }
+            | Self::FontCompleted(_)
+            | Self::ChangeHistoryExported { .. }
+            | Self::TransactionsExtracted(_)
+            | Self::NaturalLanguageEditReady(_)
+            | Self::CategorizationReady(_)
+            | Self::VerificationReport(_)
+            | Self::BalanceProposed { .. }
+            | Self::ProposedChangesApplied { .. }
+            | Self::ConfigReloaded { .. }
+            | Self::ImbalanceExplained { .. }
+            | Self::ReconstructComplete { .. }
+            | Self::BugReportSubmitted
+            | Self::WorkflowParseValidated { .. }
+            | Self::WorkflowPreviewBuilt(_)
+            | Self::VisualAlternativesReady(_)
+            | Self::DatesAdjusted { .. }
+            | Self::TransferTestsComplete(_) => {
                 Some(OperationDisposition::Succeeded)
             }
             Self::JobCompleted { disposition, .. } => Some(*disposition),

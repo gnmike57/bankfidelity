@@ -124,8 +124,11 @@ fn test_all_au_transfer_pairs() {
     let _total_pairs = pdfs.len() * (pdfs.len() - 1);
     let mut handles = Vec::new();
 
-    for (_si, source) in pdfs.iter().enumerate() {
-        for (_ti, target) in pdfs.iter().enumerate() {
+    for source in pdfs.iter() {
+        for target in pdfs.iter() {
+            if source == target {
+                continue;
+            }
             let source = source.clone();
             let target = target.clone();
             let cfg = cfg.clone();
