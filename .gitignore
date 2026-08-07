@@ -85,7 +85,7 @@ keys/
 
 node_modules/
 
-package-lock.json
+# package-lock.json is tracked for deterministic Node/Applitools installs
 
 # Pdfium binaries are produced or installed by the verified packaging/runtime
 # process; machine-specific copies must not be committed to source control.
