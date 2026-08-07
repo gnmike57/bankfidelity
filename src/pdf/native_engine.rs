@@ -379,7 +379,7 @@ fn collect_native_text_targets(
     let mut current_font = String::from("Unknown");
     let mut font_size = 12.0;
     let mut text_leading = 0.0;
-    let mut in_text = false;
+
     let mut targets = Vec::new();
 
     for (operation_index, operation) in operations.iter().enumerate() {
@@ -405,12 +405,11 @@ fn collect_native_text_targets(
                 ctm = matrix_multiply(ctm, transform);
             }
             "BT" => {
-                in_text = true;
                 tm = identity;
                 tlm = identity;
             }
-            "ET" => in_text = false,
-            "Tf" if in_text => {
+            "ET" => {}
+            "Tf" => {
                 if operation.operands.len() >= 2 {
                     if let lopdf::Object::Name(name) = &operation.operands[0] {
                         current_font = String::from_utf8_lossy(name).to_string();
@@ -420,14 +419,14 @@ fn collect_native_text_targets(
                     })?;
                 }
             }
-            "Tl" if in_text => {
+            "Tl" => {
                 if let Some(operand) = operation.operands.first() {
                     text_leading = operand_to_f32(operand).ok_or_else(|| {
                         EngineError::ApplyFailed("non-numeric text leading".into())
                     })?;
                 }
             }
-            "Tm" if in_text => {
+            "Tm" => {
                 if operation.operands.len() != 6 {
                     return Err(EngineError::ApplyFailed(
                         "malformed six-operand text matrix".into(),
@@ -440,7 +439,7 @@ fn collect_native_text_targets(
                 }
                 tlm = tm;
             }
-            "Td" | "TD" if in_text => {
+            "Td" | "TD" => {
                 if operation.operands.len() < 2 {
                     return Err(EngineError::ApplyFailed(
                         "malformed text-line translation".into(),
@@ -459,7 +458,7 @@ fn collect_native_text_targets(
                 tlm[5] += tlm[1] * tx + tlm[3] * ty;
                 tm = tlm;
             }
-            "T*" if in_text => {
+            "T*" => {
                 let shift = if text_leading == 0.0 {
                     font_size
                 } else {
@@ -469,7 +468,7 @@ fn collect_native_text_targets(
                 tlm[5] -= tlm[3] * shift;
                 tm = tlm;
             }
-            "Tj" | "TJ" if in_text => {
+            "Tj" | "TJ" => {
                 if let Some((text, advance)) = operation_text_and_advance(operation, font_size) {
                     if !text.trim().is_empty() {
                         targets.push(NativeTextTarget {
@@ -486,7 +485,7 @@ fn collect_native_text_targets(
                     tm[5] += tm[1] * advance;
                 }
             }
-            "'" | "\"" if in_text => {
+            "'" | "\"" => {
                 return Err(EngineError::ApplyFailed(
                     "native exact editor does not support quote text-show operators".into(),
                 ));
@@ -552,6 +551,70 @@ fn expand_new_text_for_date_suffix(target_text: &str, old_text: &str, new_text: 
         return new_text.to_string();
     }
     format!("{} {}", new_text.trim(), suffix)
+}
+
+/// Multi-line descriptions often split across adjacent PDF text operators.
+/// Find a contiguous run of targets (by y then x) whose joined identity matches
+/// `old_text` and whose union bbox overlaps the edit rect.
+fn find_multiline_native_targets<'a>(
+    targets: &'a [NativeTextTarget],
+    edit_rect: [f32; 4],
+    old_text: &str,
+) -> Option<Vec<&'a NativeTextTarget>> {
+    let identity = normalized_text_identity(old_text);
+    if identity.is_empty() {
+        return None;
+    }
+    let mut ordered: Vec<&NativeTextTarget> = targets.iter().collect();
+    ordered.sort_by(|a, b| {
+        let ay = (a.bbox[1] + a.bbox[3]) / 2.0;
+        let by = (b.bbox[1] + b.bbox[3]) / 2.0;
+        ay.partial_cmp(&by)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| {
+                a.bbox[0]
+                    .partial_cmp(&b.bbox[0])
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+    });
+    // Prefer shorter runs; scan contiguous windows.
+    for start in 0..ordered.len() {
+        for end in (start + 2)..=ordered.len().min(start + 6) {
+            let chunk = &ordered[start..end];
+            let joined = normalized_text_identity(
+                &chunk
+                    .iter()
+                    .map(|t| t.text.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            );
+            if !joined.eq_ignore_ascii_case(&identity) {
+                continue;
+            }
+            let union = [
+                chunk
+                    .iter()
+                    .map(|t| t.bbox[0])
+                    .fold(f32::INFINITY, f32::min),
+                chunk
+                    .iter()
+                    .map(|t| t.bbox[1])
+                    .fold(f32::INFINITY, f32::min),
+                chunk
+                    .iter()
+                    .map(|t| t.bbox[2])
+                    .fold(f32::NEG_INFINITY, f32::max),
+                chunk
+                    .iter()
+                    .map(|t| t.bbox[3])
+                    .fold(f32::NEG_INFINITY, f32::max),
+            ];
+            if bbox_overlap_fraction(edit_rect, union) >= 0.25 {
+                return Some(chunk.to_vec());
+            }
+        }
+    }
+    None
 }
 
 fn inherited_page_rotation(doc: &lopdf::Document, page_id: lopdf::ObjectId) -> i32 {
@@ -1317,36 +1380,64 @@ impl PdfEngine for OxidizePdfEngine {
                         })
                         .collect();
                 }
-                if candidates.is_empty() {
-                    return Err(EngineError::ApplyFailed(format!(
-                        "edit {edit_index} stable target not found on page {page_index}: old_text={:?}, rect={:?}",
-                        edit.old_text, edit.rect
-                    )));
+
+                if candidates.len() == 1 {
+                    let selected = candidates[0];
+                    let operation_index = selected.operation_index;
+                    if !selected_operations.insert(operation_index) {
+                        return Err(EngineError::ApplyFailed(format!(
+                            "multiple edits select page {page_index} operation {operation_index}"
+                        )));
+                    }
+                    replacements.push((
+                        operation_index,
+                        expand_new_text_for_date_suffix(
+                            &selected.text,
+                            &edit.old_text,
+                            &edit.new_text,
+                        ),
+                        true, // primary operator receives full new text
+                    ));
+                    continue;
                 }
-                if candidates.len() != 1 {
+
+                if candidates.len() > 1 {
                     return Err(EngineError::ApplyFailed(format!(
                         "edit {edit_index} is ambiguous on page {page_index}: {} operators match old_text={:?} and rect={:?}",
                         candidates.len(), edit.old_text, edit.rect
                     )));
                 }
-                let selected = candidates[0];
-                let operation_index = selected.operation_index;
-                if !selected_operations.insert(operation_index) {
-                    return Err(EngineError::ApplyFailed(format!(
-                        "multiple edits select page {page_index} operation {operation_index}"
-                    )));
+
+                // Multi-line description: join contiguous operators inside rect.
+                if let Some(chunk) =
+                    find_multiline_native_targets(&targets, edit.rect, &edit.old_text)
+                {
+                    for (i, selected) in chunk.iter().enumerate() {
+                        let operation_index = selected.operation_index;
+                        if !selected_operations.insert(operation_index) {
+                            return Err(EngineError::ApplyFailed(format!(
+                                "multiple edits select page {page_index} operation {operation_index}"
+                            )));
+                        }
+                        // Put full new text on the first span; blank the rest so
+                        // stale wrap lines do not remain after the rewrite.
+                        let replacement = if i == 0 {
+                            edit.new_text.clone()
+                        } else {
+                            String::new()
+                        };
+                        replacements.push((operation_index, replacement, i == 0));
+                    }
+                    continue;
                 }
-                replacements.push((
-                    operation_index,
-                    expand_new_text_for_date_suffix(
-                        &selected.text,
-                        &edit.old_text,
-                        &edit.new_text,
-                    ),
-                ));
+
+                return Err(EngineError::ApplyFailed(format!(
+                    "edit {edit_index} stable target not found on page {page_index}: old_text={:?}, rect={:?}",
+                    edit.old_text, edit.rect
+                )));
             }
 
-            for (operation_index, replacement_text) in replacements {
+            for (operation_index, replacement_text, _is_primary) in replacements {
                 let operation = content.operations.get_mut(operation_index).ok_or_else(|| {
                     EngineError::ApplyFailed(format!(
                         "resolved operation {operation_index} disappeared on page {page_index}"
@@ -1602,6 +1693,42 @@ mod tests {
             expand_new_text_for_date_suffix("CREDIT INTEREST", "CREDIT INTEREST", "FEE"),
             "FEE"
         );
+    }
+
+    #[test]
+    fn multiline_native_targets_join_contiguous_description_spans() {
+        let targets = vec![
+            NativeTextTarget {
+                operation_index: 1,
+                text: "Payment to".into(),
+                bbox: [10.0, 100.0, 80.0, 112.0],
+                font: "Helv".into(),
+                size: 10.0,
+            },
+            NativeTextTarget {
+                operation_index: 2,
+                text: "Merchant XYZ".into(),
+                bbox: [10.0, 114.0, 100.0, 126.0],
+                font: "Helv".into(),
+                size: 10.0,
+            },
+            NativeTextTarget {
+                operation_index: 3,
+                text: "Unrelated".into(),
+                bbox: [10.0, 200.0, 80.0, 212.0],
+                font: "Helv".into(),
+                size: 10.0,
+            },
+        ];
+        let found = find_multiline_native_targets(
+            &targets,
+            [5.0, 95.0, 120.0, 130.0],
+            "Payment to Merchant XYZ",
+        )
+        .expect("should join two wrap lines");
+        assert_eq!(found.len(), 2);
+        assert_eq!(found[0].operation_index, 1);
+        assert_eq!(found[1].operation_index, 2);
     }
 
     #[test]

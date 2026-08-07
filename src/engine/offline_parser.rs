@@ -39,7 +39,17 @@ pub fn parse_statement_offline(
 
     for page in 0..total_pages {
         #[allow(unused_mut)] // mutated only when cfg(feature = "ocr") is active
-        let mut blocks = engine.get_text_blocks(pdf_path, page).unwrap_or_default();
+        let mut blocks = match engine.get_text_blocks(pdf_path, page) {
+            Ok(b) => b,
+            Err(e) => {
+                tracing::warn!(
+                    page,
+                    error = %e,
+                    "[offline_parser] get_text_blocks failed; treating page as empty"
+                );
+                Vec::new()
+            }
+        };
 
         #[cfg(feature = "ocr")]
         {
@@ -51,6 +61,20 @@ pub fn parse_statement_offline(
                 blocks = extract_text_via_ocr(pdf_path, page, engine.clone());
             }
         }
+
+        // Stable reading order before row clustering (top→bottom, then left→right).
+        blocks.sort_by(|a, b| {
+            let y_a = (a.bbox[1] + a.bbox[3]) / 2.0;
+            let y_b = (b.bbox[1] + b.bbox[3]) / 2.0;
+            if (y_a - y_b).abs() < 5.0 {
+                a.bbox[0]
+                    .partial_cmp(&b.bbox[0])
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            } else {
+                y_a.partial_cmp(&y_b)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            }
+        });
 
         // Cluster blocks into rows by y-coordinate proximity (±5pt)
         let mut current_y: Option<f32> = None;
