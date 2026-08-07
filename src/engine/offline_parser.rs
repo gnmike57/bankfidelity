@@ -244,6 +244,92 @@ static CLOSING_KW: &[&str] = &[
     "carried forward",
 ];
 
+/// Max vertical gap (PDF points) for attaching a description-only continuation
+/// line onto the previous offline transaction. Mirrors the Python geometry
+/// `continuation_gap` upper bound.
+const OFFLINE_CONTINUATION_GAP_PTS: f32 = 34.0;
+
+fn is_balance_keyword_row(text_lower: &str) -> bool {
+    OPENING_KW.iter().any(|kw| text_lower.contains(kw))
+        || CLOSING_KW.iter().any(|kw| text_lower.contains(kw))
+}
+
+/// Expand `previous` with a description-only continuation row when the vertical
+/// gap is non-negative and within the offline continuation budget.
+fn attach_offline_continuation(previous: &mut Transaction, row: &RawRow) -> bool {
+    let Some(prev_bbox) = previous.bbox else {
+        return false;
+    };
+    let gap = row.bbox[1] - prev_bbox[3];
+    if !(0.0..=OFFLINE_CONTINUATION_GAP_PTS).contains(&gap) {
+        return false;
+    }
+    let cont = row.text.trim();
+    if cont.is_empty() {
+        return false;
+    }
+    if !previous.raw_text.ends_with(' ') && !cont.starts_with(' ') {
+        previous.raw_text.push(' ');
+    }
+    previous.raw_text.push_str(cont);
+    previous.bbox = Some([
+        prev_bbox[0].min(row.bbox[0]),
+        prev_bbox[1].min(row.bbox[1]),
+        prev_bbox[2].max(row.bbox[2]),
+        prev_bbox[3].max(row.bbox[3]),
+    ]);
+    if let Some(desc) = previous.field_bboxes.description.as_mut() {
+        desc[0] = desc[0].min(row.bbox[0]);
+        desc[1] = desc[1].min(row.bbox[1]);
+        desc[2] = desc[2].max(row.bbox[2]);
+        desc[3] = desc[3].max(row.bbox[3]);
+    } else {
+        previous.field_bboxes.description = Some(row.bbox);
+    }
+    true
+}
+
+/// Attach a description-only row that sits *above* a dated transaction
+/// (Westpac-style preceding description).
+fn attach_offline_preceding(tx: &mut Transaction, pending: &RawRow) -> bool {
+    let Some(tx_bbox) = tx.bbox else {
+        return false;
+    };
+    let gap = tx_bbox[1] - pending.bbox[3];
+    if !(0.0..=OFFLINE_CONTINUATION_GAP_PTS).contains(&gap) {
+        return false;
+    }
+    let pending_text = pending.text.trim();
+    if pending_text.is_empty() {
+        return false;
+    }
+    // Prefer prepending so description reads naturally before the dated line.
+    if !tx.raw_text.contains(pending_text) {
+        let mut combined = String::with_capacity(pending_text.len() + tx.raw_text.len() + 1);
+        combined.push_str(pending_text);
+        if !tx.raw_text.starts_with(' ') {
+            combined.push(' ');
+        }
+        combined.push_str(&tx.raw_text);
+        tx.raw_text = combined;
+    }
+    tx.bbox = Some([
+        tx_bbox[0].min(pending.bbox[0]),
+        tx_bbox[1].min(pending.bbox[1]),
+        tx_bbox[2].max(pending.bbox[2]),
+        tx_bbox[3].max(pending.bbox[3]),
+    ]);
+    if let Some(desc) = tx.field_bboxes.description.as_mut() {
+        desc[0] = desc[0].min(pending.bbox[0]);
+        desc[1] = desc[1].min(pending.bbox[1]);
+        desc[2] = desc[2].max(pending.bbox[2]);
+        desc[3] = desc[3].max(pending.bbox[3]);
+    } else {
+        tx.field_bboxes.description = Some(pending.bbox);
+    }
+    true
+}
+
 fn parse_rows_into_transactions(rows: &[RawRow]) -> (Vec<Transaction>, Decimal, Decimal) {
     let mut transactions = Vec::new();
     let mut opening_balance = Decimal::ZERO;
@@ -251,6 +337,8 @@ fn parse_rows_into_transactions(rows: &[RawRow]) -> (Vec<Transaction>, Decimal, 
     let mut found_opening = false;
     let mut found_closing = false;
     let mut continuity_balance: Option<Decimal> = None;
+    // Description-only line waiting for the next dated amount row (preceding).
+    let mut pending_preceding: Option<RawRow> = None;
 
     for row in rows {
         let text_lower = row.text.to_lowercase();
@@ -266,11 +354,31 @@ fn parse_rows_into_transactions(rows: &[RawRow]) -> (Vec<Transaction>, Decimal, 
             opening_balance = *amounts.last().unwrap();
             continuity_balance = Some(opening_balance);
             found_opening = true;
+            pending_preceding = None;
             continue;
         }
         if is_closing && !amounts.is_empty() && !found_closing {
             closing_balance = *amounts.last().unwrap();
             found_closing = true;
+            pending_preceding = None;
+            continue;
+        }
+
+        // Description-only: prefer below-date wrap on previous tx; otherwise
+        // hold as preceding description for the next dated row.
+        if !DATE_RE.is_match(&row.text)
+            && amounts.is_empty()
+            && !is_balance_keyword_row(&text_lower)
+        {
+            if let Some(previous) = transactions.last_mut() {
+                if attach_offline_continuation(previous, row) {
+                    pending_preceding = None;
+                    continue;
+                }
+            }
+            if !row.text.trim().is_empty() {
+                pending_preceding = Some(row.clone());
+            }
             continue;
         }
 
@@ -385,7 +493,7 @@ fn parse_rows_into_transactions(rows: &[RawRow]) -> (Vec<Transaction>, Decimal, 
             continuity_balance = Some(balance);
         }
 
-        transactions.push(Transaction {
+        let mut tx = Transaction {
             page: row.page,
             line_on_page: row.line_on_page,
             date,
@@ -398,7 +506,11 @@ fn parse_rows_into_transactions(rows: &[RawRow]) -> (Vec<Transaction>, Decimal, 
             provenance: Provenance::Computed,
             category: None,
             canonical: Default::default(),
-        });
+        };
+        if let Some(pending) = pending_preceding.take() {
+            let _ = attach_offline_preceding(&mut tx, &pending);
+        }
+        transactions.push(tx);
     }
 
     // If we didn't find explicit opening/closing, try to infer from transactions
@@ -538,6 +650,42 @@ fn extract_account_number(rows: &[RawRow]) -> Option<String> {
     None
 }
 
+/// Split OCR plain text into synthetic per-line `TextBlock`s so the offline
+/// row clusterer and multi-line continuation logic can still run.
+#[cfg(any(feature = "ocr", test))]
+fn ocr_text_to_line_blocks(
+    page: usize,
+    text: &str,
+    width_pts: f32,
+    height_pts: f32,
+) -> Vec<crate::pdf::TextBlock> {
+    let lines: Vec<&str> = text
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect();
+    if lines.is_empty() {
+        return vec![];
+    }
+    let line_height = (height_pts / lines.len() as f32).max(10.0);
+    lines
+        .into_iter()
+        .enumerate()
+        .map(|(index, line)| {
+            let y0 = index as f32 * line_height;
+            let y1 = ((index + 1) as f32 * line_height).min(height_pts.max(y0 + line_height));
+            crate::pdf::TextBlock {
+                page,
+                bbox: [0.0, y0, width_pts, y1],
+                text: line.to_string(),
+                font: String::new(),
+                size: 12.0,
+                obj_id: None,
+            }
+        })
+        .collect()
+}
+
 #[cfg(feature = "ocr")]
 fn extract_text_via_ocr(
     pdf_path: &Path,
@@ -570,18 +718,11 @@ fn extract_text_via_ocr(
                 text.len(),
                 page
             );
-            // Convert OCR text into a single TextBlock covering the full page.
-            // Individual line geometries are not available from the basic text API,
-            // so we treat the entire page as one block for the offline parser to
-            // split into rows.
-            vec![crate::pdf::TextBlock {
-                page,
-                bbox: [0.0, 0.0, rendered.width_pts, rendered.height_pts],
-                text,
-                font: String::new(), // OCR can't determine the original font
-                size: 12.0,          // Default — OCR has no font-size info
-                obj_id: None,        // No PDF object ID for OCR-derived blocks
-            }]
+            // Split OCR text into per-line blocks with synthetic vertical
+            // layout so multi-line transactions and continuation attach can
+            // still operate. True glyph geometry is unavailable from the
+            // basic OCR text API.
+            ocr_text_to_line_blocks(page, &text, rendered.width_pts, rendered.height_pts)
         }
         Err(e) => {
             tracing::warn!(
@@ -687,6 +828,151 @@ mod tests {
         assert_eq!(opening, dec!(1000.00));
         assert_eq!(closing, dec!(1300.00));
         assert_eq!(txs.len(), 2);
+    }
+
+    #[test]
+    fn parse_rows_attaches_below_date_description_continuation() {
+        let rows = vec![
+            RawRow {
+                page: 0,
+                line_on_page: 0,
+                text: "Opening Balance $1,000.00".into(),
+                bbox: [0.0, 0.0, 200.0, 10.0],
+                blocks: Vec::new(),
+            },
+            RawRow {
+                page: 0,
+                line_on_page: 1,
+                text: "15/01/2024 Payment to Merchant XYZ $50.00 $1,050.00".into(),
+                bbox: [0.0, 40.0, 400.0, 52.0],
+                blocks: Vec::new(),
+            },
+            // Below-date wrap: within 34pt of previous bottom (52) → top 60.
+            RawRow {
+                page: 0,
+                line_on_page: 2,
+                text: "Ref 1394711 Osko".into(),
+                bbox: [40.0, 60.0, 200.0, 72.0],
+                blocks: Vec::new(),
+            },
+            RawRow {
+                page: 0,
+                line_on_page: 3,
+                text: "16/01/2024 Coffee Shop $5.00 $1,045.00".into(),
+                bbox: [0.0, 90.0, 400.0, 102.0],
+                blocks: Vec::new(),
+            },
+            // Far continuation must not attach (gap > 34pt).
+            RawRow {
+                page: 0,
+                line_on_page: 4,
+                text: "Orphan far away".into(),
+                bbox: [40.0, 200.0, 200.0, 212.0],
+                blocks: Vec::new(),
+            },
+        ];
+        let (txs, _opening, _closing) = parse_rows_into_transactions(&rows);
+        assert_eq!(txs.len(), 2);
+        assert!(
+            txs[0].raw_text.contains("Payment to Merchant XYZ")
+                && txs[0].raw_text.contains("Ref 1394711 Osko"),
+            "below-date wrap must append to previous raw_text, got {:?}",
+            txs[0].raw_text
+        );
+        assert!(
+            !txs[1].raw_text.contains("Ref 1394711"),
+            "continuation must not attach to next tx: {:?}",
+            txs[1].raw_text
+        );
+        assert!(
+            !txs.iter().any(|t| t.raw_text.contains("Orphan far away")),
+            "out-of-gap orphan must be dropped"
+        );
+        let bbox = txs[0].bbox.expect("bbox");
+        assert!(bbox[3] >= 72.0, "bbox must expand to cover continuation");
+    }
+
+    #[test]
+    fn parse_rows_rejects_above_row_as_continuation() {
+        let rows = vec![
+            RawRow {
+                page: 0,
+                line_on_page: 0,
+                text: "15/01/2024 Deposit $50.00 $150.00".into(),
+                bbox: [0.0, 100.0, 400.0, 112.0],
+                blocks: Vec::new(),
+            },
+            // "Above" the previous bottom — negative gap must not attach.
+            RawRow {
+                page: 0,
+                line_on_page: 1,
+                text: "Should not attach".into(),
+                bbox: [40.0, 50.0, 200.0, 62.0],
+                blocks: Vec::new(),
+            },
+        ];
+        let (txs, _, _) = parse_rows_into_transactions(&rows);
+        assert_eq!(txs.len(), 1);
+        assert!(
+            !txs[0].raw_text.contains("Should not attach"),
+            "negative Y gap must not merge: {:?}",
+            txs[0].raw_text
+        );
+    }
+
+    #[test]
+    fn parse_rows_attaches_preceding_description_to_next_date() {
+        let rows = vec![
+            RawRow {
+                page: 0,
+                line_on_page: 0,
+                text: "14/01/2024 Prior Purchase $10.00 $510.00".into(),
+                bbox: [0.0, 40.0, 400.0, 52.0],
+                blocks: Vec::new(),
+            },
+            // Far enough that it is NOT a below-wrap of the prior row.
+            RawRow {
+                page: 0,
+                line_on_page: 1,
+                text: "Withdrawal-Osko Payment 1394711".into(),
+                bbox: [40.0, 100.0, 280.0, 112.0],
+                blocks: Vec::new(),
+            },
+            RawRow {
+                page: 0,
+                line_on_page: 2,
+                text: "25/09/23 $25.00 $535.00".into(),
+                bbox: [0.0, 120.0, 400.0, 132.0],
+                blocks: Vec::new(),
+            },
+        ];
+        let (txs, _, _) = parse_rows_into_transactions(&rows);
+        assert_eq!(txs.len(), 2);
+        assert!(
+            !txs[0].raw_text.contains("Osko"),
+            "preceding desc must not attach to prior far tx: {:?}",
+            txs[0].raw_text
+        );
+        assert!(
+            txs[1].raw_text.contains("Withdrawal-Osko Payment 1394711"),
+            "preceding desc must prepend to next dated row: {:?}",
+            txs[1].raw_text
+        );
+    }
+
+    #[test]
+    fn ocr_text_splits_into_per_line_blocks() {
+        let blocks = ocr_text_to_line_blocks(
+            0,
+            "15/01/2024 Payment $50.00 $150.00\nRef 1394711\n16/01/2024 Coffee $5.00 $145.00\n",
+            400.0,
+            300.0,
+        );
+        assert_eq!(blocks.len(), 3);
+        assert!(blocks[0].text.contains("Payment"));
+        assert_eq!(blocks[1].text, "Ref 1394711");
+        assert!(blocks[0].bbox[3] <= blocks[1].bbox[1] + 0.01);
+        assert!(blocks[1].bbox[3] <= blocks[2].bbox[1] + 0.01);
     }
 
     #[test]

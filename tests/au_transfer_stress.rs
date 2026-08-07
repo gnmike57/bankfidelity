@@ -21,7 +21,6 @@ use dual_core_pdf_pipeline::engine::transfer::TransferResult;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tempfile::tempdir;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -125,8 +124,8 @@ fn test_all_au_transfer_pairs() {
     let _total_pairs = pdfs.len() * (pdfs.len() - 1);
     let mut handles = Vec::new();
 
-    for (si, source) in pdfs.iter().enumerate() {
-        for (ti, target) in pdfs.iter().enumerate() {
+    for (_si, source) in pdfs.iter().enumerate() {
+        for (_ti, target) in pdfs.iter().enumerate() {
 
 
             let source = source.clone();

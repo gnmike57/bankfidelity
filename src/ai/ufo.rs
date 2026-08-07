@@ -14,6 +14,7 @@ impl UfoClient {
             tracing::warn!("Cancelling UFO Task with PID: {}", pid);
             let _ = Command::new("taskkill")
                 .arg("/F")
+                .arg("/T")
                 .arg("/PID")
                 .arg(pid.to_string())
                 .output();
@@ -74,21 +75,17 @@ impl UfoClient {
         let stderr_thread = std::thread::spawn(move || {
             use std::io::{BufRead, BufReader};
             let reader = BufReader::new(stderr);
-            for line in reader.lines() {
-                if let Ok(l) = line {
-                    tracing::warn!("[UFO-STDERR] {}", l);
-                }
+            for line in reader.lines().flatten() {
+                tracing::warn!("[UFO-STDERR] {}", line);
             }
         });
 
         use std::io::{BufRead, BufReader};
         let reader = BufReader::new(stdout);
-        for line in reader.lines() {
-            if let Ok(l) = line {
-                tracing::info!("[UFO] {}", l);
-                if let Some(cb) = on_log.as_mut() {
-                    cb(l);
-                }
+        for line in reader.lines().flatten() {
+            tracing::info!("[UFO] {}", line);
+            if let Some(cb) = on_log.as_mut() {
+                cb(line);
             }
         }
 

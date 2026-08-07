@@ -398,91 +398,274 @@ impl LlamaParseClient {
         &self,
         markdown: &str,
     ) -> Result<BankStatement, LlamaParseError> {
-        let mut transactions = Vec::new();
-        let mut in_table = false;
-        let mut line_on_page = 0;
+        parse_markdown_to_statement_inner(markdown)
+    }
+}
 
-        for line in markdown.lines() {
-            let line = line.trim();
-            if line.starts_with('|') {
-                if line.contains("---") {
-                    in_table = true;
-                    continue;
-                }
-                if in_table {
-                    let parts: Vec<&str> = line.split('|').map(|s| s.trim()).collect();
-                    // | Date | Description | Debit | Credit | Balance | -> split yields at least 7 parts if properly closed, or 6
-                    if parts.len() >= 5 {
-                        let date = parts.get(1).unwrap_or(&"").to_string();
-                        let desc = parts.get(2).unwrap_or(&"").to_string();
+/// Parse LlamaParse markdown tables into a `BankStatement`.
+///
+/// Page markers (`Page N`, `# Page N`) advance a 0-based page counter so
+/// multi-page statements keep correct identities for transfer/geometry merge.
+/// Empty-date description rows append onto the previous transaction (multi-line).
+fn parse_markdown_to_statement_inner(
+    markdown: &str,
+) -> Result<BankStatement, LlamaParseError> {
+    let mut transactions: Vec<crate::engine::model::Transaction> = Vec::new();
+    let mut in_table = false;
+    let mut line_on_page = 0usize;
+    // 0-based page index aligned with offline_parser / Document AI.
+    let mut current_page = 0usize;
+    let mut max_page = 0usize;
+    let mut opening_balance = Decimal::ZERO;
+    let mut closing_balance = Decimal::ZERO;
+    let mut found_opening = false;
+    let mut found_closing = false;
 
-                        let parse_dec = |s: &str| -> Option<Decimal> {
-                            let cleaned = s.replace(['$', ',', ' '], "");
-                            cleaned.parse::<Decimal>().ok()
-                        };
+    let page_marker = regex::Regex::new(
+        r"(?i)^(?:#{1,6}\s*)?(?:page|pg\.?)\s*(\d+)\s*(?:of\s*\d+)?\s*$",
+    )
+    .expect("page marker regex");
+    let opening_re = regex::Regex::new(
+        r"(?i)(?:opening|beginning)\s+balance[^0-9\-\(]*(-?\$?[\d,]+\.\d{2})",
+    )
+    .expect("opening balance regex");
+    let closing_re = regex::Regex::new(
+        r"(?i)(?:closing|ending)\s+balance[^0-9\-\(]*(-?\$?[\d,]+\.\d{2})",
+    )
+    .expect("closing balance regex");
 
-                        let debit = parts.get(3).and_then(|s| parse_dec(s));
-                        let credit = parts.get(4).and_then(|s| parse_dec(s));
-                        let balance = parts.get(5).and_then(|s| parse_dec(s));
+    let parse_dec = |s: &str| -> Option<Decimal> {
+        let cleaned = s.replace(['$', ',', ' ', '(', ')'], "");
+        if cleaned.is_empty() || cleaned == "-" || cleaned == "—" {
+            return None;
+        }
+        cleaned.parse::<Decimal>().ok()
+    };
 
-                        if !date.is_empty() && (debit.is_some() || credit.is_some()) {
-                            line_on_page += 1;
-                            transactions.push(crate::engine::model::Transaction {
-                                page: 1,
-                                line_on_page,
-                                date,
-                                raw_text: desc,
-                                debit,
-                                credit,
-                                running_balance: balance,
-                                bbox: None,
-                                field_bboxes: Default::default(),
-                                provenance: crate::engine::model::Provenance::Computed,
-                                category: None,
-                                canonical: Default::default(),
-                            });
-                        } else if date.is_empty()
-                            && debit.is_none()
-                            && credit.is_none()
-                            && balance.is_none()
-                            && !desc.is_empty()
-                        {
-                            // This is likely a continuation row (e.g. description spilling over a page boundary)
-                            if let Some(last_tx) = transactions.last_mut() {
-                                if !last_tx.raw_text.ends_with(' ') && !desc.starts_with(' ') {
-                                    last_tx.raw_text.push(' ');
-                                }
-                                last_tx.raw_text.push_str(&desc);
-                            }
-                        }
-                    }
-                }
-            } else {
+    for raw_line in markdown.lines() {
+        let line = raw_line.trim();
+        if line.is_empty() {
+            continue;
+        }
+
+        if let Some(caps) = page_marker.captures(line) {
+            if let Ok(n) = caps[1].parse::<usize>() {
+                // Markdown page labels are typically 1-based.
+                current_page = n.saturating_sub(1);
+                max_page = max_page.max(current_page);
+                line_on_page = 0;
                 in_table = false;
+            }
+            continue;
+        }
+
+        if !found_opening {
+            if let Some(caps) = opening_re.captures(line) {
+                if let Some(v) = parse_dec(caps.get(1).map(|m| m.as_str()).unwrap_or("")) {
+                    opening_balance = v;
+                    found_opening = true;
+                }
+            }
+        }
+        if !found_closing {
+            if let Some(caps) = closing_re.captures(line) {
+                if let Some(v) = parse_dec(caps.get(1).map(|m| m.as_str()).unwrap_or("")) {
+                    closing_balance = v;
+                    found_closing = true;
+                }
             }
         }
 
-        if transactions.is_empty() {
-            tracing::warn!(
-                "[llamaparse] No transactions found in markdown. Returning ExtractionFailed to trigger fallback hook."
-            );
-            return Err(LlamaParseError::ExtractionFailed(
-                "LlamaParse returned markdown but 0 transactions were extracted. Triggering fallback.".into()
-            ));
-        } else {
-            tracing::info!(
-                "[llamaparse] Parsed {} transactions from markdown.",
-                transactions.len()
-            );
-        }
+        if line.starts_with('|') {
+            if line.contains("---") {
+                in_table = true;
+                continue;
+            }
+            if !in_table {
+                // Header row starts a table; skip until separator, but if we
+                // already saw a separator on a previous pass this is fine.
+                // Treat any pipe row with enough cells as table body once past ---.
+                continue;
+            }
+            let parts: Vec<&str> = line.split('|').map(|s| s.trim()).collect();
+            // | Date | Description | Debit | Credit | Balance |
+            // split yields leading/trailing empties → need >= 5 meaningful cells.
+            if parts.len() < 5 {
+                continue;
+            }
+            let date = parts.get(1).unwrap_or(&"").to_string();
+            let desc = parts.get(2).unwrap_or(&"").to_string();
+            let debit = parts.get(3).and_then(|s| parse_dec(s));
+            let credit = parts.get(4).and_then(|s| parse_dec(s));
+            let balance = parts.get(5).and_then(|s| parse_dec(s));
 
-        Ok(BankStatement {
-            total_pages: 1,
-            transactions,
-            opening_balance: Decimal::ZERO,
-            closing_balance: Decimal::ZERO,
-            account_number: None,
-            bank_name: None::<String>,
-        })
+            // Skip obvious header labels.
+            let date_l = date.to_ascii_lowercase();
+            if date_l == "date" || date_l.contains("transaction") {
+                continue;
+            }
+
+            let is_continuation = date.is_empty()
+                && debit.is_none()
+                && credit.is_none()
+                && !desc.is_empty();
+
+            if is_continuation {
+                // Multi-line description wrap (optionally with a balance-only
+                // cell we ignore). Append onto the previous row.
+                if let Some(last_tx) = transactions.last_mut() {
+                    if !last_tx.raw_text.ends_with(' ') && !desc.starts_with(' ') {
+                        last_tx.raw_text.push(' ');
+                    }
+                    last_tx.raw_text.push_str(&desc);
+                    if last_tx.running_balance.is_none() {
+                        last_tx.running_balance = balance;
+                    }
+                }
+                continue;
+            }
+
+            if date.is_empty() || (debit.is_none() && credit.is_none()) {
+                continue;
+            }
+
+            line_on_page += 1;
+            max_page = max_page.max(current_page);
+            let raw_text = if desc.is_empty() {
+                date.clone()
+            } else {
+                format!("{date} {desc}")
+            };
+            transactions.push(crate::engine::model::Transaction {
+                page: current_page,
+                line_on_page,
+                date,
+                raw_text,
+                debit,
+                credit,
+                running_balance: balance,
+                bbox: None,
+                field_bboxes: Default::default(),
+                provenance: crate::engine::model::Provenance::Computed,
+                category: None,
+                canonical: Default::default(),
+            });
+        } else {
+            in_table = false;
+        }
+    }
+
+    if transactions.is_empty() {
+        tracing::warn!(
+            "[llamaparse] No transactions found in markdown. Returning ExtractionFailed to trigger fallback hook."
+        );
+        return Err(LlamaParseError::ExtractionFailed(
+            "LlamaParse returned markdown but 0 transactions were extracted. Triggering fallback."
+                .into(),
+        ));
+    }
+
+    tracing::info!(
+        "[llamaparse] Parsed {} transactions from markdown (pages={}).",
+        transactions.len(),
+        max_page + 1
+    );
+
+    // Infer opening/closing from running balances when not explicit.
+    if !found_opening {
+        if let Some(first) = transactions.first() {
+            if let Some(bal) = first.running_balance {
+                let net = first.debit.unwrap_or(Decimal::ZERO)
+                    - first.credit.unwrap_or(Decimal::ZERO);
+                opening_balance = bal - net;
+            }
+        }
+    }
+    if !found_closing {
+        if let Some(last) = transactions.last() {
+            if let Some(bal) = last.running_balance {
+                closing_balance = bal;
+            }
+        }
+    }
+
+    Ok(BankStatement {
+        total_pages: max_page + 1,
+        transactions,
+        opening_balance,
+        closing_balance,
+        account_number: None,
+        bank_name: None::<String>,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rust_decimal_macros::dec;
+
+    #[test]
+    fn markdown_continuation_appends_to_previous_raw_text() {
+        let md = r#"
+| Date | Description | Debit | Credit | Balance |
+|------|-------------|-------|--------|---------|
+| 15/01/2024 | Payment to Merchant | 50.00 |  | 1050.00 |
+|  | Ref 1394711 Osko |  |  |  |
+| 16/01/2024 | Coffee | 5.00 |  | 1045.00 |
+"#;
+        let stmt = parse_markdown_to_statement_inner(md).expect("parse");
+        assert_eq!(stmt.transactions.len(), 2);
+        assert!(
+            stmt.transactions[0]
+                .raw_text
+                .contains("Ref 1394711 Osko"),
+            "continuation must append: {:?}",
+            stmt.transactions[0].raw_text
+        );
+        assert!(!stmt.transactions[1].raw_text.contains("1394711"));
+    }
+
+    #[test]
+    fn markdown_page_markers_set_zero_based_pages() {
+        let md = r#"
+Page 1
+
+| Date | Description | Debit | Credit | Balance |
+|------|-------------|-------|--------|---------|
+| 01/01/2024 | Alpha | 10.00 |  | 110.00 |
+
+Page 2
+
+| Date | Description | Debit | Credit | Balance |
+|------|-------------|-------|--------|---------|
+| 02/01/2024 | Beta |  | 5.00 | 105.00 |
+"#;
+        let stmt = parse_markdown_to_statement_inner(md).expect("parse");
+        assert_eq!(stmt.total_pages, 2);
+        assert_eq!(stmt.transactions.len(), 2);
+        assert_eq!(stmt.transactions[0].page, 0);
+        assert_eq!(stmt.transactions[1].page, 1);
+        assert_eq!(stmt.transactions[0].line_on_page, 1);
+        assert_eq!(stmt.transactions[1].line_on_page, 1);
+    }
+
+    #[test]
+    fn markdown_opening_closing_and_raw_text_include_date() {
+        let md = r#"
+Opening Balance $1,000.00
+
+| Date | Description | Debit | Credit | Balance |
+|------|-------------|-------|--------|---------|
+| 15/01/2024 | Deposit |  | 500.00 | 1500.00 |
+
+Closing Balance $1,500.00
+"#;
+        let stmt = parse_markdown_to_statement_inner(md).expect("parse");
+        assert_eq!(stmt.opening_balance, dec!(1000.00));
+        assert_eq!(stmt.closing_balance, dec!(1500.00));
+        assert_eq!(stmt.transactions.len(), 1);
+        assert!(stmt.transactions[0].raw_text.starts_with("15/01/2024"));
+        assert!(stmt.transactions[0].raw_text.contains("Deposit"));
+        assert_eq!(stmt.transactions[0].credit, Some(dec!(500.00)));
     }
 }

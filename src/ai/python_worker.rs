@@ -39,13 +39,8 @@ impl Default for PythonWorkerConfig {
             .as_deref()
             .and_then(discover_bundled_python_root);
         let bundled_executable = bundle_root.as_deref().map(bundled_python_executable);
-        let default_executable = bundled_executable.unwrap_or_else(|| {
-            if cfg!(windows) {
-                PathBuf::from("python")
-            } else {
-                PathBuf::from("python3")
-            }
-        });
+        let default_executable =
+            bundled_executable.unwrap_or_else(resolve_system_python_executable);
         let python_executable = std::env::var_os("PYTHON_EXECUTABLE")
             .or_else(|| std::env::var_os("PYO3_PYTHON"))
             .map(PathBuf::from)
@@ -99,6 +94,114 @@ fn discover_bundled_python_root(executable_directory: &Path) -> Option<PathBuf> 
     candidates
         .into_iter()
         .find(|root| root.join("worker.py").is_file() && bundled_python_executable(root).is_file())
+}
+
+/// Resolve a usable system Python when no bundled runtime is present.
+///
+/// Order:
+/// 1. PATH names (`python` / `python3`)
+/// 2. Common Windows install roots under Program Files and LocalAppData
+/// 3. Last-resort bare name so callers still get a deterministic default
+fn resolve_system_python_executable() -> PathBuf {
+    let mut candidates: Vec<PathBuf> = if cfg!(windows) {
+        vec![PathBuf::from("python"), PathBuf::from("python3")]
+    } else {
+        vec![PathBuf::from("python3"), PathBuf::from("python")]
+    };
+
+    if cfg!(windows) {
+        candidates.extend(windows_python_install_candidates());
+    }
+
+    for candidate in candidates {
+        if python_executable_is_usable(&candidate) {
+            return candidate;
+        }
+    }
+
+    if cfg!(windows) {
+        PathBuf::from("python")
+    } else {
+        PathBuf::from("python3")
+    }
+}
+
+fn windows_python_install_candidates() -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+
+    let mut roots = Vec::new();
+    if let Ok(program_files) = std::env::var("ProgramFiles") {
+        roots.push(PathBuf::from(program_files));
+    }
+    if let Ok(program_files_x86) = std::env::var("ProgramFiles(x86)") {
+        roots.push(PathBuf::from(program_files_x86));
+    }
+    if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
+        roots.push(PathBuf::from(local_app_data).join("Programs").join("Python"));
+    }
+
+    for root in roots {
+        // Direct install roots: C:\Program Files\Python3xx\python.exe
+        if root.file_name().and_then(|name| name.to_str()).is_some_and(|name| {
+            name.eq_ignore_ascii_case("Python")
+                || name.to_ascii_lowercase().starts_with("python")
+        }) {
+            push_python_exe_if_present(&mut candidates, &root.join("python.exe"));
+        }
+
+        // Nested version folders: ...\Python\Python312\python.exe
+        // and top-level Program Files\Python3xx folders.
+        if let Ok(entries) = std::fs::read_dir(&root) {
+            let mut version_dirs = entries
+                .filter_map(|entry| entry.ok())
+                .map(|entry| entry.path())
+                .filter(|path| {
+                    path.is_dir()
+                        && path
+                            .file_name()
+                            .and_then(|name| name.to_str())
+                            .is_some_and(|name| name.to_ascii_lowercase().starts_with("python"))
+                })
+                .collect::<Vec<_>>();
+            // Prefer higher version folder names first (Python312 before Python39).
+            version_dirs.sort_by(|a, b| b.cmp(a));
+            for dir in version_dirs {
+                push_python_exe_if_present(&mut candidates, &dir.join("python.exe"));
+            }
+        }
+
+        // Also handle ProgramFiles itself containing Python3xx folders.
+        push_python_exe_if_present(&mut candidates, &root.join("python.exe"));
+    }
+
+    candidates
+}
+
+fn push_python_exe_if_present(candidates: &mut Vec<PathBuf>, path: &Path) {
+    if path.is_file() {
+        candidates.push(path.to_path_buf());
+    }
+}
+
+fn python_executable_is_usable(path: &Path) -> bool {
+    // Absolute/relative file paths: require the file to exist first.
+    if path.components().count() > 1 || path.is_absolute() {
+        if !path.is_file() {
+            return false;
+        }
+    }
+
+    Command::new(path)
+        .args([
+            "-c",
+            "import sys; raise SystemExit(0 if sys.version_info >= (3, 9) else 1)",
+        ])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]

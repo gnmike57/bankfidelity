@@ -18,6 +18,12 @@ pub struct LocalLlmClient {
     pub base_url: String,
 }
 
+impl Default for LocalLlmClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LocalLlmClient {
     pub fn new() -> Self {
         let reqwest_client = reqwest::Client::builder()
@@ -58,7 +64,9 @@ impl LocalLlmClient {
             "temperature": 0.2
         });
 
-        let resp = self.http.post(&format!("{}/chat/completions", self.base_url))
+        let resp = self
+            .http
+            .post(format!("{}/chat/completions", self.base_url))
             .json(&body)
             .send()
             .await?;
@@ -102,7 +110,9 @@ impl LocalLlmClient {
             "temperature": 0.1
         });
 
-        let resp = self.http.post(&format!("{}/chat/completions", self.base_url))
+        let resp = self
+            .http
+            .post(format!("{}/chat/completions", self.base_url))
             .json(&body)
             .send()
             .await?;

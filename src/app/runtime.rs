@@ -2033,7 +2033,15 @@ async fn process_job_inner(
                     fraction: 0.5,
                 });
                 
-                let request = format!("Automatically extract, verify, and fully correct the formatting of the bank statement located at: {:?}\n\nAdditional Context:\n{}", path, context);
+                let request = format!(
+                    "Automatically extract, verify, and fully correct the formatting of the bank statement located at: {:?}\n\n\
+CRITICAL SELF-CORRECTION PROTOCOL:\n\
+1. After making any modification using `modify_text` or `transfer_transactions`, you MUST immediately call the `verify_layout` tool.\n\
+2. If `verify_layout` reports an SSIM drop below 0.999 or any layout shift, you MUST use `local_ai_chat` to consult the local Qwen model for correction strategies.\n\
+3. Revert or adjust the edit until absolute sub-pixel perfection is restored before finishing the task.\n\n\
+Additional Context:\n{}",
+                    path, context
+                );
                 
                 let res_tx_cb = res_tx.clone();
                 let result = tokio::task::spawn_blocking(move || {

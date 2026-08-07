@@ -602,6 +602,45 @@
         "requested_count": null,
         "warnings": []
       }
+    },
+    {
+      "request": {
+        "deadline_unix_ms": 61000,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "operation": "generate_visual_proof",
+        "operation_id": "00000000-0000-4000-8000-000000000016",
+        "payload": {
+          "edits_json": "[]",
+          "output_path": "scratch/output.pdf",
+          "pdf_path": "fixtures/input.pdf"
+        },
+        "protocol_version": "1.0.0",
+        "submitted_at_unix_ms": 1000
+      },
+      "response": {
+        "applied_count": 1,
+        "capability_tier": "pro",
+        "disposition": "succeeded",
+        "failure": null,
+        "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "metrics": {
+          "duration_ms": 16,
+          "gc_collections": 0,
+          "open_handles_after": 4,
+          "open_handles_before": 4,
+          "rss_after_bytes": 1000000,
+          "rss_before_bytes": 1000000
+        },
+        "operation": "generate_visual_proof",
+        "operation_id": "00000000-0000-4000-8000-000000000016",
+        "output_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "payload": {
+          "fixture": "ok"
+        },
+        "protocol_version": "1.0.0",
+        "requested_count": 1,
+        "warnings": []
+      }
     }
   ],
   "protocol_version": "1.0.0"

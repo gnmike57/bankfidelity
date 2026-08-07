@@ -1663,7 +1663,7 @@ mod tests {
         let server = MockServer::start().await;
 
         Mock::given(method("POST"))
-            .and(path("/v1beta/models/gemini-pro-latest:generateContent"))
+            .and(path("/v1beta/models/gemini-pro-preview:generateContent"))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({
                 "candidates": [{
                     "content": {

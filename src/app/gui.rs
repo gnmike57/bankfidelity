@@ -2567,7 +2567,7 @@ impl MyApp {
 
                     if auto_edit_btn.clicked() {
                         if self.current_pdf_path.exists() {
-                            let mut context = format!("BankFidelity State Context:\n");
+                            let mut context = "BankFidelity State Context:\n".to_string();
                             context.push_str(&format!("Total Transactions loaded: {}\n", self.workflow_transactions.len()));
                             if let Some(err) = &self.last_imbalance {
                                 context.push_str(&format!("Current Error: Statement is out of balance. Difference: {:.2}\n", err));
@@ -4057,23 +4057,44 @@ impl MyApp {
                     ),
                 );
 
-                if !p.balanced {
-                    if ui.button("🧠 Ask Local AI to Explain").clicked() {
-                        let opening_balance = self.workflow_validation.as_ref().map(|v| v.opening_balance.to_string().parse::<f64>().unwrap_or(0.0)).unwrap_or(0.0);
-                        let closing_balance = self.workflow_validation.as_ref().map(|v| v.closing_balance.to_string().parse::<f64>().unwrap_or(0.0)).unwrap_or(0.0);
-                        let imbalance_f64 = p.final_imbalance.to_string().parse::<f64>().unwrap_or(0.0);
-                        
-                        if let Err(e) = self.job_tx.send(crate::app::runtime::Job::ExplainImbalance {
-                            transactions_json: serde_json::to_string(&self.workflow_transactions).unwrap_or_default(),
-                            opening_balance,
-                            closing_balance,
-                            imbalance: imbalance_f64,
-                        }) {
-                            tracing::error!("Runtime disconnected: {}", e);
-                        }
-                        self.in_flight += 1;
-                        self.ai_explanation = None;
+                if !p.balanced && ui.button("🧠 Ask Local AI to Explain").clicked() {
+                    let opening_balance = self
+                        .workflow_validation
+                        .as_ref()
+                        .map(|v| {
+                            v.opening_balance
+                                .to_string()
+                                .parse::<f64>()
+                                .unwrap_or(0.0)
+                        })
+                        .unwrap_or(0.0);
+                    let closing_balance = self
+                        .workflow_validation
+                        .as_ref()
+                        .map(|v| {
+                            v.closing_balance
+                                .to_string()
+                                .parse::<f64>()
+                                .unwrap_or(0.0)
+                        })
+                        .unwrap_or(0.0);
+                    let imbalance_f64 = p
+                        .final_imbalance
+                        .to_string()
+                        .parse::<f64>()
+                        .unwrap_or(0.0);
+
+                    if let Err(e) = self.job_tx.send(crate::app::runtime::Job::ExplainImbalance {
+                        transactions_json: serde_json::to_string(&self.workflow_transactions)
+                            .unwrap_or_default(),
+                        opening_balance,
+                        closing_balance,
+                        imbalance: imbalance_f64,
+                    }) {
+                        tracing::error!("Runtime disconnected: {}", e);
                     }
+                    self.in_flight += 1;
+                    self.ai_explanation = None;
                 }
 
                 let mut clear_explanation = false;
@@ -5179,6 +5200,10 @@ impl MyApp {
     }
 
     fn handle_shortcuts(&mut self, ctx: &egui::Context) {
+        if ctx.wants_keyboard_input() {
+            return;
+        }
+
         // Read individual shortcut states instead of cloning the entire InputState.
         let ctrl_o = ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::O));
         let ctrl_z = ctx.input(|i| i.modifiers.command && i.key_pressed(egui::Key::Z));
