@@ -408,6 +408,10 @@ pub struct MyApp {
     pub ufo_logs: Vec<String>,
     /// Whether UFO is actively running (public for E2E and cancel UI state).
     pub is_ufo_running: bool,
+    /// User clicked Cancel while UFO was running. Terminal `Error` /
+    /// `UfoAutoEditResult` still frees `in_flight` once via
+    /// `ends_gui_tracked_job`; this flag only suppresses post-cancel error UX.
+    pub ufo_user_cancelled: bool,
 }
 
 impl MyApp {
@@ -490,6 +494,7 @@ impl MyApp {
             job_rx,
             ufo_logs: Vec::new(),
             is_ufo_running: false,
+            ufo_user_cancelled: false,
             pending_python: None,
             app_paths,
             run_workspace,
@@ -1555,6 +1560,11 @@ impl MyApp {
             JobResult::UfoAutoEditResult(val) => {
                 self.is_ufo_running = false;
                 self.progress = None;
+                // in_flight freed once in the drain loop via ends_gui_tracked_job
+                if self.ufo_user_cancelled {
+                    self.ufo_user_cancelled = false;
+                    return;
+                }
 
                 let status = val["status"].as_str().unwrap_or("unknown");
                 let task_id = val["task_id"].as_str().unwrap_or("unknown");
@@ -1893,6 +1903,13 @@ impl MyApp {
             JobResult::Error { job_label, message } => {
                 if job_label == "ufo_dispatch" {
                     self.is_ufo_running = false;
+                    // User cancel already toasted; process kill surfaces as Error.
+                    // Free in_flight only via the drain ends_gui_tracked_job path.
+                    if self.ufo_user_cancelled {
+                        self.ufo_user_cancelled = false;
+                        self.progress = None;
+                        return;
+                    }
                 }
                 // in_flight decremented once in the drain loop via ends_gui_tracked_job
                 self.progress = None;
@@ -2633,11 +2650,14 @@ impl MyApp {
 
                         if cancel_btn.clicked() {
                             let _ = self.dispatch_workflow_job(Job::CancelUfo);
-                            // Fail-closed local state: cancel is fire-and-forget
-                            // at the process level; clear GUI busy flags now so
-                            // the UI does not stay stuck if no further result arrives.
+                            // Clear local busy flags immediately. Do NOT touch
+                            // in_flight here: CancelUfo kills the process and
+                            // the UfoAutoEdit spawn always emits Error or
+                            // UfoAutoEditResult, which frees exactly one wait
+                            // slot via ends_gui_tracked_job. Early decrement
+                            // would double-count when that terminal result arrives.
                             self.is_ufo_running = false;
-                            self.in_flight = self.in_flight.saturating_sub(1);
+                            self.ufo_user_cancelled = true;
                             self.progress = None;
                             self.toast(ToastKind::Warn, "UFO Task Cancelled.");
                         }
