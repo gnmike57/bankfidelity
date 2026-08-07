@@ -262,11 +262,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.89.0
-      - name: Install advisory and policy tools
-        run: |
-          cargo install --locked cargo-audit
-          cargo install --locked cargo-deny
       - name: Record dependency advisories
-        run: cargo audit
+        uses: rustsec/audit-check@v1.4.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       - name: Record dependency policy findings
-        run: cargo deny check
+        uses: EmbarkStudios/cargo-deny-action@v1
