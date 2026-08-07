@@ -1934,11 +1934,25 @@ impl MyApp {
                                 let _ = self.job_tx.send(crate::app::runtime::Job::Redo);
                             }
                             "Balance" => {
-                                let _ =
-                                    self.job_tx
-                                        .send(crate::app::runtime::Job::BalanceStatement {
-                                            path: std::path::PathBuf::from(&self.input_path),
-                                        });
+                                let auto_apply = parts
+                                    .get(2)
+                                    .map(|v| *v == "true" || *v == "1")
+                                    .unwrap_or(false);
+                                let path = std::path::PathBuf::from(&self.input_path);
+                                if auto_apply {
+                                    let output = path.with_extension("balanced.pdf");
+                                    let _ = self.job_tx.send(
+                                        crate::app::runtime::Job::BalanceAndApplyAll {
+                                            input: path,
+                                            output,
+                                            auto_apply: true,
+                                        },
+                                    );
+                                } else {
+                                    let _ = self
+                                        .job_tx
+                                        .send(crate::app::runtime::Job::BalanceStatement { path });
+                                }
                             }
                             "Verify" => {
                                 let _ = self
@@ -1955,7 +1969,50 @@ impl MyApp {
                                 );
                             }
                             "Transfer" => {
-                                // Transfer via GUI requires selecting source/target PDFs first
+                                let target_bank = parts.get(2).copied().unwrap_or("");
+                                let source = self.transfer_source_path.trim();
+                                let target = self.input_path.trim();
+                                let ready = !source.is_empty()
+                                    && !target.is_empty()
+                                    && target != "examples/sample.pdf"
+                                    && source != target;
+                                if ready {
+                                    let target_pdf = std::path::PathBuf::from(target);
+                                    let output_pdf = if self.output_path.is_empty() {
+                                        target_pdf.with_file_name(format!(
+                                            "{}_transferred.pdf",
+                                            target_pdf
+                                                .file_stem()
+                                                .unwrap_or_default()
+                                                .to_string_lossy()
+                                        ))
+                                    } else {
+                                        std::path::PathBuf::from(&self.output_path)
+                                    };
+                                    let _ = self.job_tx.send(
+                                        crate::app::runtime::Job::TransferTransactions {
+                                            source_pdf: std::path::PathBuf::from(source),
+                                            target_pdf,
+                                            output_pdf,
+                                        },
+                                    );
+                                    self.toast(
+                                        ToastKind::Info,
+                                        format!(
+                                            "Transfer started{}…",
+                                            if target_bank.is_empty() {
+                                                String::new()
+                                            } else {
+                                                format!(" (target bank: {target_bank})")
+                                            }
+                                        ),
+                                    );
+                                } else {
+                                    self.toast(
+                                        ToastKind::Warn,
+                                        "Transfer requires a source statement and a different target PDF selected in the Transfer workflow.",
+                                    );
+                                }
                             }
                             "AdjustDates" => {
                                 let _ = self.job_tx.send(
@@ -5675,7 +5732,10 @@ pub fn run_gui(
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1280.0, 820.0])
             .with_min_inner_size([960.0, 640.0])
-            .with_title("Bank Statement Fidelity Editor v0.5.0")
+            .with_title(format!(
+                "Bank Statement Fidelity Editor v{}",
+                env!("CARGO_PKG_VERSION")
+            ))
             .with_icon(load_icon()),
         ..Default::default()
     };

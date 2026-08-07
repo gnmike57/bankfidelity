@@ -1855,10 +1855,7 @@ mod tests {
         .expect("should join three wrap lines");
         assert_eq!(found.len(), 3);
         assert_eq!(
-            found
-                .iter()
-                .map(|t| t.operation_index)
-                .collect::<Vec<_>>(),
+            found.iter().map(|t| t.operation_index).collect::<Vec<_>>(),
             vec![1, 2, 3]
         );
     }
@@ -1909,12 +1906,8 @@ mod tests {
             target(2, "Beta", [10.0, 114.0, 50.0, 126.0]),
             target(3, "Gamma", [10.0, 128.0, 50.0, 140.0]),
         ];
-        let found = find_multiline_native_targets(
-            &targets,
-            [5.0, 95.0, 80.0, 145.0],
-            "Alpha Beta",
-        )
-        .expect("shortest two-span window should win");
+        let found = find_multiline_native_targets(&targets, [5.0, 95.0, 80.0, 145.0], "Alpha Beta")
+            .expect("shortest two-span window should win");
         assert_eq!(found.len(), 2);
         assert_eq!(found[0].operation_index, 1);
         assert_eq!(found[1].operation_index, 2);

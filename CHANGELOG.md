@@ -5,7 +5,17 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Native multi-line multi-span edit parity:** `find_multiline_native_targets` filters spans by tall field rect (Python multi-span rules), joins wrap lines, and blanks trailing operators after rewrite; expanded unit tests.
+- **package-lock.json tracking:** Node/Applitools dependency lockfile is committed for deterministic installs; WiX packaging artifacts (`wix.zip`, `wix_bin/`) remain ignored.
 - **Automated Stress Testing Harness:** Added a comprehensive stress testing benchmark suite (`au_transfer_stress.rs`) and result evaluation framework (`tests/stress_results/stress_test_evaluation.md`) for document processing backends. Evaluates PyMuPDF, Document AI, Mindee, LlamaParse, pdfRest, Applitools, and various LLMs for correctness, fidelity, and latency across 7 axes.
+
+### Fixed
+- **GUI `in_flight` single-path accounting:** Job wait slots free only via `ends_gui_tracked_job` drain path (no double decrement / leak on UFO/error paths).
+- **UFO missing install:** Dispatches return `Err` (not fake OK JSON); env override isolation in unit tests.
+- **UIAutomation E2E hang:** Deadline-bounded tree walk + Windows process-tree teardown for the spawned GUI.
+- **NLP `__DISPATCH`:** Balance honors `auto_apply`; Transfer no longer silent no-op (toast or real `TransferTransactions` job).
+- **GUI window title version:** Uses `CARGO_PKG_VERSION` instead of stale `v0.5.0`.
+- **Clippy CI:** Collapse nested `if` in `python_executable_is_usable`.
 
 ## [v1.0.0] - 2026-07-05
 
@@ -13,12 +23,12 @@ All notable changes to this project will be documented in this file.
 - **Automated Bug Reporting & Beta Repair Loop:** Integrated interactive fallback UI and webhook telemetry for rapid crash capture and log aggregation during the beta testing phase (`docs/BETA_TESTING.md`).
 - **Multi-Backend Pipeline Architecture:** Every pipeline stage now supports configurable primary backends with automatic fallback chains. If a cloud API fails or its key is missing, the pipeline gracefully degrades to the next-best offline option.
 - **Boot-Time API Availability Detection:** On startup, the app probes all configured API keys (Gemini, Document AI, Mindee, LlamaParse, pdfRest, Applitools, PyMuPDF Pro) and stores availability status in `ApiAvailability`. Logged to console on boot.
-- **Backend Preferences UI:** New settings panel (`Settings → Backend Preferences`) with:
+- **Backend Preferences UI:** New settings panel (`Settings ΓåÆ Backend Preferences`) with:
   - Selectable backends for AI Provider, Document Parser, PDF Engine, and Verification Renderer.
-  - Unavailable backends marked with ⛔ and explanatory hover text with signup URLs.
+  - Unavailable backends marked with Γ¢ö and explanatory hover text with signup URLs.
   - Unified warning banner when critical keys are missing.
-  - Visual diff threshold slider (0.005–0.10, default 0.02).
-  - Max visual retry attempts slider (1–10, default 5).
+  - Visual diff threshold slider (0.005ΓÇô0.10, default 0.02).
+  - Max visual retry attempts slider (1ΓÇô10, default 5).
 - **Mindee Financial Document Parser:** Added as the default document parser (`DocumentParserMode::MindeeFinDoc`). Requires `MINDEE_API_KEY`.
 - **LlamaParse Integration:** Added as an alternative LLM-based document parser. Requires `LLAMAPARSE_API_KEY`.
 - **Applitools Eyes Integration:** Visual AI testing layer in the verification pipeline. Auto-runs when `APPLITOOLS_API_KEY` is set; gracefully skips otherwise. Node.js bridge at `src/ai/applitools_bridge.js`.
@@ -33,7 +43,7 @@ All notable changes to this project will be documented in this file.
 - **Configuration Overhaul:** `AppConfig` now holds `AiProviderMode`, `DocumentParserMode`, `VerificationMode`, and `PdfEngineMode` enums, all persisted via `confy` and hot-reloadable via `Job::ReloadConfig`.
 - **Parser Fallback Logic:** All cloud parsers (Mindee, LlamaParse, Document AI) now auto-fallback to `offline_parser::parse_statement_offline()` when unconfigured or on API error.
 - **Balance Engine Fallback:** When AI is set to `ManualOnly`, balance analysis uses the local `balance::process_and_reconcile()` engine instead of failing.
-- **Verification Pipeline:** Refactored to a multi-layer system: Local SSIM + Tile-max + Perceptual Hash (always) → pdfRest cloud rendering (optional) → Applitools Eyes (optional) → Gemini Vision AI (optional).
+- **Verification Pipeline:** Refactored to a multi-layer system: Local SSIM + Tile-max + Perceptual Hash (always) ΓåÆ pdfRest cloud rendering (optional) ΓåÆ Applitools Eyes (optional) ΓåÆ Gemini Vision AI (optional).
 - **README:** Complete rewrite with backend preference tables, fallback chains, and architecture diagrams.
 - **QUICKSTART:** Updated with all new API keys, backend preferences guide, and expanded CLI examples.
 - **.env.example:** Now includes all 11 configurable API keys with signup URLs and descriptions.

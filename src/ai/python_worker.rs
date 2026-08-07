@@ -193,10 +193,8 @@ fn push_python_exe_if_present(candidates: &mut Vec<PathBuf>, path: &Path) {
 
 fn python_executable_is_usable(path: &Path) -> bool {
     // Absolute/relative file paths: require the file to exist first.
-    if path.components().count() > 1 || path.is_absolute() {
-        if !path.is_file() {
-            return false;
-        }
+    if (path.components().count() > 1 || path.is_absolute()) && !path.is_file() {
+        return false;
     }
 
     Command::new(path)
