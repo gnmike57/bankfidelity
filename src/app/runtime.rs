@@ -1269,7 +1269,6 @@ impl JobResult {
             | Self::Pong
             | Self::UfoAutoEditResult(_)
             | Self::McpRenderComplete { .. }
-            | Self::PageRendered { .. }
             | Self::ChangeApplied { .. }
             | Self::FontCompleted(_)
             | Self::ChangeHistoryExported { .. }
@@ -1283,7 +1282,6 @@ impl JobResult {
             | Self::ImbalanceExplained { .. }
             | Self::ReconstructComplete { .. }
             | Self::BugReportSubmitted
-            | Self::WorkflowParseValidated { .. }
             | Self::WorkflowPreviewBuilt(_)
             | Self::VisualAlternativesReady(_)
             | Self::DatesAdjusted { .. }
