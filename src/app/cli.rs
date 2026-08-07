@@ -393,6 +393,9 @@ fn wait_for_terminal_result(job_rx: &Receiver<JobResult>) -> Result<JobResult, (
             Ok(JobResult::ApiKeysVerified(_)) => {
                 tracing::debug!("[cli] ignoring non-terminal ApiKeysVerified");
             }
+            Ok(JobResult::JobCompleted { job_label, .. }) if job_label == "cleanup_temp_files" => {
+                tracing::debug!("[cli] ignoring background cleanup_temp_files completion");
+            }
             Ok(JobResult::Error { job_label, message }) => {
                 return Err((job_label, message));
             }

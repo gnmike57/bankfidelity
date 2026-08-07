@@ -591,7 +591,13 @@ impl SegmentManager {
                 "merged page order, boxes, or rotations differ from the segment map".into(),
             ));
         }
-        std::fs::File::open(&staged_path)?.sync_all()?;
+        {
+            let f = std::fs::File::open(&staged_path)?;
+            f.sync_all()?;
+        }
+        if output_path.exists() {
+            let _ = std::fs::remove_file(output_path);
+        }
         staged_path
             .persist(output_path)
             .map_err(|error| crate::engine::pdf_split_merge::SplitMergeError::Io(error.error))?;

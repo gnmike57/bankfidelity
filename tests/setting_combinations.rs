@@ -114,6 +114,6 @@ fn default_settings_are_expected() {
         DocumentParserMode::default(),
         DocumentParserMode::LlamaParse
     );
-    assert_eq!(AiProviderMode::default(), AiProviderMode::GroqApiKey);
+    assert_eq!(AiProviderMode::default(), AiProviderMode::LocalLlama);
     assert_eq!(VerificationMode::default(), VerificationMode::LocalPdfium);
 }

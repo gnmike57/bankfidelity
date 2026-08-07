@@ -1259,12 +1259,10 @@ impl JobResult {
             | Self::WorkflowFailed(_)
             | Self::TransferFailed { .. }
             | Self::DocAiVersionError(_)
-            | Self::NuclearFallbackRequired(_) => {
-                Some(OperationDisposition::Failed)
-            }
+            | Self::NuclearFallbackRequired(_) => Some(OperationDisposition::Failed),
             Self::Cancelled { .. } => Some(OperationDisposition::Cancelled),
             Self::TimedOut { .. } => Some(OperationDisposition::TimedOut),
-            Self::WorkflowComplete(_) 
+            Self::WorkflowComplete(_)
             | Self::TransferComplete(_)
             | Self::Pong
             | Self::UfoAutoEditResult(_)
@@ -1285,9 +1283,7 @@ impl JobResult {
             | Self::WorkflowPreviewBuilt(_)
             | Self::VisualAlternativesReady(_)
             | Self::DatesAdjusted { .. }
-            | Self::TransferTestsComplete(_) => {
-                Some(OperationDisposition::Succeeded)
-            }
+            | Self::TransferTestsComplete(_) => Some(OperationDisposition::Succeeded),
             Self::JobCompleted { disposition, .. } => Some(*disposition),
             _ => None,
         }
@@ -7223,7 +7219,7 @@ Additional Context:\n{context}",
             });
         }
         Job::CleanupTempFiles => {
-            tokio::task::spawn_blocking(|| {
+            tokio::task::spawn_blocking(move || {
                 let now = std::time::SystemTime::now();
                 for dir in &["output", "audit"] {
                     if let Ok(entries) = std::fs::read_dir(dir) {
@@ -7261,9 +7257,8 @@ Additional Context:\n{context}",
             let tx = result_tx_clone.clone();
             tokio::task::spawn(async move {
                 let _ = tx.send(JobResult::Error {
-                    job_label: "typst_reconstruct".into(),
-                    message: "Typst reconstruction cannot preserve edit-in-place fidelity; use PyMuPDF Pro / native edit paths"
-                        .into(),
+                    job_label: "typst_reconstruct_disabled".into(),
+                    message: "Automatic Typst reconstruction is disabled in this build: cannot preserve edit-in-place fidelity".into(),
                 });
             });
         }
