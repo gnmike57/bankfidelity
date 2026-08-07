@@ -79,94 +79,13 @@ output_test.pdf
 .codebuddy
 .kiro
 .traycer
-# =============================================================================
-# Secrets — never commit
-# =============================================================================
-.env
-.env.local
-.env.*.local
-.env.production
-.env.development
-.env.test
-*.env
-!.env.example          # the template is fine to track
-.pipeline_key          # software-root passphrase file
-*.key
-*.pem
-!tests/fixtures/*.pem  # test-only fixtures (verified fake)
-service-account*.json
-*service_account*.json
-!tests/fixtures/*service_account*.json  # test-only fixture (verified fake)
-credentials.json
-secrets.json
-*.gcp-credentials.json
-# OAuth 2.0 client secrets downloaded from Google Cloud Console
-client_secret*.json
-client-secret*.json
-*.apps.googleusercontent.com.json
-*.apps.googleusercontent.com.txt
-
-# =============================================================================
-# Rust / Cargo
-# =============================================================================
-target/
-Cargo.lock.bak
-*.pdb
-*.exe.stackdump
-
-# =============================================================================
-# Python
-# =============================================================================
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-.venv/
-venv/
-env/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-
-# =============================================================================
-# IDE / editor
-# =============================================================================
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-Thumbs.db
-
-# =============================================================================
-# Project artefacts
-# =============================================================================
-output/
-out/
-scratch/
-audit/
-logs/
-logs_test/
-lcov.info
-output_test.pdf
-*.tmp
-*.bak
-
-# =============================================================================
-# AI assistants / local tooling caches
-# =============================================================================
-.codebuddy
-.kiro
-.traycer
 .aider*
 
 keys/
 
 node_modules/
 
-
+package-lock.json
 
 # Pdfium binaries are produced or installed by the verified packaging/runtime
 # process; machine-specific copies must not be committed to source control.
@@ -180,7 +99,7 @@ include/
 lib/
 licenses/
 
- 
+
 *.log
 
 target_check/
@@ -195,4 +114,3 @@ wix_bin/
 
 # Local ad-hoc debug binaries
 src/bin/test_*.rs
-
