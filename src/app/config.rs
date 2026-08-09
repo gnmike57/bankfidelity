@@ -628,10 +628,6 @@ impl AppConfig {
     pub fn validate(&self) -> Vec<String> {
         let mut errors = Vec::new();
 
-        if self.pymupdf_pro_key.is_none() && !self.is_dev_mode {
-            errors.push("PYMUPDF_PRO_KEY environment variable is not set".to_string());
-        }
-
         if self.passphrase.len() < MIN_PASSPHRASE_LENGTH && !self.is_dev_mode {
             errors.push(format!(
                 "DUAL_CORE_PASSPHRASE must be at least {MIN_PASSPHRASE_LENGTH} characters"
@@ -1086,14 +1082,13 @@ mod tests {
     }
 
     #[test]
-    fn validate_reports_missing_pro_key_and_passphrase_in_production_mode() {
+    fn validate_reports_short_passphrase_in_production_mode() {
         let mut cfg = AppConfig::default();
         cfg.pymupdf_pro_key = None;
         cfg.passphrase = "short".into();
         cfg.is_dev_mode = false;
 
         let errors = cfg.validate();
-        assert!(errors.iter().any(|e| e.contains("PYMUPDF_PRO_KEY")));
         assert!(errors.iter().any(|e| e.contains("DUAL_CORE_PASSPHRASE")));
     }
 

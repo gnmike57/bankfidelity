@@ -35,10 +35,7 @@ impl LocalLlmClient {
         let base_url = std::env::var("LOCAL_LLM_URL")
             .unwrap_or_else(|_| "http://127.0.0.1:8080/v1".to_string());
 
-        Self {
-            http,
-            base_url,
-        }
+        Self { http, base_url }
     }
 
     pub async fn explain_imbalance(
