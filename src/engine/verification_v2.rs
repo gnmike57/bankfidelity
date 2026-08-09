@@ -87,6 +87,7 @@ impl VisualFidelityEngine {
         original_img: &RgbaImage,
         edited_img: &RgbaImage,
         edit_regions: &[(usize, [f32; 4])], // (page, bbox)
+        math_inputs: Option<&super::verification::MathInputs>,
     ) -> EnhancedVerificationReport {
         // Convert to grayscale for structural analysis
         let orig_gray = Self::to_gray(original_img);
@@ -106,14 +107,22 @@ impl VisualFidelityEngine {
         // Determine if verification passed under immutable policy.
         let passed = tile_score < fixed_threshold && ssim >= self.ssim_floor;
 
+        let mut math_valid = true;
+        let mut math_msg = String::new();
+        if let Some(inputs) = math_inputs {
+            let (valid, msg) = super::verification::validate_math_inputs(inputs);
+            math_valid = valid;
+            math_msg = format!(" | Math: {msg}");
+        }
+
         EnhancedVerificationReport {
-            math_valid: true, // TODO: integrate math validation
+            math_valid,
             visual_diff_score: tile_score,
             only_intended_changes: passed,
             report_files: vec![],
             message: format!(
-                "Visual verification: tile_max={:.4}, SSIM={:.4}, hash_dist={:.4}, fixed_threshold={:.4}",
-                tile_score, ssim, hash_dist, fixed_threshold
+                "Visual verification: tile_max={:.4}, SSIM={:.4}, hash_dist={:.4}, fixed_threshold={:.4}{}",
+                tile_score, ssim, hash_dist, fixed_threshold, math_msg
             ),
             edit_region_scores: vec![],
             adaptive_threshold: fixed_threshold,
@@ -262,7 +271,7 @@ mod tests {
     fn test_validate_identical_images() {
         let engine = VisualFidelityEngine::new();
         let img = RgbaImage::new(100, 100);
-        let report = engine.validate_edit(&img, &img, &[]);
+        let report = engine.validate_edit(&img, &img, &[], None);
 
         assert!(report.only_intended_changes, "identical images should pass");
         assert!(!report.passed_with_adaptive_mask);

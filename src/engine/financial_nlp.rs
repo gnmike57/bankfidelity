@@ -121,9 +121,26 @@ pub fn detect_pay_cycles(transactions: &[Transaction]) -> Vec<PayCycle> {
             Some(amounts[amounts.len() / 2])
         };
 
+        // Compute frequency days (median gap between dates)
+        let mut parsed_dates: Vec<chrono::NaiveDate> = txns
+            .iter()
+            .filter_map(|t| crate::engine::date_adjust::parse_date(&t.date).map(|(d, _)| d))
+            .collect();
+        parsed_dates.sort();
+        let frequency_days = if parsed_dates.len() > 1 {
+            let mut gaps = Vec::with_capacity(parsed_dates.len() - 1);
+            for i in 1..parsed_dates.len() {
+                gaps.push((parsed_dates[i] - parsed_dates[i - 1]).num_days());
+            }
+            gaps.sort();
+            Some(gaps[gaps.len() / 2] as u32)
+        } else {
+            None
+        };
+
         cycles.push(PayCycle {
             payee: payee.clone(),
-            frequency_days: None, // TODO: parse dates and compute gaps
+            frequency_days,
             typical_amount,
             transaction_count: txns.len(),
             is_income,
@@ -773,7 +790,7 @@ fn apply_scale_income(
         };
     }
 
-    let first_changed = *income_indices.iter().min().unwrap();
+    let first_changed = *income_indices.iter().min().unwrap_or(&0);
     let count = income_indices.len();
     let payee_desc = payee.as_deref().unwrap_or("all payees");
 
@@ -825,7 +842,7 @@ fn apply_scale_expense(
         };
     }
 
-    let first_changed = *expense_indices.iter().min().unwrap();
+    let first_changed = *expense_indices.iter().min().unwrap_or(&0);
     let count = expense_indices.len();
     let payee_desc = payee.as_deref().unwrap_or("all payees");
 
@@ -879,7 +896,7 @@ fn apply_set_amount(
         };
     }
 
-    let first_changed = *relevant_indices.iter().min().unwrap();
+    let first_changed = *relevant_indices.iter().min().unwrap_or(&0);
     let count = relevant_indices.len();
     let payee_desc = payee.as_deref().unwrap_or("all payees");
 
@@ -955,7 +972,7 @@ fn apply_remove_transactions(transactions: Vec<Transaction>, payee: &str) -> Fin
     }
 
     let count = indices_to_remove.len();
-    let first_removed = *indices_to_remove.iter().min().unwrap();
+    let first_removed = *indices_to_remove.iter().min().unwrap_or(&0);
     let mut new_txns: Vec<Transaction> = transactions
         .into_iter()
         .enumerate()

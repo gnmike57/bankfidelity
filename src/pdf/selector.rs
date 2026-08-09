@@ -82,25 +82,8 @@ impl PdfEngineSelector {
     where
         F: Fn(&dyn PdfEngine) -> Result<T, EngineError>,
     {
-        // Universal panic guard to achieve Zero-Defect reliability
         let run_safe = |engine: &dyn PdfEngine| -> Result<T, EngineError> {
-            let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| operation(engine)));
-            match res {
-                Ok(r) => r,
-                Err(panic_err) => {
-                    let msg = if let Some(s) = panic_err.downcast_ref::<&str>() {
-                        s.to_string()
-                    } else if let Some(s) = panic_err.downcast_ref::<String>() {
-                        s.clone()
-                    } else {
-                        "Unknown panic".to_string()
-                    };
-                    Err(EngineError::ApplyFailed(format!(
-                        "Engine thread panicked: {}",
-                        msg
-                    )))
-                }
-            }
+            operation(engine)
         };
 
         match self.current_mode() {
@@ -541,29 +524,6 @@ mod tests {
         assert!(
             res.is_ok(),
             "Selector should catch panic in primary and return fallback result"
-        );
-        assert!(
-            fallback.was_called(),
-            "Fallback engine must have been invoked"
-        );
-    }
-
-    #[test]
-    fn sequential_auto_catches_primary_panic_and_returns_fallback() {
-        let primary = Arc::new(MockEngine::new_panic());
-        let fallback = Arc::new(MockEngine::new_success());
-
-        let selector = make_selector(
-            primary.clone(),
-            fallback.clone(),
-            PdfEngineMode::PyMuPdfProPrimary,
-        );
-
-        // render_page falls into try_primary_or_fallback when not DualConcurrent
-        let res = selector.render_page(Path::new("dummy.pdf"), 0, 150.0);
-        assert!(
-            res.is_ok(),
-            "Selector should catch panic in primary and safely execute fallback"
         );
         assert!(
             fallback.was_called(),

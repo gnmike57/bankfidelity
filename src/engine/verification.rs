@@ -279,7 +279,7 @@ fn validate_expected_ledger(
     )
 }
 
-fn validate_math_inputs(inputs: &MathInputs) -> (bool, String) {
+pub(crate) fn validate_math_inputs(inputs: &MathInputs) -> (bool, String) {
     if inputs.transactions.is_empty() {
         return if inputs.required {
             (
