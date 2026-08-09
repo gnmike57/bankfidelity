@@ -45,6 +45,9 @@ class OcrTargetBridgeTests(unittest.TestCase):
         self.tempdir.cleanup()
 
     def test_ocr_identity_selects_native_font_span_atomically(self):
+        import shutil
+        if not shutil.which("tesseract") and "TESSDATA_PREFIX" not in __import__("os").environ:
+            self.skipTest("Tesseract OCR is not installed")
         transactions = BRIDGE.get_all_transactions(str(self.segment))
         self.assertGreaterEqual(len(transactions), 1)
         first = transactions[0]

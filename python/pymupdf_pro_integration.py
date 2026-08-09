@@ -726,8 +726,6 @@ def _span_overlaps_target_rect(span_rect, rect, rect_area, *, multiline=False):
     # rects are taller than any one span, so also accept spans mostly inside.
     if inter_area / rect_area >= 0.5:
         return True
-    if not multiline:
-        return False
     span_area = max(float(span_rect.width * span_rect.height), 1e-6)
     return inter_area / span_area >= 0.5
 
@@ -3780,11 +3778,7 @@ def apply_many_edits(pdf_path: str, output_path: str, edits: list, font_path: st
                 ocr_words=ocr_words_cache[page_num],
             )
         
-        # FALLBACK: If we still don't have candidates (e.g. Tesseract is missing and text is corrupted),
-        # just create a fake span from the provided rect so we don't fail the whole edit batch.
-        if not candidates:
-            candidates = [{"bbox": rect_obj, "text": old_text, "origin": (rect_obj.x0, rect_obj.y1)}]
-
+        # Remove fallback fake span creation to allow proper failure.
         failure_method = None
         if not candidates:
             failure_method = "identity-no-match"

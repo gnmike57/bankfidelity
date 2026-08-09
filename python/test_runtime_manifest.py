@@ -46,7 +46,7 @@ class RuntimeManifestTests(unittest.TestCase):
     def test_exact_base_runtime_is_accepted(self) -> None:
         report = runtime_manifest.verify("base")
         self.assertEqual(report["protocol_version"], "1.0.0")
-        self.assertEqual(report["packages"]["PyMuPDF"], "1.28.0")
+        self.assertEqual(report["packages"]["PyMuPDF"], "1.28.2")
         self.assertIn("worker.py", report["source_files"])
 
     def test_source_tampering_is_rejected(self) -> None:
@@ -64,7 +64,7 @@ class RuntimeManifestTests(unittest.TestCase):
         ):
             with self.assertRaisesRegex(
                 runtime_manifest.RuntimeManifestError,
-                "PyMuPDF 0.0.0 does not match 1.28.0",
+                "PyMuPDF 0.0.0 does not match 1.28.2",
             ):
                 runtime_manifest.verify("base")
 

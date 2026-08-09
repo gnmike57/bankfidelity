@@ -28,7 +28,7 @@ class RuntimeManifestError(RuntimeError):
 
 
 def fail(message: str) -> None:
-    print(message, file=sys.stderr)
+    raise RuntimeManifestError(message)
 
 
 def load_manifest() -> dict[str, Any]:
