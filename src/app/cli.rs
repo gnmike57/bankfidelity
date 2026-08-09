@@ -1945,7 +1945,7 @@ pub fn run_inner(
                 eprintln!("Could not submit date adjustment: {error}");
                 return Ok(exit_code::GENERAL);
             }
-            match wait_for_operation_completion(&job_rx, "adjust_date_periods") {
+            match wait_for_operation_completion(&job_rx, "adjust_dates") {
                 Ok(completion) => {
                     let exit = disposition_exit_code(completion.disposition);
                     if completion.disposition == OperationDisposition::Succeeded {

@@ -1282,7 +1282,6 @@ impl JobResult {
             | Self::BugReportSubmitted
             | Self::WorkflowPreviewBuilt(_)
             | Self::VisualAlternativesReady(_)
-            | Self::DatesAdjusted { .. }
             | Self::TransferTestsComplete(_) => Some(OperationDisposition::Succeeded),
             Self::JobCompleted { disposition, .. } => Some(*disposition),
             _ => None,
