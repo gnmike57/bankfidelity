@@ -114,3 +114,6 @@ wix_bin/
 
 # Local ad-hoc debug binaries
 src/bin/test_*.rs
+
+# Vinv local artifacts (captures, index, reports)
+.vinv/

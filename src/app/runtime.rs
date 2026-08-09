@@ -1087,14 +1087,14 @@ impl Job {
             | Self::Redo
             | Self::Cancel { .. }
             | Self::ReloadConfig
-            | Self::CleanupTempFiles => Duration::from_secs(30),
+            | Self::CleanupTempFiles => Duration::from_secs(300),
             Self::WorkflowParseAndValidate { .. }
             | Self::WorkflowConfirmAndRender { .. }
             | Self::TransferTransactions { .. }
             | Self::RunTransferTests { .. }
             | Self::Verify { .. }
             | Self::TypstReconstruct { .. } => Duration::from_secs(15 * 60),
-            _ => Duration::from_secs(5 * 60),
+            _ => Duration::from_secs(15 * 60),
         }
     }
 }
