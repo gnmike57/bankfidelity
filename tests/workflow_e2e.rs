@@ -1,7 +1,7 @@
 //! Stage 12 / Item #5: end-to-end workflow smoke.
 //!
 //! Exercises the full Stage 1 → Stage 6 chain against the real AU statement
-//! at `AU Bank Statements/IA_Bank_Statement_202602.pdf`:
+//! at `AU Bank Statements/commbank_smartaccess_example.pdf`:
 //!
 //!   1. WorkflowParseAndValidate: Document AI parse + Gemini completeness
 //!   2. Edit a single transaction's debit value
@@ -44,7 +44,7 @@ fn drain_until<F: Fn(&JobResult) -> bool>(
 
 #[test]
 fn end_to_end_workflow_against_au_statement() {
-    let pdf = PathBuf::from("AU Bank Statements/IA_Bank_Statement_202602.pdf");
+    let pdf = PathBuf::from("AU Bank Statements/commbank_smartaccess_example.pdf");
     if !pdf.exists() {
         eprintln!(
             "[skip] AU statement not present at {}; e2e test self-skipped",

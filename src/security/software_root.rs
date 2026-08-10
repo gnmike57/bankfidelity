@@ -123,10 +123,7 @@ fn get_passphrase() -> Result<String, String> {
     }
 
     // 3. Fallback for pure dev (weak but allows testing)
-    if cfg!(feature = "dev") {
-        tracing::warn!("[SECURITY] ⚠ Using default dev passphrase (NOT for production!)");
-        return Ok("dev-passphrase-for-testing-only-2026".to_string());
-    }
+    // Removed: Hardcoded dev fallback passphrase (FND-001)
 
     Err("No strong passphrase found!\n\
          Set DUAL_CORE_PASSPHRASE environment variable or create .pipeline_key file.\n\
