@@ -1,5 +1,9 @@
 # Verified Finding Register
 
+> [!WARNING]
+> **SUPERSEDED**
+> This register has been superseded by a newer, standalone audit report located at the root of the repository: `findings_register.md`.
+
 **Author:** Manus AI
 **Audited revision:** `41993a8daf73266eaae5d6d4abcc2cc13ac85662`
 
