@@ -82,9 +82,7 @@ impl PdfEngineSelector {
     where
         F: Fn(&dyn PdfEngine) -> Result<T, EngineError>,
     {
-        let run_safe = |engine: &dyn PdfEngine| -> Result<T, EngineError> {
-            operation(engine)
-        };
+        let run_safe = |engine: &dyn PdfEngine| -> Result<T, EngineError> { operation(engine) };
 
         match self.current_mode() {
             crate::app::config::PdfEngineMode::NativeOnly => run_safe(&*self.fallback),
