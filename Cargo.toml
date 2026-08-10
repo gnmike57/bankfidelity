@@ -147,15 +147,15 @@ uiautomation = "0.13"
 # Switching dev profile to packed debug info keeps stack traces but avoids
 # the per-DLL PDB explosion.
 [profile.dev]
-debug = 1
-split-debuginfo = "off"
+debug = true
+split-debuginfo = "packed"
 incremental = true
 
 [profile.test]
 # Match the development profile so dependencies compiled by `cargo check` and
 # `cargo build` can be reused by the base-state tests on every CI host.
-debug = 1
-split-debuginfo = "off"
+debug = true
+split-debuginfo = "packed"
 opt-level = 0
 incremental = true
 
