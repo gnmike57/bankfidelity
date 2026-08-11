@@ -69,9 +69,14 @@ impl UfoClient {
             std::env::current_dir().unwrap_or_default()
         );
 
-        let python_exe = ufo_dir.join("python_env").join("python.exe");
-        let python_cmd = if python_exe.exists() {
-            python_exe.to_string_lossy().to_string()
+        let python_cmd = if let Ok(pyo3_py) = std::env::var("PYO3_PYTHON") {
+            pyo3_py
+        } else if let Ok(py_exe) = std::env::var("PYTHON_EXE") {
+            py_exe
+        } else if ufo_dir.join("python_env").join("python.exe").exists() {
+            ufo_dir.join("python_env").join("python.exe").to_string_lossy().to_string()
+        } else if std::path::Path::new("C:\\Users\\zbook\\Downloads\\python-3.15.0rc1-embed-amd64\\python.exe").exists() {
+            "C:\\Users\\zbook\\Downloads\\python-3.15.0rc1-embed-amd64\\python.exe".to_string()
         } else {
             "python".to_string()
         };

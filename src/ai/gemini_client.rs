@@ -179,16 +179,16 @@ pub struct GeminiClient {
     auth: GeminiAuth,
 }
 
-/// The best available Gemini **Pro** model id, tried first for all reasoning
+/// The best available Gemini model id, tried first for all reasoning
 /// and vision calls.
 ///
-/// `gemini-pro-preview` is Google's most advanced generally available reasoning model.
-const GEMINI_PRO_MODEL: &str = "gemini-pro-preview";
+/// `gemini-3.6-flash` is Google's latest generally available flash model.
+const GEMINI_PRO_MODEL: &str = "gemini-3.6-flash";
 
-/// If `gemini-pro-latest` fails or is unavailable, fallback to next best
+/// If the primary model fails or is unavailable, fallback to next best
 const GEMINI_PRO_FALLBACK: &str = "gemini-flash-latest";
 
-/// Absolute fallback if both Pro models fail.
+/// Absolute fallback if both models fail.
 const GEMINI_FLASH_FALLBACK: &str = "gemini-flash-latest";
 
 /// Resolved authentication strategy for a `GeminiClient`.

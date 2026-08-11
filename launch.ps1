@@ -7,9 +7,18 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force -Err
 
 # ─── Paths ───────────────────────────────────────────────────────────────────
 $ProjectRoot = $PSScriptRoot
-$PythonExe = (Get-Command python.exe -ErrorAction SilentlyContinue).Source
+if (Test-Path "C:\ufo\python_env\python.exe") {
+    $PythonExe = "C:\ufo\python_env\python.exe"
+} elseif (Test-Path "C:\Users\zbook\Downloads\python-3.15.0rc1-embed-amd64\python.exe") {
+    $PythonExe = "C:\Users\zbook\Downloads\python-3.15.0rc1-embed-amd64\python.exe"
+} else {
+    $sysPython = (Get-Command python.exe -ErrorAction SilentlyContinue).Source
+    if ($sysPython) { $PythonExe = $sysPython }
+}
+
 if (-not $PythonExe) {
-    Write-Host "[launch] ERROR: python.exe not found in PATH" -ForegroundColor Red
+    Write-Host "[launch] ERROR: python.exe not found in PATH or standard fallback locations." -ForegroundColor Red
+    Read-Host "Press Enter to exit"
     exit 1
 }
 $Python      = Split-Path -Parent $PythonExe

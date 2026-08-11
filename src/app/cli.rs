@@ -42,7 +42,6 @@ pub enum Commands {
     /// Dispatch a UI automation task to Microsoft UFO
     Ufo {
         /// The instruction for UFO (e.g. "download bank statement from chrome")
-        #[arg(short, long)]
         request: String,
     },
 
