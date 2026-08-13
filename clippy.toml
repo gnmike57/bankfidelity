@@ -1,0 +1,10 @@
+# Clippy configuration for dual-core-pdf-pipeline
+# Ref: https://doc.rust-lang.org/clippy/configuration.html
+
+# PDF pipeline has complex chains — raise complexity threshold
+cognitive-complexity-threshold = 30
+too-many-arguments-threshold = 10
+too-many-lines-threshold = 200
+
+# Don't break existing public API surface during linting
+avoid-breaking-exported-api = true

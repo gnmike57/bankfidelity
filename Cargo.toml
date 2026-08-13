@@ -169,3 +169,10 @@ codegen-units = 1
 panic = "unwind"
 strip = true
 debug = false
+
+[lints.clippy]
+# Surface risky patterns as warnings — non-blocking during development
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+todo = "warn"
