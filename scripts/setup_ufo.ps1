@@ -1,4 +1,4 @@
-$ufoPath = Join-Path $HOME "UFO"
+$ufoPath = "C:\ufo\ufo"
 
 if (-Not (Test-Path $ufoPath)) {
     Write-Host "Cloning Microsoft UFO into $ufoPath..."

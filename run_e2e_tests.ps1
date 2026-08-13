@@ -49,6 +49,14 @@ Write-Host " 1. Running Native Rust UIAutomation Test Foundation" -ForegroundCol
 Write-Host "==========================================================" -ForegroundColor Cyan
 cargo test --test e2e_rust_uiautomation -- --nocapture
 
+$venvPath = Join-Path $PSScriptRoot ".venv_e2e\Scripts\activate.ps1"
+if (Test-Path $venvPath) {
+    . $venvPath
+    Write-Host "Activated E2E Virtual Environment." -ForegroundColor Green
+} else {
+    Write-Host "WARNING: Virtual environment not found at $venvPath. Tests may fail due to missing modules." -ForegroundColor Yellow
+}
+
 Write-Host "`n==========================================================" -ForegroundColor Cyan
 Write-Host " 2. Running Python PyWinAuto (Accessibility) Foundation" -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan

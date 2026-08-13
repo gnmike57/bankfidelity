@@ -7,8 +7,8 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force -Err
 
 # ─── Paths ───────────────────────────────────────────────────────────────────
 $ProjectRoot = $PSScriptRoot
-if (Test-Path "C:\ufo\python_env\python.exe") {
-    $PythonExe = "C:\ufo\python_env\python.exe"
+if (Test-Path "C:\ufo\ufo\python_env\python.exe") {
+    $PythonExe = "C:\ufo\ufo\python_env\python.exe"
 } elseif (Test-Path "C:\Users\zbook\Downloads\python-3.15.0rc1-embed-amd64\python.exe") {
     $PythonExe = "C:\Users\zbook\Downloads\python-3.15.0rc1-embed-amd64\python.exe"
 } else {
@@ -60,9 +60,14 @@ if (-not $env:OTEL_EXPORTER_OTLP_ENDPOINT -or $env:OTEL_EXPORTER_OTLP_ENDPOINT -
 }
 
 # ─── Find binary (release preferred, fall back to debug) ─────────────────────
-$release = "$ProjectRoot\target\x86_64-pc-windows-gnu\release\dual-core-pdf-pipeline.exe"
-$debug   = "$ProjectRoot\target\x86_64-pc-windows-gnu\debug\dual-core-pdf-pipeline.exe"
-if (Test-Path $release) { $binary = $release; $mode = "release" }
+$release_gnu = "$ProjectRoot\target\x86_64-pc-windows-gnu\release\dual-core-pdf-pipeline.exe"
+$debug_gnu   = "$ProjectRoot\target\x86_64-pc-windows-gnu\debug\dual-core-pdf-pipeline.exe"
+$release     = "$ProjectRoot\target\release\dual-core-pdf-pipeline.exe"
+$debug       = "$ProjectRoot\target\debug\dual-core-pdf-pipeline.exe"
+
+if (Test-Path $release_gnu) { $binary = $release_gnu; $mode = "release" }
+elseif (Test-Path $debug_gnu) { $binary = $debug_gnu; $mode = "debug" }
+elseif (Test-Path $release) { $binary = $release; $mode = "release" }
 elseif (Test-Path $debug) { $binary = $debug; $mode = "debug" }
 else {
     Write-Host "[launch] ERROR: No binary found. Run 'cargo build --features dev' first." -ForegroundColor Red

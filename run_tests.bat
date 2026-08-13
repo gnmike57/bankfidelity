@@ -5,6 +5,14 @@ echo ========================================
 echo.
 
 REM Set Python path for PyO3 dynamically
+if exist "C:\ufo\ufo\python_env\python.exe" (
+    set "PYO3_PYTHON=C:\ufo\ufo\python_env\python.exe"
+    goto :found_python
+)
+if exist "C:\Users\zbook\Downloads\python-3.15.0rc1-embed-amd64\python.exe" (
+    set "PYO3_PYTHON=C:\Users\zbook\Downloads\python-3.15.0rc1-embed-amd64\python.exe"
+    goto :found_python
+)
 for /f "delims=" %%i in ('where python.exe 2^>nul') do (
     set "PYO3_PYTHON=%%i"
     goto :found_python
