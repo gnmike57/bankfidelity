@@ -23,7 +23,9 @@ impl EngineCaches {
         Self {
             // ~24 pages of rendered PNGs and 256 page-block lists is plenty
             // for snappy navigation without unbounded memory growth.
+            #[allow(clippy::unwrap_used)] // NonZeroUsize::new with non-zero constants
             rendered: Mutex::new(LruCache::new(NonZeroUsize::new(24).unwrap())),
+            #[allow(clippy::unwrap_used)]
             blocks: Mutex::new(LruCache::new(NonZeroUsize::new(256).unwrap())),
         }
     }
@@ -345,6 +347,7 @@ impl PdfEngine for PdfEngineSelector {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
     use crate::app::config::{AppConfig, PdfEngineMode};
     use std::sync::atomic::{AtomicBool, Ordering};

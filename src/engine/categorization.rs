@@ -47,6 +47,7 @@ pub fn categorize_transactions(transactions: &mut [Transaction]) {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
     use crate::engine::model::{Provenance, Transaction};
     use rust_decimal::Decimal;

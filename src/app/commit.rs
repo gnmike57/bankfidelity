@@ -119,6 +119,7 @@ fn synced_temporary_copy(source: &Path, directory: &Path) -> io::Result<tempfile
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
     use tempfile::tempdir;
 

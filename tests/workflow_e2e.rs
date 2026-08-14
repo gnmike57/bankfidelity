@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Stage 12 / Item #5: end-to-end workflow smoke.
 //!
 //! Exercises the full Stage 1 → Stage 6 chain against the real AU statement

@@ -133,6 +133,7 @@ fn get_passphrase() -> Result<String, String> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
     use std::env;
 

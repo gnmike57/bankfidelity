@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! End-to-end smoke test for the runtime job loop.
 //!
 //! Spins up a real `Runtime`, sends a `Ping`, and asserts a `Pong` comes back.

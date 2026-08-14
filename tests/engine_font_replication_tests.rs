@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use dual_core_pdf_pipeline::engine::font_replication::{
     extract_font_bytes_from_pdf, DeepFontReplicationResult,
 };

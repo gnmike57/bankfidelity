@@ -83,20 +83,21 @@ impl Theme {
 
         // Non-interactive surfaces
         visuals.widgets.noninteractive.bg_fill = p.surface;
-        visuals.widgets.noninteractive.bg_stroke = egui::Stroke::new(1.0, p.surface);
+        visuals.widgets.noninteractive.bg_stroke = egui::Stroke::new(1.0_f32, p.surface);
         visuals.widgets.noninteractive.rounding = egui::Rounding::same(4.0);
 
         // Interactive states
         visuals.widgets.inactive.bg_fill = p.surface;
-        visuals.widgets.inactive.bg_stroke = egui::Stroke::new(1.0, p.surface);
+        visuals.widgets.inactive.bg_stroke = egui::Stroke::new(1.0_f32, p.surface);
         visuals.widgets.inactive.rounding = egui::Rounding::same(4.0);
 
         visuals.widgets.hovered.bg_fill = p.accent.linear_multiply(0.15);
-        visuals.widgets.hovered.bg_stroke = egui::Stroke::new(1.0, p.accent.linear_multiply(0.5));
+        visuals.widgets.hovered.bg_stroke =
+            egui::Stroke::new(1.0_f32, p.accent.linear_multiply(0.5));
         visuals.widgets.hovered.rounding = egui::Rounding::same(4.0);
 
         visuals.widgets.active.bg_fill = p.accent.linear_multiply(0.3);
-        visuals.widgets.active.bg_stroke = egui::Stroke::new(1.0, p.accent);
+        visuals.widgets.active.bg_stroke = egui::Stroke::new(1.0_f32, p.accent);
         visuals.widgets.active.rounding = egui::Rounding::same(4.0);
 
         visuals.hyperlink_color = p.accent;

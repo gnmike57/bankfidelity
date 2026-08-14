@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Exhaustive GUI Button → Core Function tests.
 //!
 //! Every button in the GUI that triggers a core function is catalogued

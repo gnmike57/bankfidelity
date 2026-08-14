@@ -164,7 +164,8 @@ async fn verify_pymupdf_pro(config: &AppConfig) -> VerificationResult {
 
     // Check key format
     use crate::app::env_spec::is_well_formed_pro_key;
-    let key_str = key.unwrap();
+    #[allow(clippy::expect_used)] // None case handled by early return above
+    let key_str = key.expect("key presence checked above");
     if !is_well_formed_pro_key(key_str) {
         return VerificationResult {
             service: "PyMuPDF Pro".to_string(),
@@ -265,7 +266,7 @@ async fn verify_document_ai(config: &AppConfig) -> VerificationResult {
     }
 }
 
-/// Verify Gemini with fallback chain: gemini-2.5-pro -> gemini-1.5-pro -> gemini-2.5-flash
+/// Verify Gemini with primary model: gemini-3.7-flash -> fallback to gemini-flash-latest
 async fn verify_gemini(config: &AppConfig) -> VerificationResult {
     let start = Instant::now();
 
@@ -349,7 +350,8 @@ async fn verify_llamaparse(config: &AppConfig) -> VerificationResult {
         };
     }
 
-    let key_str = key.unwrap();
+    #[allow(clippy::expect_used)] // None case handled by early return above
+    let key_str = key.expect("key presence checked above");
     if !key_str.starts_with("llx-") {
         return VerificationResult {
             service: "LlamaParse".to_string(),

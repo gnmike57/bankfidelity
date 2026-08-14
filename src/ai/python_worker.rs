@@ -752,6 +752,7 @@ fn locked_tail(tail: &Arc<Mutex<String>>) -> String {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
     use serde_json::json;
     use uuid::Uuid;

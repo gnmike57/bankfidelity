@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use dual_core_pdf_pipeline::app::config::AppConfig;
 use dual_core_pdf_pipeline::app::gui::MyApp;
 use dual_core_pdf_pipeline::app::runtime::{Job, JobResult};

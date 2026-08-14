@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use dual_core_pdf_pipeline::ai::document_ai::DocumentAiClient;
 use dual_core_pdf_pipeline::ai::llamaparse::LlamaParseClient;
 use dual_core_pdf_pipeline::app::config::AppConfig;

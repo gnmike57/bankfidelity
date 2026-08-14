@@ -239,6 +239,7 @@ pub trait PdfEngine: Send + Sync + std::fmt::Debug {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
 
     fn block(page: usize, bbox: [f32; 4]) -> TextBlock {

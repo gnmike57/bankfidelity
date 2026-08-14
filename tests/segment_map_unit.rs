@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Unit tests for the pure page-mapping layer in `src/engine/segments.rs`.
 //!
 //! These cover hand-built `SegmentMap`s for documents of 1, 2, 3, 4, 7, and 10

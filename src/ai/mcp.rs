@@ -36,9 +36,12 @@ impl McpServer {
                     let is_notification = req.id.is_none();
                     let response = Self::handle_request(req);
                     if !is_notification {
-                        let response_str = serde_json::to_string(&response).unwrap();
-                        writeln!(stdout, "{}", response_str).unwrap();
-                        stdout.flush().unwrap();
+                        #[allow(clippy::unwrap_used, clippy::expect_used)]
+                        {
+                            let response_str = serde_json::to_string(&response).unwrap();
+                            writeln!(stdout, "{}", response_str).expect("MCP: stdout write failed");
+                            stdout.flush().expect("MCP: stdout flush failed");
+                        }
                     }
                 }
                 Err(e) => {

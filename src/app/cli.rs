@@ -1999,6 +1999,7 @@ pub fn run_inner(
 
 #[cfg(test)]
 mod batch_extraction_tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
 
     #[test]

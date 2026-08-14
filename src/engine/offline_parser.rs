@@ -233,9 +233,11 @@ impl RawRow {
 // ---------------------------------------------------------------------------
 
 /// Currency regex for quick scanning before invoking the winnow parser
+#[allow(clippy::unwrap_used)] // Static regex pattern — compilation cannot fail
 static AMOUNT_RE: std::sync::LazyLock<regex::Regex> =
     std::sync::LazyLock::new(|| regex::Regex::new(r"-?\$?[\d,]+\.\d{2}").unwrap());
 
+#[allow(clippy::unwrap_used)] // Static regex pattern — compilation cannot fail
 static DATE_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
     regex::Regex::new(
         r"(?ix)\b(?:
@@ -374,14 +376,20 @@ fn parse_rows_into_transactions(rows: &[RawRow]) -> (Vec<Transaction>, Decimal, 
         let amounts = extract_amounts(&row.text);
 
         if is_opening && !amounts.is_empty() && !found_opening {
-            opening_balance = *amounts.last().unwrap();
+            #[allow(clippy::unwrap_used)] // guarded by !amounts.is_empty()
+            {
+                opening_balance = *amounts.last().unwrap();
+            }
             continuity_balance = Some(opening_balance);
             found_opening = true;
             pending_preceding = None;
             continue;
         }
         if is_closing && !amounts.is_empty() && !found_closing {
-            closing_balance = *amounts.last().unwrap();
+            #[allow(clippy::unwrap_used)] // guarded by !amounts.is_empty()
+            {
+                closing_balance = *amounts.last().unwrap();
+            }
             found_closing = true;
             pending_preceding = None;
             continue;
@@ -440,6 +448,7 @@ fn parse_rows_into_transactions(rows: &[RawRow]) -> (Vec<Transaction>, Decimal, 
                 // 3+ amounts: try to identify debit, credit, running balance
                 // Common layout: description | debit | credit | balance
                 // where one of debit/credit is blank (shows as no match)
+                #[allow(clippy::unwrap_used)] // match arm guarantees 3+ amounts
                 let bal = *amounts.last().unwrap();
 
                 // Look at the 2nd-to-last and 3rd-to-last
@@ -760,6 +769,7 @@ fn extract_text_via_ocr(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
     use rust_decimal_macros::dec;
 

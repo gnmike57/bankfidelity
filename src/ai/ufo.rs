@@ -73,14 +73,22 @@ impl UfoClient {
             pyo3_py
         } else if let Ok(py_exe) = std::env::var("PYTHON_EXE") {
             py_exe
-        } else if ufo_dir.join("python_env").join("python.exe").exists() {
-            ufo_dir.join("python_env").join("python.exe").to_string_lossy().to_string()
-        } else if std::path::Path::new("C:\\Users\\zbook\\Downloads\\python-3.15.0rc1-embed-amd64\\python.exe").exists() {
+        } else if ufo_dir.join("ufo").join("python_env").join("python.exe").exists() {
+            ufo_dir
+                .join("ufo")
+                .join("python_env")
+                .join("python.exe")
+                .to_string_lossy()
+                .to_string()
+        } else if std::path::Path::new(
+            "C:\\Users\\zbook\\Downloads\\python-3.15.0rc1-embed-amd64\\python.exe",
+        )
+        .exists()
+        {
             "C:\\Users\\zbook\\Downloads\\python-3.15.0rc1-embed-amd64\\python.exe".to_string()
         } else {
             "python".to_string()
         };
-
         let mut child = Command::new(&python_cmd)
             .arg("-m")
             .arg("ufo")
@@ -177,6 +185,7 @@ fn kill_process_tree(pid: u32) {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
     static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 

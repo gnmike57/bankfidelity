@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Exhaustive N×(N−1) cross-transfer stress test for AU bank statements.
 //!
 //! For every ordered pair of AU bank statements (source → target), this test

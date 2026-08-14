@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Property-based tests for `SegmentMap` page mapping.
 //!
 //! **Property 2 (CP-2): Round-trip page mapping**

@@ -287,6 +287,7 @@ pub fn detect_format_from_neighbours(neighbours: &[&str]) -> NumberFormat {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
     use rust_decimal_macros::dec;
 

@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use dual_core_pdf_pipeline::engine::verification::{VerificationGateStatus, VerificationIntent};
 use dual_core_pdf_pipeline::engine::verification_content::verify_intended_edit_membership;
 use dual_core_pdf_pipeline::pdf::engine::PdfEngine;

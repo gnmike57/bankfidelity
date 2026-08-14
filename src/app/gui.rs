@@ -1183,7 +1183,7 @@ impl MyApp {
                             color: egui::Color32::from_black_alpha((100.0 * fade) as u8),
                         })
                         .stroke(egui::Stroke::new(
-                            1.0,
+                            1.0_f32,
                             self.settings.theme.palette().text.linear_multiply(0.1),
                         ))
                         .show(ui, |ui| {
@@ -2447,7 +2447,7 @@ impl MyApp {
                 se: 24.0,
             },
             fill: ctx.style().visuals.window_fill.linear_multiply(0.95), // Slight translucency
-            stroke: egui::Stroke::new(1.0, ctx.style().visuals.widgets.inactive.bg_fill),
+            stroke: egui::Stroke::new(1.0_f32, ctx.style().visuals.widgets.inactive.bg_fill),
             shadow: egui::epaint::Shadow {
                 offset: egui::vec2(0.0, 8.0),
                 blur: 16.0,
@@ -2807,7 +2807,7 @@ impl MyApp {
                                         ui.painter().hline(
                                             rect.min.x..=rect.max.x,
                                             rect.center().y,
-                                            egui::Stroke::new(2.0, line_color),
+                                            egui::Stroke::new(2.0_f32, line_color),
                                         );
                                         ui.add_space(8.0);
                                     }
@@ -2870,7 +2870,7 @@ impl MyApp {
         let right_frame = egui::Frame {
             inner_margin: egui::Margin::same(16.0),
             fill: ctx.style().visuals.window_fill.linear_multiply(0.98),
-            stroke: egui::Stroke::new(1.0, ctx.style().visuals.widgets.inactive.bg_fill),
+            stroke: egui::Stroke::new(1.0_f32, ctx.style().visuals.widgets.inactive.bg_fill),
             shadow: egui::epaint::Shadow {
                 offset: egui::vec2(0.0, 12.0),
                 blur: 24.0,
@@ -4668,7 +4668,7 @@ impl MyApp {
                                     egui::pos2(split_x, rect.min.y),
                                     egui::pos2(split_x, rect.max.y),
                                 ],
-                                egui::Stroke::new(2.0, egui::Color32::from_rgb(255, 200, 0)),
+                                egui::Stroke::new(2.0_f32, egui::Color32::from_rgb(255, 200, 0)),
                             );
                         }
 
@@ -4692,13 +4692,13 @@ impl MyApp {
                                     if sx0 < split_x {
                                         let mut r = item_rect;
                                         r.max.x = r.max.x.min(split_x);
-                                        painter.rect_stroke(r, 2.0, egui::Stroke::new(2.0, egui::Color32::from_rgba_premultiplied(255, 50, 50, 150)));
+                                        painter.rect_stroke(r, 2.0, egui::Stroke::new(2.0_f32, egui::Color32::from_rgba_premultiplied(255, 50, 50, 150)));
                                     }
 
                                     if sx1 > split_x {
                                         let mut r = item_rect;
                                         r.min.x = r.min.x.max(split_x);
-                                        painter.rect_stroke(r, 2.0, egui::Stroke::new(2.0, egui::Color32::from_rgba_premultiplied(50, 255, 50, 150)));
+                                        painter.rect_stroke(r, 2.0, egui::Stroke::new(2.0_f32, egui::Color32::from_rgba_premultiplied(50, 255, 50, 150)));
                                     }
 
                                     // Phase 2 - Stage 1: Smart Alignment Guides (on hover)
@@ -4709,13 +4709,13 @@ impl MyApp {
                                             let guide_color = p.accent.linear_multiply(0.4);
 
                                             // Horizontal guide through center
-                                            painter.hline(response.rect.min.x..=response.rect.max.x, item_rect.center().y, egui::Stroke::new(1.0, guide_color));
+                                            painter.hline(response.rect.min.x..=response.rect.max.x, item_rect.center().y, egui::Stroke::new(1.0_f32, guide_color));
 
                                             // Vertical guide through center
-                                            painter.vline(item_rect.center().x, response.rect.min.y..=response.rect.max.y, egui::Stroke::new(1.0, guide_color));
+                                            painter.vline(item_rect.center().x, response.rect.min.y..=response.rect.max.y, egui::Stroke::new(1.0_f32, guide_color));
 
                                             // Highlight the bounds
-                                            painter.rect_stroke(item_rect, 0.0, egui::Stroke::new(2.0, p.accent));
+                                            painter.rect_stroke(item_rect, 0.0, egui::Stroke::new(2.0_f32, p.accent));
                                         }
                                     }
                                 }
@@ -4769,7 +4769,7 @@ impl MyApp {
                             painter.rect_stroke(
                                 egui::Rect::from_min_max(min, max),
                                 4.0,
-                                egui::Stroke::new(2.0, egui::Color32::from_rgb(255, 200, 0)),
+                                egui::Stroke::new(2.0_f32, egui::Color32::from_rgb(255, 200, 0)),
                             );
                         }
                     }
@@ -4811,7 +4811,7 @@ impl MyApp {
                                 cell,
                                 2.0,
                                 egui::Stroke::new(
-                                    1.0,
+                                    1.0_f32,
                                     egui::Color32::from_rgb(220, 180, 0),
                                 ),
                             );
@@ -4870,7 +4870,7 @@ impl MyApp {
 
                         // Background
                         painter.rect_filled(minimap_rect, 4.0, egui::Color32::from_black_alpha(180));
-                        painter.rect_stroke(minimap_rect, 4.0, egui::Stroke::new(1.0, egui::Color32::from_white_alpha(30)));
+                        painter.rect_stroke(minimap_rect, 4.0, egui::Stroke::new(1.0_f32, egui::Color32::from_white_alpha(30)));
 
                         // Render full page texture scaled down
                         painter.image(
@@ -4893,7 +4893,7 @@ impl MyApp {
                         );
 
                         painter.rect_filled(ind_rect, 2.0, self.settings.theme.palette().accent.linear_multiply(0.2));
-                        painter.rect_stroke(ind_rect, 2.0, egui::Stroke::new(1.5, self.settings.theme.palette().accent));
+                        painter.rect_stroke(ind_rect, 2.0, egui::Stroke::new(1.5_f32, self.settings.theme.palette().accent));
                     }
                 } else {
                     // Welcome / empty placeholder
@@ -4923,7 +4923,7 @@ impl MyApp {
                             color: egui::Color32::from_black_alpha(80),
                         })
                         .rounding(16.0)
-                        .stroke(egui::Stroke::new(1.0, p.text.linear_multiply(0.1)))
+                        .stroke(egui::Stroke::new(1.0_f32, p.text.linear_multiply(0.1)))
                         .inner_margin(egui::Margin::symmetric(20.0, 16.0))
                         .show(ui, |ui| {
                             ui.vertical(|ui| {
@@ -5060,7 +5060,7 @@ impl MyApp {
                                 spread: 0.0,
                                 color: egui::Color32::from_black_alpha(40),
                             })
-                            .stroke(egui::Stroke::new(1.0, p.surface.linear_multiply(0.5)))
+                            .stroke(egui::Stroke::new(1.0_f32, p.surface.linear_multiply(0.5)))
                             .show(ui, |ui| {
                                 // Phase 2 - Stage 2: Shimmering Skeleton Loader
                                 let time = ui.input(|i| i.time);
@@ -5126,7 +5126,7 @@ impl MyApp {
             panel_rect,
             egui::Rounding::same(24.0),
             p.surface.linear_multiply(0.85),
-            egui::Stroke::new(1.5, p.text.linear_multiply(0.1)),
+            egui::Stroke::new(1.5_f32, p.text.linear_multiply(0.1)),
         );
 
         ui.allocate_new_ui(egui::UiBuilder::new().max_rect(panel_rect), |ui| {
@@ -5295,7 +5295,7 @@ impl MyApp {
                                 .fill(bg)
                                 .rounding(10.0)
                                 .stroke(egui::Stroke::new(
-                                    1.0,
+                                    1.0_f32,
                                     egui::Color32::from_white_alpha((40.0 * slide) as u8),
                                 ))
                                 .inner_margin(egui::vec2(12.0, 8.0))
@@ -5712,6 +5712,7 @@ fn setup_custom_fonts(ctx: &egui::Context) {
 // ---------------------------------------------------------------------------
 
 fn load_icon() -> egui::IconData {
+    #[allow(clippy::expect_used)] // Embedded compile-time asset — failure is a build error
     let image = image::load_from_memory(include_bytes!("../../assets/icon.png"))
         .expect("Failed to open icon path")
         .into_rgba8();

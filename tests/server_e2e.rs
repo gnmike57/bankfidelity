@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use dual_core_pdf_pipeline::app::audit::AuditLog;
 use dual_core_pdf_pipeline::app::runtime::Runtime;
 use std::sync::Arc;

@@ -249,10 +249,12 @@ struct ReconstructWorld {
 impl ReconstructWorld {
     fn new(source_text: String) -> Self {
         let font_data = include_bytes!("../../assets/Inter-Regular.ttf");
+        #[allow(clippy::expect_used)] // Embedded compile-time font asset
         let font = Font::new(typst::foundations::Bytes::new(font_data.to_vec()), 0)
             .expect("Failed to parse Inter-Regular");
 
         let font_bold_data = include_bytes!("../../assets/Inter-Bold.ttf");
+        #[allow(clippy::expect_used)] // Embedded compile-time font asset
         let font_bold = Font::new(typst::foundations::Bytes::new(font_bold_data.to_vec()), 0)
             .expect("Failed to parse Inter-Bold");
 

@@ -223,6 +223,7 @@ pub fn sha256_file(path: &Path) -> Result<String, ApplyReportError> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
 
     fn success_json() -> String {

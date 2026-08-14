@@ -419,12 +419,15 @@ fn parse_markdown_to_statement_inner(markdown: &str) -> Result<BankStatement, Ll
     let mut found_opening = false;
     let mut found_closing = false;
 
+    #[allow(clippy::expect_used)] // Static regex patterns — compilation cannot fail
     let page_marker =
         regex::Regex::new(r"(?i)^(?:#{1,6}\s*)?(?:page|pg\.?)\s*(\d+)\s*(?:of\s*\d+)?\s*$")
             .expect("page marker regex");
+    #[allow(clippy::expect_used)]
     let opening_re =
         regex::Regex::new(r"(?i)(?:opening|beginning)\s+balance[^0-9\-\(]*(-?\$?[\d,]+\.\d{2})")
             .expect("opening balance regex");
+    #[allow(clippy::expect_used)]
     let closing_re =
         regex::Regex::new(r"(?i)(?:closing|ending)\s+balance[^0-9\-\(]*(-?\$?[\d,]+\.\d{2})")
             .expect("closing balance regex");
@@ -594,6 +597,7 @@ fn parse_markdown_to_statement_inner(markdown: &str) -> Result<BankStatement, Ll
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
     use rust_decimal_macros::dec;
 

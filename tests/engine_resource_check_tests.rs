@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use dual_core_pdf_pipeline::engine::resource_check::{check_merged_resources, ResourceCheckError};
 use lopdf::{
     content::Content, content::Operation, dictionary, Document, Object, Stream, StringFormat,

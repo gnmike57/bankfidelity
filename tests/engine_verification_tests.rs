@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use dual_core_pdf_pipeline::engine::verification::{
     verify_edit_pages, MathInputs, VerificationDisposition, VerificationEvidencePackage,
     VERIFICATION_EVIDENCE_SCHEMA,

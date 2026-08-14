@@ -81,6 +81,7 @@ pub async fn verify_and_repair_extraction(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
     use crate::engine::model::{Provenance, Transaction};
     use rust_decimal_macros::dec;

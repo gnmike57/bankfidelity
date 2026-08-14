@@ -303,6 +303,7 @@ impl SmartDocumentEngine {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
     #[test]
     fn calculate_global_imbalance_correct() {

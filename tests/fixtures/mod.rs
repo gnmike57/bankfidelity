@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Shared test utilities and synthetic PDF fixture generators.
 //!
 //! Provides `generate_test_pdf(pages, path)` which creates a minimal valid PDF

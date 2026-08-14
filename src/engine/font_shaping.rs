@@ -46,6 +46,7 @@ pub fn calculate_exact_width(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
 
     // A simple test to ensure the function signature works. In a real scenario,

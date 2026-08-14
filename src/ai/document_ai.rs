@@ -1290,10 +1290,8 @@ impl DocumentAiClient {
                         closing_balance = f64_to_dec(v);
                     }
                 }
-                "account_number" => {
-                    if !text.is_empty() {
-                        account_number = Some(text);
-                    }
+                "account_number" if !text.is_empty() => {
+                    account_number = Some(text);
                 }
                 _ => {}
             }
@@ -2003,6 +2001,7 @@ fn property_bbox(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
 
     #[test]

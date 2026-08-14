@@ -262,6 +262,7 @@ pub fn process_and_reconcile(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
     use crate::engine::model::{Provenance, Transaction};
     use rust_decimal_macros::dec;

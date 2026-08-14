@@ -182,8 +182,8 @@ pub struct GeminiClient {
 /// The best available Gemini model id, tried first for all reasoning
 /// and vision calls.
 ///
-/// `gemini-3.6-flash` is Google's latest generally available flash model.
-const GEMINI_PRO_MODEL: &str = "gemini-3.6-flash";
+/// `gemini-3.7-flash` is Google's latest generally available flash model.
+const GEMINI_PRO_MODEL: &str = "gemini-3.7-flash";
 
 /// If the primary model fails or is unavailable, fallback to next best
 const GEMINI_PRO_FALLBACK: &str = "gemini-flash-latest";
@@ -1587,6 +1587,7 @@ fn mint_gcp_access_token(doc_ai: &crate::app::config::DocumentAiConfig) -> Resul
 /// sending them to the cloud for analysis. Gemini only needs the math, not the PII.
 pub fn scrub_pii(transactions: &[Transaction]) -> Vec<Transaction> {
     // Basic scrubbing: replace sequences of 6+ digits (potential account/routing numbers)
+    #[allow(clippy::unwrap_used)] // Static regex pattern — compilation cannot fail
     static RE_DIGITS: std::sync::LazyLock<regex::Regex> =
         std::sync::LazyLock::new(|| regex::Regex::new(r"\b\d{6,}\b").unwrap());
     let re_digits = &*RE_DIGITS;
@@ -1605,6 +1606,7 @@ pub fn scrub_pii(transactions: &[Transaction]) -> Vec<Transaction> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
     use wiremock::matchers::{method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};

@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use dual_core_pdf_pipeline::pdf::native_engine::pdfium_resolver;
 use pdfium_render::prelude::Pdfium;
 use std::time::Duration;

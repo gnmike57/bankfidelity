@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use dual_core_pdf_pipeline::ai::backend::AiBackend;
 use dual_core_pdf_pipeline::ai::gemini_client::GeminiClient;
 use dual_core_pdf_pipeline::app::config::AiProviderMode;

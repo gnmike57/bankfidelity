@@ -224,7 +224,7 @@ impl AppModals for MyApp {
                                     ("Gemini", stats.gemini_wins),
                                     ("Offline", stats.offline_wins),
                                 ];
-                                leaderboard.sort_by(|a, b| b.1.cmp(&a.1));
+                                leaderboard.sort_by_key(|b| std::cmp::Reverse(b.1));
 
                                 egui::Grid::new("leaderboard_grid")
                                     .num_columns(3)
@@ -387,7 +387,7 @@ impl AppModals for MyApp {
                             ui.label("Drag and drop .ttf or .otf files here to override Document AI.");
                             let rect = egui::Rect::from_min_size(ui.cursor().min, egui::vec2(ui.available_width(), 60.0));
                             let response = ui.allocate_rect(rect, egui::Sense::hover());
-                            ui.painter().rect_stroke(response.rect, 4.0, egui::Stroke::new(1.0, self.settings.theme.palette().weak));
+                            ui.painter().rect_stroke(response.rect, 4.0, egui::Stroke::new(1.0_f32, self.settings.theme.palette().weak));
                             ui.allocate_new_ui(egui::UiBuilder::new().max_rect(response.rect), |ui| {
                                 ui.centered_and_justified(|ui| {
                                     ui.label(egui::RichText::new("Drop fonts here").color(self.settings.theme.palette().weak).size(16.0));
@@ -1030,6 +1030,8 @@ impl AppModals for MyApp {
                             let input = std::path::PathBuf::from(&self.input_path);
                             let output = Self::safe_output_path(&input, "dates");
 
+                            #[allow(clippy::expect_used)]
+                            // Button is disabled until validation passes
                             let mode = validated_mode
                                 .clone()
                                 .expect("enabled date-adjust action has validated input");

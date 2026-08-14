@@ -28,7 +28,8 @@ impl Watchdog {
         std::thread::spawn(move || {
             let mut sys = System::new_all();
             let mut networks = sysinfo::Networks::new_with_refreshed_list();
-            let pid = sysinfo::get_current_pid().unwrap();
+            #[allow(clippy::expect_used)]
+            let pid = sysinfo::get_current_pid().expect("failed to get current PID");
 
             let mut last_activity_time = Instant::now();
             let mut stalled_notified = false;
@@ -36,7 +37,8 @@ impl Watchdog {
             loop {
                 std::thread::sleep(Duration::from_secs(1));
 
-                let active = *active_clone.lock().unwrap() > 0;
+                #[allow(clippy::expect_used)]
+                let active = *active_clone.lock().expect("watchdog mutex poisoned") > 0;
                 if !active {
                     last_activity_time = Instant::now();
                     if stalled_notified {
@@ -123,11 +125,21 @@ impl Watchdog {
     }
 
     pub fn start_pro_edit(&self) {
-        *self.active_pro_edits.lock().unwrap() += 1;
+        #[allow(clippy::expect_used)]
+        {
+            *self
+                .active_pro_edits
+                .lock()
+                .expect("watchdog mutex poisoned") += 1;
+        }
     }
 
     pub fn end_pro_edit(&self) {
-        let mut count = self.active_pro_edits.lock().unwrap();
+        #[allow(clippy::expect_used)]
+        let mut count = self
+            .active_pro_edits
+            .lock()
+            .expect("watchdog mutex poisoned");
         if *count > 0 {
             *count -= 1;
         }
@@ -136,6 +148,7 @@ impl Watchdog {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
 
     #[test]

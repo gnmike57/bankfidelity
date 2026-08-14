@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! End-to-end validation of the 3-Page-Mode segmented pipeline on real,
 //! multi-page bank statements (>3 pages), which the plain CLI `text` path
 //! cannot edit because the PyMuPDF Pro 3-page guard (correctly) blocks a

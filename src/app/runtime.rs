@@ -1647,6 +1647,7 @@ impl Runtime {
         audit_log: AuditLog,
         config: Arc<crate::app::config::AppConfig>,
     ) -> (Self, RuntimeClient, mpsc::Receiver<JobResult>) {
+        #[allow(clippy::expect_used)] // Tokio runtime creation is infallible in practice
         let tokio_rt = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
@@ -1821,6 +1822,7 @@ impl Runtime {
             String,
             crate::ai::document_ai::BankStatement,
         >::new(
+            #[allow(clippy::unwrap_used)] // NonZeroUsize::new(20) is always Some
             std::num::NonZeroUsize::new(20).unwrap(),
         )));
         let fast_parse_cache = parse_cache.clone();
@@ -2684,7 +2686,12 @@ Additional Context:\n{context}",
                             );
                             Some(consensus)
                         } else {
-                            let mut statement = statements.into_iter().next().unwrap().1;
+                            #[allow(clippy::expect_used)]
+                            let mut statement = statements
+                                .into_iter()
+                                .next()
+                                .expect("non-empty statements checked above")
+                                .1;
                             if let Some(geometry_statement) = geometry_statement.as_ref() {
                                 let enriched = crate::engine::consensus::enrich_statement_geometry(
                                     &mut statement,
@@ -6829,7 +6836,8 @@ Additional Context:\n{context}",
                 let edit_values: Vec<serde_json::Value> = usable
                     .iter()
                     .map(|change| {
-                        let bbox = change.bbox.expect("usable changes have resolved bboxes");
+                        #[allow(clippy::expect_used)]
+                        let bbox = change.bbox.expect("usable changes filtered to have bboxes");
                         serde_json::json!({
                             "page": change.page,
                             "rect": [bbox[0], bbox[1], bbox[2], bbox[3]],
@@ -8912,12 +8920,16 @@ Additional Context:\n{context}",
                             }
                             let segment_edits = grouped.get(&i).cloned().unwrap_or_default();
                             if !segment_edits.is_empty() {
-                                let temp_seg_out = mgr_opt.as_ref().unwrap().join(format!(
-                                    "seg_{}_batch_{}_{}.pdf",
-                                    i,
-                                    workflow_stamp,
-                                    Uuid::new_v4()
-                                ));
+                                #[allow(clippy::expect_used)]
+                                let temp_seg_out = mgr_opt
+                                    .as_ref()
+                                    .expect("segment manager initialized when map exists")
+                                    .join(format!(
+                                        "seg_{}_batch_{}_{}.pdf",
+                                        i,
+                                        workflow_stamp,
+                                        Uuid::new_v4()
+                                    ));
 
                                 use crate::engine::number_format::format_like;
                                 use rust_decimal::Decimal;
@@ -9532,6 +9544,7 @@ Additional Context:\n{context}",
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
     use crate::app::config::AppConfig;
     use std::time::Duration;

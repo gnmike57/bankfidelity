@@ -233,6 +233,7 @@ pub fn f64_to_dec(v: f64) -> Decimal {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
     use rust_decimal_macros::dec;
 

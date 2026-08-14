@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 fn main() {
     let mut sys = sysinfo::System::new_all();
     sys.refresh_all();

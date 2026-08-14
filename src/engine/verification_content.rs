@@ -128,6 +128,7 @@ pub fn verify_intended_edit_membership(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
 
     #[test]

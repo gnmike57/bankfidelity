@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 #![cfg(windows)]
 //! Windows UIAutomation E2E against the real GUI binary.
 //!

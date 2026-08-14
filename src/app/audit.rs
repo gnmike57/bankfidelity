@@ -85,7 +85,8 @@ impl AuditLog {
         write_json_atomic(&event_path, &event)?;
 
         let timestamp = Utc::now().to_rfc3339();
-        if let Err(error) = self.db.as_ref().unwrap().execute(
+        #[allow(clippy::expect_used)] // db is Some after ensure_open() succeeds
+        if let Err(error) = self.db.as_ref().expect("ensure_open succeeded").execute(
             "INSERT INTO audit_log (timestamp, action, details) VALUES (?1, ?2, ?3)",
             params![timestamp, "write", json_line],
         ) {
@@ -112,9 +113,10 @@ impl AuditLog {
     pub fn append_line(&mut self, line: &str) -> AuditResult<()> {
         self.ensure_open()?;
         let timestamp = Utc::now().to_rfc3339();
+        #[allow(clippy::expect_used)] // db is Some after ensure_open() succeeds
         self.db
             .as_ref()
-            .unwrap()
+            .expect("ensure_open succeeded")
             .execute(
                 "INSERT INTO audit_log (timestamp, action, details) VALUES (?1, ?2, ?3)",
                 params![timestamp, "append_line", line.trim()],
@@ -555,6 +557,7 @@ impl AuditLogParser {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
     use tempfile::tempdir;
 

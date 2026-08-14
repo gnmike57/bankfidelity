@@ -20,12 +20,16 @@ impl<W: Write> ScrubbingWriter<W> {
         static RE_MAC_PATH: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
         static RE_WIN_PATH: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
 
+        #[allow(clippy::unwrap_used)] // Static regex patterns — compilation cannot fail
         let re_email = RE_EMAIL.get_or_init(|| {
             regex::Regex::new(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+").unwrap()
         });
+        #[allow(clippy::unwrap_used)]
         let re_keys = RE_KEYS.get_or_init(|| regex::Regex::new(r#"(?i)(api[_-]?key|token|secret|password|bearer)[\s=:>]+['"]?[A-Za-z0-9\-_]{16,}['"]?"#).unwrap());
+        #[allow(clippy::unwrap_used)]
         let re_mac_path =
             RE_MAC_PATH.get_or_init(|| regex::Regex::new(r"/Users/[a-zA-Z0-9_.-]+").unwrap());
+        #[allow(clippy::unwrap_used)]
         let re_win_path =
             RE_WIN_PATH.get_or_init(|| regex::Regex::new(r"C:\\Users\\[a-zA-Z0-9_.-]+").unwrap());
 
@@ -105,7 +109,7 @@ fn managed_log_files(log_dir: &Path, prefix: &str) -> std::io::Result<Vec<(PathB
             .unwrap_or(SystemTime::UNIX_EPOCH);
         files.push((entry.path(), modified));
     }
-    files.sort_by(|left, right| right.1.cmp(&left.1));
+    files.sort_by_key(|right| std::cmp::Reverse(right.1));
     Ok(files)
 }
 
@@ -312,6 +316,7 @@ pub fn init(cfg: &AppConfig) -> TelemetryGuard {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
     #[cfg(feature = "otel")]
     use std::path::PathBuf;

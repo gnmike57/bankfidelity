@@ -165,6 +165,7 @@ impl CanonicalPageBox {
     }
 
     #[cfg(test)]
+    #[allow(clippy::expect_used)]
     fn content_span_to_top_left(self, x: f32, y: f32, width: f32, height: f32) -> [f32; 4] {
         self.content_rect_to_top_left(x, y, x + width, y + height, 0)
             .expect("zero-degree page rotation is always supported")
@@ -1089,6 +1090,7 @@ pub mod pdfium_resolver {
 
     #[cfg(test)]
     mod tests {
+        #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
         use super::*;
 
         fn make_archive(library_member: &str, library: &[u8]) -> Vec<u8> {
@@ -1736,6 +1738,7 @@ impl PdfEngine for OxidizePdfEngine {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
 
     #[test]

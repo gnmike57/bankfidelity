@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use image::ImageFormat;
 use pdfium_render::prelude::*;
 use std::fs;

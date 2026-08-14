@@ -181,7 +181,11 @@ pub fn merge_consensus_statements(statements: Vec<BankStatement>) -> BankStateme
 
     // If only 1 statement, just return it.
     if statements.len() == 1 {
-        return statements.into_iter().next().unwrap();
+        #[allow(clippy::expect_used)]
+        return statements
+            .into_iter()
+            .next()
+            .expect("len()==1 guarantees an element");
     }
 
     // Preserve one coherent semantic ledger instead of unioning unmatched rows

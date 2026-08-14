@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Phase 3: Exhaustive setting-combination roundtrip test.
 //!
 //! Constructs every valid (PdfEngineMode × DocumentParserMode × AiProviderMode × VerificationMode)

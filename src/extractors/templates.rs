@@ -373,6 +373,7 @@ pub fn learn_template(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
     use std::collections::HashMap;
     use tempfile::tempdir;

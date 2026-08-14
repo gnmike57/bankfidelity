@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Optional desktop-session computer-use smoke.
 //! Marked `#[ignore]` — requires an interactive display and a built binary.
 

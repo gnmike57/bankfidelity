@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Fail-closed integration contract for legacy automatic font generation.
 //!
 //! The operation remains in the worker protocol for compatibility, but it must

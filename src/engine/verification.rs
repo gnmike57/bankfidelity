@@ -1360,6 +1360,7 @@ async fn verify_edit_pages_with_intents_and_padding(
 
 #[cfg(test)]
 mod stage_g_tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
     use image::{GrayImage, Luma};
     use rust_decimal_macros::dec;

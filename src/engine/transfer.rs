@@ -1154,6 +1154,7 @@ pub fn write_transfer_audit(
     let verify_data = std::fs::read(&audit_path)?;
     if verify_data.len() >= 4 {
         let verify_checksum = crc32fast::hash(&verify_data[..verify_data.len() - 4]);
+        #[allow(clippy::unwrap_used)] // Slice is exactly 4 bytes (checked by len >= 4 above)
         let stored_checksum =
             u32::from_le_bytes(verify_data[verify_data.len() - 4..].try_into().unwrap());
         if verify_checksum != stored_checksum {
@@ -1174,6 +1175,7 @@ pub fn write_transfer_audit(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
     use rust_decimal_macros::dec;
 

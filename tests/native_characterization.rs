@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use dual_core_pdf_pipeline::app::config::{AppConfig, ConfigManager};
 use dual_core_pdf_pipeline::pdf::engine::{EngineError, PdfEngine};
 use dual_core_pdf_pipeline::pdf::native_engine::OxidizePdfEngine;

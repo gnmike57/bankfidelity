@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use dual_core_pdf_pipeline::engine::model::{FieldBboxes, Provenance, Transaction};
 use dual_core_pdf_pipeline::engine::transfer::{
     plan_transaction_transfer_deterministic, transaction_description,

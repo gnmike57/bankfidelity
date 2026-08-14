@@ -1170,6 +1170,7 @@ pub fn prune_redundant_edits(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
     use crate::engine::model::Provenance;
     use rust_decimal_macros::dec;

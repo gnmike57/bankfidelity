@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Live AI integration tests.
 //!
 //! These probe the actual external services with the keys in `.env`. They

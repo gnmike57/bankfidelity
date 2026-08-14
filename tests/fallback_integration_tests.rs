@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use dual_core_pdf_pipeline::engine::layout::DocumentLayout;
 use dual_core_pdf_pipeline::pdf::engine::{
     EngineCapabilities, RenderedPage, ReplaceOutcome, TextBlock,
