@@ -491,10 +491,10 @@ impl AppModals for MyApp {
                         egui::ComboBox::from_id_salt("pdf_engine_mode")
                             .selected_text(match self.edit_engine_mode {
                                 PdfEngineMode::DualConcurrent => "Dual Concurrent",
-                                PdfEngineMode::PyMuPdfProPrimary => "PyMuPDF Pro Primary",
-                                PdfEngineMode::NativeOnly => "Native Only",
-                                PdfEngineMode::PyMuPdfOnly => "PyMuPDF Only",
-                                PdfEngineMode::TypstReconstruct => "Typst Reconstruct",
+                                PdfEngineMode::PyMuPdfProPrimary => "Rank 1: PyMuPDF Pro Primary (Baseline)",
+                                PdfEngineMode::NativeOnly => "Rank 2: Native (Fallback)",
+                                PdfEngineMode::PyMuPdfOnly => "PyMuPDF Only (Unranked)",
+                                PdfEngineMode::TypstReconstruct => "Rank 3: Typst Reconstruct (Backup)",
                             })
                             .show_ui(ui, |ui| {
                                 capability_selectable_value(

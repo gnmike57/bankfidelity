@@ -4,6 +4,38 @@ use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct UfoTaskResult {
+    pub status: String,
+    pub task_id: String,
+    pub output: Option<String>,
+    pub error_type: Option<String>,
+    pub error_message: Option<String>,
+    pub traceback: Option<String>,
+}
+
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum UfoError {
+    #[error("Hallucination: {0}")]
+    Hallucination(String),
+    #[error("Crash: {0}")]
+    Crash(String),
+    #[error("Dependency: {0}")]
+    Dependency(String),
+    #[error("Unknown: {0}")]
+    Unknown(String),
+}
+
+impl From<String> for UfoError {
+    fn from(err: String) -> Self {
+        UfoError::Unknown(err)
+    }
+}
+
+
+
 pub struct UfoClient;
 
 static UFO_ACTIVE_PID: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
@@ -39,17 +71,17 @@ impl UfoClient {
     ///
     /// Returns `Err` when UFO is missing, the process fails to start, or the
     /// UFO process exits non-zero. Concurrent dispatches cancel the previous task.
-    pub fn dispatch_task<F>(request: &str, mut on_log: Option<F>) -> Result<Value, String>
+    pub fn dispatch_task<F>(request: &str, mut on_log: Option<F>) -> Result<UfoTaskResult, UfoError>
     where
         F: FnMut(String) + Send + 'static,
     {
         let ufo_dir = Self::ufo_dir();
 
         if !ufo_dir.exists() {
-            return Err(format!(
+            return Err(UfoError::Unknown(format!(
                 "UFO framework not found at {:?}. Install Microsoft UFO or set BANKFIDELITY_UFO_DIR.",
                 ufo_dir
-            ));
+            )));
         }
 
         // Avoid orphaning a previous UFO process when a new task starts.
@@ -134,33 +166,70 @@ impl UfoClient {
             }
         }
 
-        let status = child
-            .wait()
-            .map_err(|e| format!("Failed to wait on UFO process: {e}"))?;
+        let start_wait = std::time::Instant::now();
+        let timeout = std::time::Duration::from_secs(600);
+        let status = loop {
+            match child.try_wait() {
+                Ok(Some(s)) => break s,
+                Ok(None) => {
+                    if start_wait.elapsed() > timeout {
+                        tracing::error!("UFO task timed out after 10 minutes. Killing process tree.");
+                        kill_process_tree(child.id());
+                        return Err(UfoError::Crash("UFO task timed out (indefinite hang detected)".into()));
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                }
+                Err(e) => return Err(UfoError::Crash(format!("Failed to wait on UFO: {e}"))),
+            }
+        };
         UFO_ACTIVE_PID.store(0, std::sync::atomic::Ordering::SeqCst);
         let _ = stderr_thread.join();
 
         let stderr_str = stderr_buf.lock().map(|s| s.clone()).unwrap_or_default();
 
+        let result_json_path = ufo_dir.join("logs").join(&task_id).join("result.json");
+        if result_json_path.exists() {
+            let json_str = std::fs::read_to_string(&result_json_path).unwrap_or_default();
+            match serde_json::from_str::<UfoTaskResult>(&json_str) {
+                Ok(res) => {
+                    if res.status == "error" {
+                        let err_msg = res.error_message.clone().unwrap_or_default();
+                        let err_type = res.error_type.as_deref().unwrap_or("");
+                        match err_type {
+                            "ValueError" | "AssertionError" => return Err(UfoError::Hallucination(err_msg)),
+                            "ImportError" | "ModuleNotFoundError" => return Err(UfoError::Dependency(err_msg)),
+                            _ => return Err(UfoError::Crash(err_msg)),
+                        }
+                    }
+                    return Ok(res);
+                }
+                Err(e) => {
+                    tracing::warn!("result.json was corrupted. Synthesizing crash report.");
+                    return Err(UfoError::Crash(format!("UFO payload corrupted ({e}). Stderr snapshot: {}", stderr_str)));
+                }
+            }
+        }
+        
+        // Fallback if result.json wasn't written
         let log_path = ufo_dir.join("logs").join(&task_id).join("output.md");
         let ufo_result = if log_path.exists() {
-            std::fs::read_to_string(&log_path)
-                .unwrap_or_else(|e| format!("Failed to read output.md: {e}"))
+            std::fs::read_to_string(&log_path).unwrap_or_default()
         } else {
-            "UFO did not generate an output.md file.".into()
+            "".into()
         };
 
         if !status.success() {
-            return Err(format!(
-                "UFO task failed (exit={status}).\nStderr:\n{stderr_str}\n\nLog Output:\n{ufo_result}"
-            ));
+            return Err(UfoError::Crash(format!("Exit {status}. Stderr: {stderr_str}")));
         }
 
-        Ok(json!({
-            "status": "success",
-            "output": ufo_result,
-            "task_id": task_id
-        }))
+        Ok(UfoTaskResult {
+            status: "success".into(),
+            task_id: task_id,
+            output: Some(ufo_result),
+            error_type: None,
+            error_message: None,
+            traceback: None,
+        })
     }
 }
 
@@ -197,6 +266,7 @@ mod tests {
         let result = UfoClient::dispatch_task("noop", None::<fn(String)>);
         std::env::remove_var("BANKFIDELITY_UFO_DIR");
         let err = result.expect_err("missing UFO must be Err");
+        let err = match err { UfoError::Unknown(s) => s, _ => String::new() };
         assert!(
             err.contains("UFO framework not found"),
             "unexpected error: {err}"

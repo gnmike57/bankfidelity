@@ -32,7 +32,7 @@ The application is built on a high-performance Rust core with a supervised Pytho
 | :--- | :--- |
 | **`app/`** | CLI, egui GUI, runtime loop, audit logging, telemetry, and configuration. |
 | **`engine/`** | Exact-decimal balance math, transaction modeling, multi-layer verification, layout, and font analysis. |
-| **`pdf/`** | Engine trait + selector (PyMuPDF primary, Pdfium fallback, OxidizePdf). |
+| **`pdf/`** | Engine trait + selector (Rank 1: PyMuPdfPro, Rank 2: Native, Rank 3: Typst). |
 | **`extractors/`** | Deterministic geometry providers (per-bank templates) and hybrid mergers. |
 | **`ai/`** | Document AI, Gemini, LlamaParse, pdfRest, Vision AI, and the supervised Python bridge. |
 | **`security/`** | Software root-of-trust and ChaCha20-Poly1305 encryption. |

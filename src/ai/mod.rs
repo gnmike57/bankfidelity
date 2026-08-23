@@ -14,3 +14,5 @@ pub mod python_protocol;
 pub mod python_worker;
 pub mod repair;
 pub mod vision;
+
+pub mod reducto;

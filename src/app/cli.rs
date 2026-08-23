@@ -1204,30 +1204,70 @@ pub fn run_inner(
             Ok(exit_code::SUCCESS)
         }
         Commands::Ufo { request } => {
-            match crate::ai::ufo::UfoClient::dispatch_task(&request, None::<fn(String)>) {
-                Ok(result) => {
-                    println!(
-                        "UFO Task Result:\n{}",
-                        serde_json::to_string_pretty(&result).unwrap_or_default()
-                    );
-                    // Defensive: older clients may still embed status:"error" in Ok.
-                    if result.get("status").and_then(|s| s.as_str()) == Some("error") {
-                        tracing::error!(
-                            "UFO returned error status: {}",
-                            result
-                                .get("message")
-                                .and_then(|m| m.as_str())
-                                .unwrap_or("unknown")
+            let mut attempts = 0;
+            loop {
+                match crate::ai::ufo::UfoClient::dispatch_task(&request, None::<fn(String)>) {
+                    Ok(result) => {
+                        println!(
+                            "UFO Task Result:\n{}",
+                            serde_json::to_string_pretty(&result).unwrap_or_default()
                         );
-                        Ok(exit_code::GENERAL)
-                    } else {
-                        Ok(exit_code::SUCCESS)
+                        if result.status == "error" {
+                            let msg = result.error_message.as_deref().unwrap_or("unknown");
+                            if attempts == 0 {
+                                tracing::warn!("UFO Error: {}. Retrying once...", msg);
+                                attempts += 1;
+                                continue;
+                            } else {
+                                tracing::error!("UFO returned error status: {}", msg);
+                                return Ok(exit_code::GENERAL);
+                            }
+                        } else {
+                            if let Some(out) = result.output.as_ref() {
+                                if out.contains(".pdf") {
+                                    tracing::info!("UFO successfully acquired a PDF! Handoff ready: {}", out);
+                                    let re = regex::Regex::new(r"(?i)[a-z]:[\\/][^<>\x22\|\?\*]+\.pdf").unwrap();
+                                    if let Some(caps) = re.captures(out) {
+                                        let pdf_path = std::path::PathBuf::from(caps.get(0).unwrap().as_str());
+                                        tracing::info!("Auto-dispatching Reducto Parse Job for: {:?}", pdf_path);
+                                        let _ = job_tx.send_headless(crate::app::runtime::Job::ExtractTransactions {
+                                            path: pdf_path,
+                                            parser_mode: crate::app::config::DocumentParserMode::LlamaParse,
+                                        });
+                                        match wait_for_terminal_result(&job_rx) {
+                                            Ok(crate::app::runtime::JobResult::TransactionsExtracted(transactions)) => {
+                                                println!("--- E2E SUCCESS: PARSED TRANSACTIONS ---");
+                                                for t in transactions {
+                                                    println!("{:?}", t);
+                                                }
+                                                return Ok(exit_code::SUCCESS);
+                                            }
+                                            Ok(other) => {
+                                                tracing::error!("Unexpected terminal result: {:?}", other);
+                                                return Ok(exit_code::GENERAL);
+                                            }
+                                            Err((label, err)) => {
+                                                tracing::error!("Job '{}' failed: {}", label, err);
+                                                return Ok(exit_code::GENERAL);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            return Ok(exit_code::SUCCESS);
+                        }
                     }
-                }
-                Err(e) => {
-                    tracing::error!("UFO dispatch failed: {}", e);
-                    eprintln!("UFO dispatch failed: {e}");
-                    Ok(exit_code::GENERAL)
+                    Err(e) => {
+                        if attempts == 0 {
+                            tracing::warn!("UFO dispatch failed: {}. Retrying once...", e);
+                            attempts += 1;
+                            continue;
+                        } else {
+                            tracing::error!("UFO dispatch failed: {}", e);
+                            eprintln!("UFO dispatch failed: {e}");
+                            return Ok(exit_code::GENERAL);
+                        }
+                    }
                 }
             }
         }

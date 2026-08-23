@@ -16,15 +16,18 @@ use uuid::Uuid;
 
 /// Opaque per-job handle. The runtime returns one when a job is enqueued;
 /// callers can later `Job::Cancel` it.
-pub type JobId = u64;
 
-static NEXT_JOB_ID: AtomicU64 = AtomicU64::new(1);
+use super::*;
+use crate::app::runtime::client::*;
+use crate::app::runtime::jobs::*;
+use crate::app::runtime::python_job::*;
+use crate::app::runtime::tracking::*;
+
+
+pub(crate) static NEXT_JOB_ID: AtomicU64 = AtomicU64::new(1);
 
 /// Allocate a fresh `JobId`. Used by both the runtime and external callers
 /// who want to enqueue a job and remember its handle.
-pub fn alloc_job_id() -> JobId {
-    NEXT_JOB_ID.fetch_add(1, Ordering::SeqCst)
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExecutionMode {
@@ -32,36 +35,9 @@ pub enum ExecutionMode {
     Headless,
 }
 
-#[derive(Debug, Clone)]
-pub struct JobMetadata {
-    pub job_id: JobId,
-    pub document_id: Option<String>,
-    pub correlation_id: Uuid,
-    pub label: &'static str,
-    pub submitted_at: std::time::SystemTime,
-    pub deadline: std::time::Instant,
-    pub execution_mode: ExecutionMode,
-}
 
-impl JobMetadata {
-    fn for_job(job: &Job) -> Self {
-        Self::for_job_with_mode(job, ExecutionMode::Interactive)
-    }
 
-    fn for_job_with_mode(job: &Job, execution_mode: ExecutionMode) -> Self {
-        Self {
-            job_id: alloc_job_id(),
-            document_id: job.document_path().map(document_id_for_path),
-            correlation_id: Uuid::new_v4(),
-            label: job.label(),
-            submitted_at: std::time::SystemTime::now(),
-            deadline: std::time::Instant::now() + job.default_timeout(),
-            execution_mode,
-        }
-    }
-}
-
-fn document_id_for_path(path: &Path) -> String {
+pub(crate) fn document_id_for_path(path: &Path) -> String {
     use sha2::Digest;
     let normalized = path
         .canonicalize()
@@ -74,363 +50,34 @@ fn document_id_for_path(path: &Path) -> String {
         .collect()
 }
 
-struct JobEnvelope {
-    metadata: JobMetadata,
-    job: Job,
-    route: Option<mpsc::Sender<JobResult>>,
-}
 
-impl JobEnvelope {
-    fn broadcast(job: Job) -> Self {
-        Self {
-            metadata: JobMetadata::for_job(&job),
-            job,
-            route: None,
-        }
-    }
 
-    fn broadcast_with_mode(job: Job, execution_mode: ExecutionMode) -> Self {
-        Self {
-            metadata: JobMetadata::for_job_with_mode(&job, execution_mode),
-            job,
-            route: None,
-        }
-    }
 
-    fn routed_with_mode(
-        job: Job,
-        route: mpsc::Sender<JobResult>,
-        execution_mode: ExecutionMode,
-    ) -> Self {
-        Self {
-            metadata: JobMetadata::for_job_with_mode(&job, execution_mode),
-            job,
-            route: Some(route),
-        }
-    }
-}
 
-#[derive(Debug, Clone, Copy)]
-pub struct RuntimeSubmitError;
 
-impl std::fmt::Display for RuntimeSubmitError {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str("runtime intake channel is disconnected")
-    }
-}
 
-impl std::error::Error for RuntimeSubmitError {}
 
-#[derive(Clone)]
-pub struct RuntimeClient {
-    intake: Arc<Mutex<Option<mpsc::Sender<JobEnvelope>>>>,
-}
 
-impl RuntimeClient {
-    fn new(intake: mpsc::Sender<JobEnvelope>) -> Self {
-        Self {
-            intake: Arc::new(Mutex::new(Some(intake))),
-        }
-    }
 
-    fn sender(&self) -> Result<mpsc::Sender<JobEnvelope>, RuntimeSubmitError> {
-        self.intake
-            .lock()
-            .ok()
-            .and_then(|guard| guard.as_ref().cloned())
-            .ok_or(RuntimeSubmitError)
-    }
-
-    pub fn close_intake(&self) {
-        if let Ok(mut guard) = self.intake.lock() {
-            guard.take();
-        }
-    }
-
-    pub fn is_accepting(&self) -> bool {
-        self.intake
-            .lock()
-            .map(|guard| guard.is_some())
-            .unwrap_or(false)
-    }
-
-    pub fn send(&self, job: Job) -> Result<JobId, RuntimeSubmitError> {
-        self.send_with_mode(job, ExecutionMode::Interactive)
-    }
-
-    pub fn send_headless(&self, job: Job) -> Result<JobId, RuntimeSubmitError> {
-        self.send_with_mode(job, ExecutionMode::Headless)
-    }
-
-    pub fn send_with_mode(
-        &self,
-        job: Job,
-        execution_mode: ExecutionMode,
-    ) -> Result<JobId, RuntimeSubmitError> {
-        let envelope = JobEnvelope::broadcast_with_mode(job, execution_mode);
-        let id = envelope.metadata.job_id;
-        self.sender()?
-            .send(envelope)
-            .map_err(|_| RuntimeSubmitError)?;
-        Ok(id)
-    }
-
-    pub fn submit(&self, job: Job) -> Result<JobTicket, RuntimeSubmitError> {
-        self.submit_with_mode(job, ExecutionMode::Interactive)
-    }
-
-    pub fn submit_headless(&self, job: Job) -> Result<JobTicket, RuntimeSubmitError> {
-        self.submit_with_mode(job, ExecutionMode::Headless)
-    }
-
-    pub fn submit_with_mode(
-        &self,
-        job: Job,
-        execution_mode: ExecutionMode,
-    ) -> Result<JobTicket, RuntimeSubmitError> {
-        let (result_tx, result_rx) = mpsc::channel();
-        let envelope = JobEnvelope::routed_with_mode(job, result_tx, execution_mode);
-        let metadata = envelope.metadata.clone();
-        self.sender()?
-            .send(envelope)
-            .map_err(|_| RuntimeSubmitError)?;
-        Ok(JobTicket {
-            metadata,
-            results: result_rx,
-            client: self.clone(),
-        })
-    }
-}
-
-impl From<mpsc::Sender<Job>> for RuntimeClient {
-    fn from(job_tx: mpsc::Sender<Job>) -> Self {
-        let (intake_tx, intake_rx) = mpsc::channel::<JobEnvelope>();
-        std::thread::spawn(move || {
-            while let Ok(envelope) = intake_rx.recv() {
-                if job_tx.send(envelope.job).is_err() {
-                    break;
-                }
-            }
-        });
-        Self::new(intake_tx)
-    }
-}
-
-pub struct JobTicket {
-    metadata: JobMetadata,
-    results: mpsc::Receiver<JobResult>,
-    client: RuntimeClient,
-}
-
-impl JobTicket {
-    pub fn metadata(&self) -> &JobMetadata {
-        &self.metadata
-    }
-
-    pub fn recv_timeout(
-        &self,
-        timeout: std::time::Duration,
-    ) -> Result<JobResult, mpsc::RecvTimeoutError> {
-        self.results.recv_timeout(timeout)
-    }
-
-    pub fn try_recv(&self) -> Result<JobResult, mpsc::TryRecvError> {
-        self.results.try_recv()
-    }
-
-    pub fn cancel(&self) -> Result<JobId, RuntimeSubmitError> {
-        self.client.send(Job::Cancel {
-            id: self.metadata.job_id,
-        })
-    }
-}
 
 /// A registry of currently-running jobs and their cancellation tokens.
 /// Cloneable; the runtime keeps one and the dispatcher keeps another.
-#[derive(Clone, Default)]
-pub struct CancellationRegistry {
-    inner: Arc<Mutex<HashMap<JobId, CancellationToken>>>,
-}
 
-impl CancellationRegistry {
-    pub fn new() -> Self {
-        Self::default()
-    }
 
-    /// Register a new token under `id`. Returns the token (so the caller
-    /// can pass it into the spawned task).
-    pub fn register(&self, id: JobId) -> CancellationToken {
-        let token = CancellationToken::new();
-        if let Ok(mut g) = self.inner.lock() {
-            g.insert(id, token.clone());
-        }
-        token
-    }
 
-    /// Cancel and remove the token for `id`. No-op if unknown.
-    pub fn cancel(&self, id: JobId) -> bool {
-        let token = self.inner.lock().ok().and_then(|mut g| g.remove(&id));
-        if let Some(t) = token {
-            t.cancel();
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Drop the token for `id` (job has finished naturally).
-    pub fn complete(&self, id: JobId) {
-        if let Ok(mut g) = self.inner.lock() {
-            g.remove(&id);
-        }
-    }
-
-    /// Request cancellation for every in-flight job while retaining registry
-    /// entries until their exactly-once terminal result confirms completion.
-    pub fn request_cancel_all(&self) {
-        if let Ok(g) = self.inner.lock() {
-            for token in g.values() {
-                token.cancel();
-            }
-        }
-    }
-
-    /// Force-clear every job token after a bounded graceful wait has expired.
-    pub fn cancel_all(&self) {
-        if let Ok(mut g) = self.inner.lock() {
-            for (_, token) in g.drain() {
-                token.cancel();
-            }
-        }
-    }
-
-    /// How many jobs are currently registered.
-    pub fn len(&self) -> usize {
-        self.inner.lock().map(|g| g.len()).unwrap_or(0)
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum PythonJob {
-    Ping,
-    GetTextBlocks {
-        pdf_path: String,
-        page_num: usize,
-    },
-    ReplaceTextInRect {
-        pdf_path: String,
-        output_path: String,
-        page_num: usize,
-        rect: [f32; 4],
-        old_text: String,
-        new_text: String,
-        font_path: Option<String>,
-    },
-    FindTextBlockAtClick {
-        pdf_path: String,
-        page_num: usize,
-        x: f32,
-        y: f32,
-    },
-    GetAllTransactions {
-        pdf_path: String,
-    },
-    AnalyzeDocumentLayout {
-        pdf_path: String,
-    },
-    CompleteFontWithAdaption {
-        pdf_path: String,
-        font_name: String,
-    },
-    DeepFontReplication {
-        pdf_path: String,
-        font_name: String,
-        output_dir: String,
-    },
-    /// Stage 3 / Item #14: apply N edits in one open/save pass.
-    /// `edits_json` is a JSON array of `{page, rect, old_text, new_text, fill_color?}`.
-    ApplyManyEdits {
-        pdf_path: String,
-        output_path: String,
-        edits_json: String,
-        font_path: Option<String>,
-    },
-    /// Stage 3 / Item #16: split a PDF into chunks <= 30 pages so Document AI
-    /// can parse documents above its single-request page cap.
-    ChunkPdfForDocai {
-        pdf_path: String,
-        output_dir: String,
-        max_pages_per_chunk: usize,
-    },
-    /// Stage 8.5: per-font usage + coverage analysis. Returns the JSON
-    /// shape produced by `pymupdf_pro_integration.analyze_fonts`.
-    AnalyzeFonts {
-        pdf_path: String,
-    },
-    /// Stage 11: targeted font cascade. Runs composite synthesis ->
-    /// subset extension -> Gemini Vision donor identification on the
-    /// supplied `missing_chars`. Returns the JSON dict produced by
-    /// `replicate_font_for_chars`.
-    ReplicateFontForMissingChars {
-        pdf_path: String,
-        font_name: String,
-        missing_chars_csv: String,
-        output_dir: String,
-    },
-    /// Clone (duplicate) pages within a PDF to create capacity for more
-    /// transactions. Each entry in `page_indices` is a source page to clone;
-    /// clones are inserted immediately after the original. Does NOT require
-    /// PyMuPDF Pro - page-level operations use the free tier.
-    ClonePages {
-        pdf_path: String,
-        output_path: String,
-        page_indices: Vec<usize>,
-    },
-    /// Remove pages from a PDF (excess capacity). Pages are deleted in
-    /// descending order so indices don't shift. Does NOT require PyMuPDF Pro.
-    RemovePages {
-        pdf_path: String,
-        output_path: String,
-        page_indices: Vec<usize>,
-    },
-    RenderPageToPng {
-        pdf_path: String,
-        page_num: usize,
-        dpi: f32,
-    },
-    GenerateVisualProof {
-        pdf_path: String,
-        output_path: String,
-        edits_json: String,
-    },
-}
-
-#[derive(Debug)]
-pub enum PythonJobResult {
-    Pong,
-    Json(String),
-    ApplyReport(crate::ai::apply_report::ApplyReport),
-    ReplacedWithReviewWarning { reason: String },
-    Success,
-    Error(String),
-}
 
 #[derive(serde::Deserialize)]
 struct GeometryTransactionRow {
-    page: usize,
-    line_on_page: usize,
-    date: String,
-    raw_text: String,
-    debit: Option<f64>,
-    credit: Option<f64>,
-    running_balance: Option<f64>,
-    bbox: Option<[f32; 4]>,
+    pub(crate) page: usize,
+    pub(crate) line_on_page: usize,
+    pub(crate) date: String,
+    pub(crate) raw_text: String,
+    pub(crate) debit: Option<f64>,
+    pub(crate) credit: Option<f64>,
+    pub(crate) running_balance: Option<f64>,
+    pub(crate) bbox: Option<[f32; 4]>,
     #[serde(default)]
-    field_bboxes: crate::engine::model::FieldBboxes,
+    pub(crate) field_bboxes: crate::engine::model::FieldBboxes,
 }
 
 fn geometry_statement_from_json(
@@ -486,272 +133,8 @@ fn geometry_statement_from_json(
     })
 }
 
-impl PythonJob {
-    fn to_worker_request(
-        &self,
-    ) -> Result<crate::ai::python_protocol::PythonRequestEnvelope, String> {
-        use crate::ai::python_protocol::{PythonOperation, PythonRequestEnvelope};
-        use serde_json::json;
 
-        let (operation, input_path, payload) = match self {
-            Self::Ping => (PythonOperation::Ping, None, json!({})),
-            Self::GetTextBlocks { pdf_path, page_num } => (
-                PythonOperation::GetTextBlocks,
-                Some(pdf_path.as_str()),
-                json!({"pdf_path": pdf_path, "page_num": page_num}),
-            ),
-            Self::ReplaceTextInRect {
-                pdf_path,
-                output_path,
-                page_num,
-                rect,
-                old_text,
-                new_text,
-                font_path,
-            } => (
-                PythonOperation::ReplaceTextInRect,
-                Some(pdf_path.as_str()),
-                json!({
-                    "pdf_path": pdf_path,
-                    "output_path": output_path,
-                    "page_num": page_num,
-                    "rect": rect,
-                    "old_text": old_text,
-                    "new_text": new_text,
-                    "font_path": font_path,
-                }),
-            ),
-            Self::FindTextBlockAtClick {
-                pdf_path,
-                page_num,
-                x,
-                y,
-            } => (
-                PythonOperation::FindTextBlockAtClick,
-                Some(pdf_path.as_str()),
-                json!({"pdf_path": pdf_path, "page_num": page_num, "x": x, "y": y}),
-            ),
-            Self::GetAllTransactions { pdf_path } => (
-                PythonOperation::GetAllTransactions,
-                Some(pdf_path.as_str()),
-                json!({"pdf_path": pdf_path}),
-            ),
-            Self::AnalyzeDocumentLayout { pdf_path } => (
-                PythonOperation::AnalyzeDocumentLayout,
-                Some(pdf_path.as_str()),
-                json!({"pdf_path": pdf_path}),
-            ),
-            Self::CompleteFontWithAdaption {
-                pdf_path,
-                font_name,
-            } => (
-                PythonOperation::CompleteFontWithAdaption,
-                Some(pdf_path.as_str()),
-                json!({"pdf_path": pdf_path, "font_name": font_name}),
-            ),
-            Self::DeepFontReplication {
-                pdf_path,
-                font_name,
-                output_dir,
-            } => (
-                PythonOperation::DeepFontReplication,
-                Some(pdf_path.as_str()),
-                json!({
-                    "pdf_path": pdf_path,
-                    "font_name": font_name,
-                    "output_dir": output_dir,
-                }),
-            ),
-            Self::ApplyManyEdits {
-                pdf_path,
-                output_path,
-                edits_json,
-                font_path,
-            } => {
-                let edits: serde_json::Value = serde_json::from_str(edits_json)
-                    .map_err(|error| format!("invalid edit payload: {error}"))?;
-                (
-                    PythonOperation::ApplyManyEdits,
-                    Some(pdf_path.as_str()),
-                    json!({
-                        "pdf_path": pdf_path,
-                        "output_path": output_path,
-                        "edits": edits,
-                        "font_path": font_path,
-                    }),
-                )
-            }
-            Self::ChunkPdfForDocai {
-                pdf_path,
-                output_dir,
-                max_pages_per_chunk,
-            } => (
-                PythonOperation::ChunkPdfForDocai,
-                Some(pdf_path.as_str()),
-                json!({
-                    "pdf_path": pdf_path,
-                    "output_dir": output_dir,
-                    "max_pages_per_chunk": max_pages_per_chunk,
-                }),
-            ),
-            Self::AnalyzeFonts { pdf_path } => (
-                PythonOperation::AnalyzeFonts,
-                Some(pdf_path.as_str()),
-                json!({"pdf_path": pdf_path}),
-            ),
-            Self::ReplicateFontForMissingChars {
-                pdf_path,
-                font_name,
-                missing_chars_csv,
-                output_dir,
-            } => (
-                PythonOperation::ReplicateFontForMissingChars,
-                Some(pdf_path.as_str()),
-                json!({
-                    "pdf_path": pdf_path,
-                    "font_name": font_name,
-                    "missing_chars": missing_chars_csv
-                        .split(',')
-                        .filter(|value| !value.is_empty())
-                        .collect::<Vec<_>>(),
-                    "output_dir": output_dir,
-                }),
-            ),
-            Self::ClonePages {
-                pdf_path,
-                output_path,
-                page_indices,
-            } => (
-                PythonOperation::ClonePages,
-                Some(pdf_path.as_str()),
-                json!({
-                    "pdf_path": pdf_path,
-                    "output_path": output_path,
-                    "page_indices": page_indices,
-                }),
-            ),
-            Self::RemovePages {
-                pdf_path,
-                output_path,
-                page_indices,
-            } => (
-                PythonOperation::RemovePages,
-                Some(pdf_path.as_str()),
-                json!({
-                    "pdf_path": pdf_path,
-                    "output_path": output_path,
-                    "page_indices": page_indices,
-                }),
-            ),
-            Self::RenderPageToPng {
-                pdf_path,
-                page_num,
-                dpi,
-            } => (
-                PythonOperation::RenderPageToPng,
-                Some(pdf_path.as_str()),
-                json!({"pdf_path": pdf_path, "page_num": page_num, "dpi": dpi}),
-            ),
-            Self::GenerateVisualProof {
-                pdf_path,
-                output_path,
-                edits_json,
-            } => (
-                PythonOperation::GenerateVisualProof,
-                Some(pdf_path.as_str()),
-                json!({"pdf_path": pdf_path, "output_path": output_path, "edits_json": edits_json}),
-            ),
-        };
-
-        let submitted_at_unix_ms = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|error| error.to_string())?
-            .as_millis() as u64;
-        let input_sha256 = input_path.map(python_input_sha256).transpose()?;
-        PythonRequestEnvelope::new(
-            operation,
-            Uuid::new_v4(),
-            submitted_at_unix_ms,
-            submitted_at_unix_ms + 120_000,
-            input_sha256,
-            payload,
-        )
-        .map_err(|error| error.to_string())
-    }
-
-    fn worker_response_to_legacy(
-        &self,
-        response: crate::ai::python_protocol::PythonResponseEnvelope,
-    ) -> PythonJobResult {
-        use crate::ai::python_protocol::PythonDisposition;
-
-        let result = response
-            .payload
-            .get("result")
-            .cloned()
-            .unwrap_or_else(|| serde_json::json!({}));
-        if let Self::ApplyManyEdits { edits_json, .. } = self {
-            let expected = serde_json::from_str::<Vec<serde_json::Value>>(edits_json)
-                .map(|edits| edits.len())
-                .unwrap_or_default();
-            if let Ok(report) =
-                crate::ai::apply_report::ApplyReport::from_json_exact(&result.to_string(), expected)
-            {
-                return PythonJobResult::ApplyReport(report);
-            }
-        }
-
-        if response.disposition != PythonDisposition::Succeeded {
-            let detail = response
-                .failure
-                .as_ref()
-                .map(|failure| format!("{}: {}", failure.code, failure.message))
-                .or_else(|| {
-                    response
-                        .warnings
-                        .first()
-                        .map(|warning| format!("{}: {}", warning.code, warning.message))
-                })
-                .unwrap_or_else(|| format!("{:?}", response.disposition));
-            return PythonJobResult::Error(detail);
-        }
-
-        if matches!(self, Self::Ping) {
-            return PythonJobResult::Pong;
-        }
-        match self {
-            Self::ApplyManyEdits { edits_json, .. } => {
-                let expected = serde_json::from_str::<Vec<serde_json::Value>>(edits_json)
-                    .map(|edits| edits.len())
-                    .unwrap_or_default();
-                match crate::ai::apply_report::ApplyReport::from_json_exact(
-                    &result.to_string(),
-                    expected,
-                ) {
-                    Ok(report) => PythonJobResult::ApplyReport(report),
-                    Err(error) => PythonJobResult::Error(error.to_string()),
-                }
-            }
-            Self::ReplaceTextInRect { .. } if !response.warnings.is_empty() => {
-                PythonJobResult::ReplacedWithReviewWarning {
-                    reason: response
-                        .warnings
-                        .iter()
-                        .map(|warning| warning.message.as_str())
-                        .collect::<Vec<_>>()
-                        .join("; "),
-                }
-            }
-            Self::ReplaceTextInRect { .. } => PythonJobResult::Success,
-            _ => match serde_json::to_string(&result) {
-                Ok(json) => PythonJobResult::Json(json),
-                Err(error) => PythonJobResult::Error(error.to_string()),
-            },
-        }
-    }
-}
-
-fn python_input_sha256(path: &str) -> Result<String, String> {
+pub(crate) fn python_input_sha256(path: &str) -> Result<String, String> {
     use sha2::Digest;
     use std::io::Read;
 
@@ -777,693 +160,12 @@ fn python_input_sha256(path: &str) -> Result<String, String> {
         .collect())
 }
 
-#[derive(Debug)]
-pub enum Job {
-    Ping,
-    UfoAutoEdit {
-        path: PathBuf,
-        context: String,
-    },
-    CancelUfo,
-    Python(PythonJob, oneshot::Sender<PythonJobResult>),
-    LoadDocument {
-        path: PathBuf,
-        three_page_mode: bool,
-    },
-    /// Stage 8.5: standalone font analysis trigger. Useful from a "Re-analyze"
-    /// menu in the GUI; LoadDocument also fires this automatically.
-    AnalyzeFonts {
-        path: PathBuf,
-    },
-    RenderPage {
-        path: PathBuf,
-        page: usize,
-        dpi: f32,
-        tag: String,
-    },
-    ApplyChange {
-        input: PathBuf,
-        output: PathBuf,
-        page: usize,
-        bbox: [f32; 4],
-        new_text: String,
-        old_text: String,
-        description: String,
-        deep_font_replication: bool,
-    },
-    CompleteFont {
-        path: PathBuf,
-        font_name: String,
-    },
-    Undo,
-    Redo,
-    BalanceStatement {
-        path: PathBuf,
-    },
-    ExtractTransactions {
-        path: PathBuf,
-        parser_mode: crate::app::config::DocumentParserMode,
-    },
-    NaturalLanguageEdit {
-        prompt: String,
-        transactions: Vec<crate::engine::model::Transaction>,
-    },
-    CategorizeTransactions {
-        transactions: Vec<crate::engine::model::Transaction>,
-    },
-    ApplyProposedChanges {
-        input: PathBuf,
-        output: PathBuf,
-        changes: Vec<crate::engine::model::ProposedChange>,
-    },
-    GenerateVisualAlternatives {
-        input: PathBuf,
-        out_dir: PathBuf,
-        page: usize,
-        edits: Vec<crate::engine::workflow::UserEdit>,
-        bbox: [f32; 4],
-    },
-    ExportChangeHistory {
-        output: PathBuf,
-    },
-    LoadHistory {
-        input: PathBuf,
-    },
-    Verify {
-        original: PathBuf,
-        edited: PathBuf,
-        output_dir: PathBuf,
-        intended_edits: Vec<crate::engine::verification::VerificationIntent>,
-        use_pdfrest: bool,
-        pdfrest_key: Option<String>,
-        auto_match_dpi: bool,
-    },
-    ExplainImbalance {
-        transactions_json: String,
-        opening_balance: f64,
-        closing_balance: f64,
-        imbalance: f64,
-    },
 
-    /// Cancel a previously-enqueued job by its [`JobId`]. Best-effort; the
-    /// task may have already finished. The runtime drops the token, so any
-    /// `tokio::select!` watching `cancelled()` exits with a structured error.
-    Cancel {
-        id: JobId,
-    },
-    SubmitBugReport {
-        description: String,
-        include_logs: bool,
-        include_audit: bool,
-    },
-    TypstReconstruct {
-        input: std::path::PathBuf,
-        output: std::path::PathBuf,
-    },
-    McpRenderPage {
-        input: std::path::PathBuf,
-        page: usize,
-    },
 
-    /// Hot-reload the runtime's `AppConfig` from the current process
-    /// environment. The GUI sends this after the user updates API keys /
-    /// credentials in-app (which write `.env` and `std::env::set_var`), so
-    /// subsequent Document AI / Gemini jobs pick up the new values without an
-    /// application restart.
-    ReloadConfig,
 
-    /// Trigger an active validation check on the AI credentials
-    ValidateCredentials,
 
-    /// Run the Smart Balance Engine and, when `auto_apply` is true, apply every
-    /// proposed adjustment to the PDF in one shot (the "Adjust entire bank
-    /// statement accordingly and apply all edits" button). When `auto_apply`
-    /// is false this behaves like [`Job::BalanceStatement`].
-    BalanceAndApplyAll {
-        input: PathBuf,
-        output: PathBuf,
-        auto_apply: bool,
-    },
-    /// Cleanup orphaned temporary files from crash recovery
-    CleanupTempFiles,
 
-    // ----- Multi-stage workflow -------------------------------------------
-    /// Stage 1: parse with Document AI then validate completeness with Gemini.
-    WorkflowParseAndValidate {
-        input: PathBuf,
-        version: Option<String>,
-        /// Which document parser the user selected in Backend Preferences.
-        parser_mode: crate::app::config::DocumentParserMode,
-        /// Which AI provider the user selected (used for completeness validation).
-        ai_provider: crate::app::config::AiProviderMode,
-        ignore_offline_fallback: bool,
-    },
-    /// Stage 3: build a balance preview from edits without writing the PDF.
-    WorkflowPreview {
-        original_transactions: Vec<crate::engine::model::Transaction>,
-        edits: Vec<crate::engine::workflow::UserEdit>,
-        opening_balance: rust_decimal::Decimal,
-        expected_closing: Option<rust_decimal::Decimal>,
-    },
-    /// Stage 4 + 5 + 6: apply edits, render, validate visually in a loop, then
-    /// re-parse with Document AI to confirm math.
-    WorkflowConfirmAndRender {
-        input: PathBuf,
-        output: PathBuf,
-        edits: Vec<crate::engine::workflow::UserEdit>,
-        original_transactions: Vec<crate::engine::model::Transaction>,
-        opening_balance: rust_decimal::Decimal,
-        expected_closing: Option<rust_decimal::Decimal>,
-        deep_font_replication: bool,
-        max_visual_attempts: u32,
-        visual_threshold: f64,
-        ignore_font_coverage: bool,
-        ignore_visual_fidelity: bool,
-    },
-    /// Use AI to fix text box issues and visual fidelity differences
-    AiFixVisualFidelity {
-        input: PathBuf,
-        page: usize,
-    },
-    /// Transfer transactions from one bank statement PDF to another,
-    /// adapting formats and verifying math + visual fidelity.
-    TransferTransactions {
-        source_pdf: PathBuf,
-        target_pdf: PathBuf,
-        output_pdf: PathBuf,
-    },
-    /// Bulk-shift or remap all transaction dates.
-    AdjustDatePeriods {
-        input: PathBuf,
-        output: PathBuf,
-        mode: crate::engine::date_adjust::DateAdjustMode,
-    },
-    /// User's response to an AI confirmation question.
-    AiConfirmationResponse(crate::engine::ai_confirm::AiConfirmationResponse),
-    InteractiveFallbackResponse(crate::engine::interactive_fallback::InteractiveFallbackResponse),
-    /// Run cross-statement transfer tests on a set of PDFs.
-    RunTransferTests {
-        statements: Vec<PathBuf>,
-        max_iterations: u32,
-    },
-    AiCommand {
-        prompt: String,
-        path: PathBuf,
-    },
 
-    // -- Document AI Version Management --
-    /// Fetch list of available processor versions from the API.
-    ListDocAiVersions,
-    /// Deploy a specific processor version for inference.
-    DeployDocAiVersion {
-        version_id: String,
-    },
-    /// Undeploy a specific processor version.
-    UndeployDocAiVersion {
-        version_id: String,
-    },
-    /// Set a version as the default processor version.
-    SetDefaultDocAiVersion {
-        version_id: String,
-    },
-    /// Trigger training of a new custom processor version.
-    TrainDocAiVersion {
-        display_name: String,
-        base_version: Option<String>,
-    },
-}
-
-impl Job {
-    pub fn is_fast(&self) -> bool {
-        matches!(
-            self,
-            Job::Ping
-                | Job::Undo
-                | Job::Redo
-                | Job::Cancel { .. }
-                | Job::ReloadConfig
-                | Job::CleanupTempFiles
-        )
-    }
-
-    pub fn label(&self) -> &'static str {
-        match self {
-            Job::McpRenderPage { .. } => "mcp_render_page",
-            Self::Ping => "ping",
-            Self::Python(..) => "python",
-            Self::LoadDocument { .. } => "load_document",
-            Self::AnalyzeFonts { .. } => "analyze_fonts",
-            Self::RenderPage { .. } => "render_page",
-            Self::ApplyChange { .. } => "apply_change",
-            Self::CompleteFont { .. } => "complete_font",
-            Self::Undo => "undo",
-            Self::Redo => "redo",
-            Self::BalanceStatement { .. } => "balance_statement",
-            Self::ExtractTransactions { .. } => "extract_transactions",
-            Self::NaturalLanguageEdit { .. } => "natural_language_edit",
-            Self::CategorizeTransactions { .. } => "categorize_transactions",
-            Self::ApplyProposedChanges { .. } => "apply_proposed_changes",
-            Self::GenerateVisualAlternatives { .. } => "generate_visual_alternatives",
-            Self::ExportChangeHistory { .. } => "export_change_history",
-            Self::LoadHistory { .. } => "load_history",
-            Self::Verify { .. } => "verify",
-            Self::Cancel { .. } => "cancel",
-            Self::SubmitBugReport { .. } => "submit_bug_report",
-            Self::TypstReconstruct { .. } => "typst_reconstruct",
-            Self::ExplainImbalance { .. } => "explain_imbalance",
-            Self::ReloadConfig => "reload_config",
-            Self::ValidateCredentials => "validate_credentials",
-            Self::BalanceAndApplyAll { .. } => "balance_and_apply_all",
-            Self::CleanupTempFiles => "cleanup_temp_files",
-            Self::WorkflowParseAndValidate { .. } => "workflow_parse_and_validate",
-            Self::WorkflowPreview { .. } => "workflow_preview",
-            Self::WorkflowConfirmAndRender { .. } => "workflow_confirm_and_render",
-            Self::AiFixVisualFidelity { .. } => "ai_fix_visual_fidelity",
-            Self::TransferTransactions { .. } => "transfer_transactions",
-            Self::AdjustDatePeriods { .. } => "adjust_date_periods",
-            Self::AiConfirmationResponse(_) => "ai_confirmation_response",
-            Self::InteractiveFallbackResponse(_) => "interactive_fallback_response",
-            Self::RunTransferTests { .. } => "run_transfer_tests",
-            Self::AiCommand { .. } => "ai_command",
-            Self::ListDocAiVersions => "list_docai_versions",
-            Self::DeployDocAiVersion { .. } => "deploy_docai_version",
-            Self::UndeployDocAiVersion { .. } => "undeploy_docai_version",
-            Self::SetDefaultDocAiVersion { .. } => "set_default_docai_version",
-            Self::TrainDocAiVersion { .. } => "train_docai_version",
-            Self::UfoAutoEdit { .. } => "ufo_auto_edit",
-            Self::CancelUfo => "cancel_ufo",
-        }
-    }
-
-    fn document_path(&self) -> Option<&Path> {
-        match self {
-            Self::LoadDocument { path, .. }
-            | Self::AnalyzeFonts { path }
-            | Self::RenderPage { path, .. }
-            | Self::CompleteFont { path, .. }
-            | Self::BalanceStatement { path }
-            | Self::ExtractTransactions { path, .. } => Some(path),
-            Self::ApplyChange { input, .. }
-            | Self::ApplyProposedChanges { input, .. }
-            | Self::GenerateVisualAlternatives { input, .. }
-            | Self::TypstReconstruct { input, .. }
-            | Self::BalanceAndApplyAll { input, .. }
-            | Self::WorkflowParseAndValidate { input, .. }
-            | Self::WorkflowConfirmAndRender { input, .. }
-            | Self::AiFixVisualFidelity { input, .. }
-            | Self::AdjustDatePeriods { input, .. } => Some(input),
-            Self::Verify { edited, .. } => Some(edited),
-            Self::TransferTransactions { target_pdf, .. } => Some(target_pdf),
-            Self::AiCommand { path, .. } => Some(path),
-            _ => None,
-        }
-    }
-
-    fn default_timeout(&self) -> std::time::Duration {
-        use std::time::Duration;
-        match self {
-            Self::Ping
-            | Self::Undo
-            | Self::Redo
-            | Self::Cancel { .. }
-            | Self::ReloadConfig
-            | Self::CleanupTempFiles => Duration::from_secs(300),
-            Self::WorkflowParseAndValidate { .. }
-            | Self::WorkflowConfirmAndRender { .. }
-            | Self::TransferTransactions { .. }
-            | Self::RunTransferTests { .. }
-            | Self::Verify { .. }
-            | Self::TypstReconstruct { .. } => Duration::from_secs(15 * 60),
-            _ => Duration::from_secs(15 * 60),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum OperationDisposition {
-    Succeeded,
-    NoOp,
-    Partial,
-    Failed,
-    Cancelled,
-    TimedOut,
-}
-
-#[derive(Debug)]
-pub enum JobResult {
-    Pong,
-    UfoAutoEditResult(serde_json::Value),
-    UfoLog(String),
-    ApiKeysVerified(crate::app::api_verification::VerificationReport),
-    DocumentLoaded {
-        layout_json: String,
-        total_pages: usize,
-    },
-    PageRendered {
-        png_bytes: Vec<u8>,
-        page: usize,
-        dpi: f32,
-        tag: String,
-        width_pts: f32,
-        height_pts: f32,
-    },
-    ChangeApplied {
-        record: ChangeRecord,
-        requires_visual_review: bool,
-    },
-    HistoryUpdated {
-        history: ChangeHistory,
-    },
-    FontCompleted(String),
-    ChangeHistoryExported {
-        path: PathBuf,
-    },
-    TransactionsExtracted(Vec<crate::engine::model::Transaction>),
-    NaturalLanguageEditReady(Vec<crate::engine::model::Transaction>),
-    CategorizationReady(Vec<crate::engine::model::Transaction>),
-    VerificationReport(crate::engine::verification::VerificationReport),
-    /// Stage 8.5: per-font usage and coverage breakdown for the loaded PDF.
-    /// Sent automatically after `Job::LoadDocument` and on demand from
-    /// `Job::AnalyzeFonts`.
-    FontAnalysisReady(crate::engine::font_analysis::FontAnalysis),
-    /// Stage 12 / Item #3: emitted when the workflow's font cascade was
-    /// invoked because the apply step hit FONT_COVERAGE_INSUFFICIENT.
-    /// The GUI uses this to surface a small audit line summarising which
-    /// tiers were used and which characters each tier contributed.
-    FontCascadeUsed(crate::engine::font_analysis::FontCascadeReport),
-    BalanceProposed {
-        imbalance: rust_decimal::Decimal,
-        changes: Vec<crate::engine::model::ProposedChange>,
-    },
-    McpRenderComplete {
-        base64_png: String,
-    },
-    ProposedChangesApplied {
-        changes_applied: usize,
-        failures: Vec<String>,
-    },
-    ImbalanceExplained {
-        explanation: String,
-    },
-    /// Emitted after a [`Job::ReloadConfig`]: reports whether the reloaded
-    /// config has working AI credentials so the GUI can update its status line.
-    ConfigReloaded {
-        generation: u64,
-        config: std::sync::Arc<crate::app::config::AppConfig>,
-        document_ai_configured: bool,
-        gemini_configured: bool,
-        pro_editing_available: bool,
-    },
-    Error {
-        job_label: String,
-        message: String,
-    },
-    NuclearFallbackRequired(String),
-    Progress {
-        label: String,
-        fraction: f32,
-    },
-    /// A job tagged with this `JobId` was cancelled before it finished.
-    Cancelled {
-        id: JobId,
-    },
-    TimedOut {
-        id: JobId,
-        job_label: String,
-    },
-    ReconstructComplete {
-        output_path: std::path::PathBuf,
-    },
-    BugReportSubmitted,
-
-    // ----- Multi-stage workflow ------------------------------------------
-    WorkflowStageChanged {
-        stage: crate::engine::workflow::WorkflowStage,
-    },
-    WorkflowParseValidated {
-        validation: crate::engine::workflow::ParseValidation,
-        transactions: Vec<crate::engine::model::Transaction>,
-    },
-    WorkflowPreviewBuilt(crate::engine::workflow::BalancePreview),
-    WorkflowVisualAttempt(crate::engine::workflow::VisualAttempt),
-    VisualAlternativesReady(Vec<(String, Vec<u8>)>),
-    WorkflowComplete(crate::engine::workflow::WorkflowOutcome),
-    WorkflowFailed(crate::engine::workflow::WorkflowFailure),
-
-    // ----- Transfer Transactions ------------------------------------------
-    TransferComplete(crate::engine::transfer::TransferResult),
-    TransferFailed {
-        stage: String,
-        message: String,
-    },
-
-    // ----- Date Adjustment -------------------------------------------------
-    DatesAdjusted {
-        records: Vec<crate::engine::date_adjust::DateShiftRecord>,
-        output_path: PathBuf,
-    },
-
-    // ----- AI Confirmation -------------------------------------------------
-    AiConfirmationNeeded(crate::engine::ai_confirm::AiConfirmation),
-    InteractiveFallbackRequired(crate::engine::interactive_fallback::InteractiveFallbackRequest),
-
-    // ----- Transfer Test Harness -------------------------------------------
-    TransferTestsComplete(crate::engine::transfer_test_harness::TestHarnessReport),
-
-    // ----- General Lifecycle -----------------------------------------------
-    JobCompleted {
-        job_label: String,
-        disposition: OperationDisposition,
-        artifact: Option<PathBuf>,
-        message: String,
-    },
-
-    // ----- Document AI Version Management ----------------------------------
-    DocAiVersionsListed(Vec<crate::ai::document_ai::ProcessorVersionInfo>),
-    DocAiVersionOperationStarted {
-        operation_name: String,
-        description: String,
-    },
-    DocAiVersionError(String),
-    WatchdogEvent(crate::app::watchdog::WatchdogEvent),
-}
-
-impl JobResult {
-    /// True only for results that definitively end a tracked job lifecycle.
-    /// Intermediate payloads must be enumerated by consumers, not inferred as
-    /// terminal merely because they are not progress messages.
-    pub fn disposition(&self) -> Option<OperationDisposition> {
-        match self {
-            Self::Error { .. }
-            | Self::WorkflowFailed(_)
-            | Self::TransferFailed { .. }
-            | Self::DocAiVersionError(_)
-            | Self::NuclearFallbackRequired(_) => Some(OperationDisposition::Failed),
-            Self::Cancelled { .. } => Some(OperationDisposition::Cancelled),
-            Self::TimedOut { .. } => Some(OperationDisposition::TimedOut),
-            Self::WorkflowComplete(_)
-            | Self::TransferComplete(_)
-            | Self::Pong
-            | Self::UfoAutoEditResult(_)
-            | Self::McpRenderComplete { .. }
-            | Self::ChangeApplied { .. }
-            | Self::FontCompleted(_)
-            | Self::ChangeHistoryExported { .. }
-            | Self::TransactionsExtracted(_)
-            | Self::NaturalLanguageEditReady(_)
-            | Self::CategorizationReady(_)
-            | Self::VerificationReport(_)
-            | Self::BalanceProposed { .. }
-            | Self::ProposedChangesApplied { .. }
-            | Self::ConfigReloaded { .. }
-            | Self::ImbalanceExplained { .. }
-            | Self::ReconstructComplete { .. }
-            | Self::BugReportSubmitted
-            | Self::WorkflowPreviewBuilt(_)
-            | Self::VisualAlternativesReady(_)
-            | Self::TransferTestsComplete(_) => Some(OperationDisposition::Succeeded),
-            Self::JobCompleted { disposition, .. } => Some(*disposition),
-            _ => None,
-        }
-    }
-
-    /// True only for results that definitively end a tracked job lifecycle
-    /// from the runtime `TerminalTracker` perspective (strict).
-    pub fn is_terminal(&self) -> bool {
-        self.disposition().is_some()
-    }
-
-    /// True when this result should free one GUI `in_flight` wait slot.
-    ///
-    /// Broader than [`Self::is_terminal`]: many jobs complete with a success
-    /// payload (e.g. `PageRendered`, `TransactionsExtracted`) that is not a
-    /// `TerminalTracker` terminal event but still ends the user wait.
-    /// Intermediate stream events (`Progress`, `UfoLog`, side-effect fonts)
-    /// must return false.
-    pub fn ends_gui_tracked_job(&self) -> bool {
-        match self {
-            // Intermediate / side-channel — never free a wait slot.
-            Self::Progress { .. }
-            | Self::UfoLog(_)
-            | Self::WatchdogEvent(_)
-            | Self::FontAnalysisReady(_)
-            | Self::FontCascadeUsed(_)
-            | Self::HistoryUpdated { .. }
-            | Self::WorkflowStageChanged { .. }
-            | Self::WorkflowVisualAttempt(_)
-            | Self::AiConfirmationNeeded(_)
-            | Self::InteractiveFallbackRequired(_)
-            | Self::DocAiVersionsListed(_)
-            | Self::DocAiVersionOperationStarted { .. }
-            | Self::ApiKeysVerified(_)
-            // DocumentLoaded auto-chains into parse; keep the same wait open.
-            | Self::DocumentLoaded { .. } => false,
-
-            // Failures and explicit terminals.
-            Self::Error { .. }
-            | Self::Cancelled { .. }
-            | Self::TimedOut { .. }
-            | Self::WorkflowFailed(_)
-            | Self::TransferFailed { .. }
-            | Self::JobCompleted { .. }
-            | Self::NuclearFallbackRequired(_)
-            // Success payloads that complete a user-dispatched job.
-            | Self::Pong
-            | Self::UfoAutoEditResult(_)
-            | Self::McpRenderComplete { .. }
-            | Self::PageRendered { .. }
-            | Self::ChangeApplied { .. }
-            | Self::FontCompleted(_)
-            | Self::ChangeHistoryExported { .. }
-            | Self::TransactionsExtracted(_)
-            | Self::NaturalLanguageEditReady(_)
-            | Self::CategorizationReady(_)
-            | Self::VerificationReport(_)
-            | Self::BalanceProposed { .. }
-            | Self::ProposedChangesApplied { .. }
-            | Self::ConfigReloaded { .. }
-            | Self::ImbalanceExplained { .. }
-            | Self::ReconstructComplete { .. }
-            | Self::BugReportSubmitted
-            | Self::WorkflowParseValidated { .. }
-            | Self::WorkflowPreviewBuilt(_)
-            | Self::VisualAlternativesReady(_)
-            | Self::WorkflowComplete(_)
-            | Self::TransferComplete(_)
-            | Self::DatesAdjusted { .. }
-            | Self::TransferTestsComplete(_)
-            | Self::DocAiVersionError(_) => true,
-        }
-    }
-
-    pub fn completed(
-        job_label: impl Into<String>,
-        disposition: OperationDisposition,
-        artifact: Option<PathBuf>,
-        message: impl Into<String>,
-    ) -> Self {
-        Self::JobCompleted {
-            job_label: job_label.into(),
-            disposition,
-            artifact,
-            message: message.into(),
-        }
-    }
-}
-
-#[derive(Clone)]
-struct ResultSink {
-    broadcast: mpsc::Sender<JobResult>,
-    metadata: JobMetadata,
-    route: Option<mpsc::Sender<JobResult>>,
-    cancellations: CancellationRegistry,
-    terminal_sent: std::sync::Arc<std::sync::atomic::AtomicBool>,
-    completion: std::sync::Arc<tokio::sync::Notify>,
-}
-
-impl ResultSink {
-    fn new(
-        broadcast: mpsc::Sender<JobResult>,
-        metadata: JobMetadata,
-        route: Option<mpsc::Sender<JobResult>>,
-        cancellations: CancellationRegistry,
-    ) -> Self {
-        Self {
-            broadcast,
-            metadata,
-            route,
-            cancellations,
-            terminal_sent: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
-            completion: std::sync::Arc::new(tokio::sync::Notify::new()),
-        }
-    }
-
-    #[allow(clippy::result_large_err)]
-    fn send(&self, result: JobResult) -> Result<(), mpsc::SendError<JobResult>> {
-        use std::sync::atomic::Ordering;
-
-        let disposition = result.disposition();
-        let terminal = disposition.is_some();
-        tracing::debug!(
-            job_id = self.metadata.job_id,
-            correlation_id = %self.metadata.correlation_id,
-            document_id = self.metadata.document_id.as_deref().unwrap_or("none"),
-            job_label = self.metadata.label,
-            terminal,
-            disposition = ?disposition,
-            "runtime result emitted"
-        );
-        if self.terminal_sent.load(Ordering::Acquire) {
-            tracing::warn!(
-                job_id = self.metadata.job_id,
-                job_label = self.metadata.label,
-                "suppressing result emitted after terminal event"
-            );
-            return Ok(());
-        }
-        if terminal && self.terminal_sent.swap(true, Ordering::AcqRel) {
-            tracing::warn!(
-                job_id = self.metadata.job_id,
-                job_label = self.metadata.label,
-                "suppressing duplicate terminal event"
-            );
-            return Ok(());
-        }
-        let outcome = if let Some(route) = &self.route {
-            route.send(result)
-        } else {
-            self.broadcast.send(result)
-        };
-        if terminal {
-            tracing::info!(
-                job_id = self.metadata.job_id,
-                correlation_id = %self.metadata.correlation_id,
-                document_id = self.metadata.document_id.as_deref().unwrap_or("none"),
-                job_label = self.metadata.label,
-                disposition = ?disposition,
-                "runtime job terminated"
-            );
-            self.cancellations.complete(self.metadata.job_id);
-            self.completion.notify_waiters();
-        }
-        outcome
-    }
-
-    fn is_interactive(&self) -> bool {
-        self.metadata.execution_mode == ExecutionMode::Interactive
-    }
-
-    async fn completed(&self) {
-        if self
-            .terminal_sent
-            .load(std::sync::atomic::Ordering::Acquire)
-        {
-            return;
-        }
-        self.completion.notified().await;
-    }
-}
 
 type InteractiveFallbackRouter = std::sync::Arc<
     tokio::sync::Mutex<std::collections::HashMap<uuid::Uuid, tokio::sync::oneshot::Sender<String>>>,
@@ -1475,6 +177,10 @@ fn extraction_provider_order(
     use crate::app::config::DocumentParserMode;
     match selected {
         DocumentParserMode::OfflineHeuristic => vec![DocumentParserMode::OfflineHeuristic],
+        DocumentParserMode::Reducto => vec![
+            DocumentParserMode::Reducto,
+            DocumentParserMode::LlamaParse,
+        ],
         DocumentParserMode::LlamaParse => vec![
             DocumentParserMode::LlamaParse,
             DocumentParserMode::OfflineHeuristic,
@@ -1533,77 +239,15 @@ fn spawn_job_lifecycle_monitor(
     });
 }
 
-#[derive(Clone)]
-pub struct TerminalTracker(std::sync::Arc<TerminalTrackerInner>);
 
-struct TerminalTrackerInner {
-    tx: ResultSink,
-    label: String,
-    terminal_sent: std::sync::atomic::AtomicBool,
-}
 
-impl TerminalTracker {
-    fn new(tx: ResultSink, label: impl Into<String>) -> Self {
-        Self(std::sync::Arc::new(TerminalTrackerInner {
-            tx,
-            label: label.into(),
-            terminal_sent: std::sync::atomic::AtomicBool::new(false),
-        }))
-    }
 
-    #[allow(clippy::result_large_err)]
-    pub fn send(&self, res: JobResult) -> Result<(), std::sync::mpsc::SendError<JobResult>> {
-        use std::sync::atomic::Ordering;
-
-        if self.0.terminal_sent.load(Ordering::Acquire) {
-            tracing::warn!(
-                "[runtime] suppressing result emitted after terminal event for {}: {:?}",
-                self.0.label,
-                res
-            );
-            return Ok(());
-        }
-        if res.is_terminal()
-            && self
-                .0
-                .terminal_sent
-                .swap(true, std::sync::atomic::Ordering::AcqRel)
-        {
-            tracing::warn!(
-                "[runtime] suppressing duplicate terminal event for {}: {:?}",
-                self.0.label,
-                res
-            );
-            return Ok(());
-        }
-        self.0.tx.send(res)
-    }
-
-    fn is_interactive(&self) -> bool {
-        self.0.tx.is_interactive()
-    }
-}
-
-impl Drop for TerminalTrackerInner {
-    fn drop(&mut self) {
-        if !self
-            .terminal_sent
-            .load(std::sync::atomic::Ordering::Acquire)
-        {
-            let _ = self.tx.send(JobResult::Error {
-                job_label: self.label.clone(),
-                message: "Background task panicked or exited silently without a terminal result."
-                    .into(),
-            });
-        }
-    }
-}
 
 pub struct Runtime {
-    tokio_rt: Option<tokio::runtime::Runtime>,
-    runtime_client: RuntimeClient,
-    audit_log: Arc<Mutex<AuditLog>>,
-    shutdown_complete: bool,
+    pub(crate) tokio_rt: Option<tokio::runtime::Runtime>,
+    pub(crate) runtime_client: RuntimeClient,
+    pub(crate) audit_log: Arc<Mutex<AuditLog>>,
+    pub(crate) shutdown_complete: bool,
     /// Registry of in-flight jobs and their cancellation tokens. Cloneable;
     /// pass to the GUI so it can cancel by id.
     pub cancellations: CancellationRegistry,
@@ -2154,16 +798,22 @@ Additional Context:\n{context}",
                     )
                 })
                 .await
-                .unwrap_or_else(|e| Err(crate::ai::ufo::UfoError::Unknown(format!("Tokio spawn_blocking panicked: {e}"))));
+                .unwrap_or_else(|e| Err(format!("Tokio spawn_blocking panicked: {e}")));
 
                 match result {
                     Ok(val) => {
-                        let _ = res_tx.send(JobResult::UfoAutoEditResult(serde_json::to_value(val).unwrap_or(serde_json::Value::Null)));
+                        let _ = res_tx.send(JobResult::UfoAutoEditResult(serde_json::to_value(val).unwrap_or_default()));
+                    }
+                    Err(crate::ai::ufo::UfoError::Hallucination(e)) => {
+                        let _ = res_tx.send(JobResult::Error {
+                            job_label: "ufo_dispatch".into(),
+                            message: format!("UFO Hallucination detected: {e}. Falling back to OfflineHeuristic parser..."),
+                        });
                     }
                     Err(e) => {
                         let _ = res_tx.send(JobResult::Error {
                             job_label: "ufo_dispatch".into(),
-                            message: format!("UFO Auto-Edit failed: {e}"),
+                            message: format!("UFO Auto-Edit failed: {:?}", e),
                         });
                     }
                 }
@@ -2532,6 +1182,30 @@ Additional Context:\n{context}",
                             }));
                         }
 
+                        // 1.5. Reducto
+                        DocumentParserMode::Reducto => {
+                            crate::ai::reducto::ReductoClient::from_app_config(&cfg)
+                                .map_err(|e| e.to_string())
+                                .and_then(|client| {
+                                    tokio::task::block_in_place(|| {
+                                        tokio::runtime::Handle::current()
+                                            .block_on(client.parse_statement(path))
+                                    })
+                                    .map_err(|e| e.to_string())
+                                })
+                                .map(|stmt| {
+                                    (
+                                        "Reducto",
+                                        super::ExtractionResult::Success(stmt),
+                                    )
+                                })
+                                .unwrap_or_else(|e| {
+                                    (
+                                        "Reducto",
+                                        super::ExtractionResult::Failed(e),
+                                    )
+                                })
+                        }
                         // 2. LlamaParse
                         if let Ok(llama) =
                             crate::ai::llamaparse::LlamaParseClient::from_app_config(&cfg)
@@ -6103,7 +4777,24 @@ Additional Context:\n{context}",
 
                     let attempt: Result<crate::ai::document_ai::BankStatement, String> =
                         match provider {
-                            crate::app::config::DocumentParserMode::LlamaParse => {
+                            crate::app::config::DocumentParserMode::Reducto => {
+                                match crate::ai::reducto::ReductoClient::from_app_config(&cfg) {
+                                    Ok(client) => client.parse_statement_for_transfer(path).await.map_err(|e| e.to_string()),
+                                    Err(e) => Err(e.to_string()),
+                                }
+                            }
+                            crate::app::config::DocumentParserMode::Reducto => {
+                            let _ = tx.send(JobProgress {
+                                job_id,
+                                progress: 0.1,
+                                label: "Parsing with Reducto...".into(),
+                            });
+                            match crate::ai::reducto::ReductoClient::from_app_config(&cfg) {
+                                Ok(client) => client.parse_statement(path).await.map_err(|e| e.to_string()),
+                                Err(e) => Err(e.to_string()),
+                            }
+                        }
+                        DocumentParserMode::LlamaParse => {
                                 match crate::ai::llamaparse::LlamaParseClient::from_app_config(&cfg) {
                                     Ok(client) => crate::engine::pro_edit::perform_pro_edit(
                                         "LlamaParse",
@@ -7637,14 +6328,14 @@ Additional Context:\n{context}",
 
             #[derive(serde::Deserialize)]
             struct RawTxRow {
-                page: usize,
-                line_on_page: Option<usize>,
-                date: Option<String>,
-                raw_text: Option<String>,
-                debit: Option<f64>,
-                credit: Option<f64>,
-                running_balance: Option<f64>,
-                bbox: Option<[f32; 4]>,
+                pub(crate) page: usize,
+                pub(crate) line_on_page: Option<usize>,
+                pub(crate) date: Option<String>,
+                pub(crate) raw_text: Option<String>,
+                pub(crate) debit: Option<f64>,
+                pub(crate) credit: Option<f64>,
+                pub(crate) running_balance: Option<f64>,
+                pub(crate) bbox: Option<[f32; 4]>,
             }
 
             fn parse_rows(json: &str, label: &str) -> Result<Vec<RawTxRow>, String> {
@@ -8095,6 +6786,17 @@ Additional Context:\n{context}",
                             }
                         }
 
+                        DocumentParserMode::Reducto => {
+                            let _ = tx.send(JobProgress {
+                                job_id,
+                                progress: 0.1,
+                                label: "Parsing with Reducto...".into(),
+                            });
+                            match crate::ai::reducto::ReductoClient::from_app_config(&cfg) {
+                                Ok(client) => client.parse_statement(path).await.map_err(|e| e.to_string()),
+                                Err(e) => Err(e.to_string()),
+                            }
+                        }
                         DocumentParserMode::LlamaParse => {
                             let _ = res_tx.send(JobResult::Progress {
                                 label: "Parsing with LlamaParse...".into(),
@@ -9539,623 +8241,5 @@ Additional Context:\n{context}",
                 });
             });
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-    use super::*;
-    use crate::app::config::AppConfig;
-    use std::time::Duration;
-
-    fn test_sink(broadcast: mpsc::Sender<JobResult>) -> ResultSink {
-        ResultSink::new(
-            broadcast,
-            JobMetadata::for_job(&Job::Ping),
-            None,
-            CancellationRegistry::new(),
-        )
-    }
-
-    #[test]
-    fn cancellation_registry_register_and_cancel_round_trip() {
-        let reg = CancellationRegistry::new();
-        let id = alloc_job_id();
-        let token = reg.register(id);
-        assert_eq!(reg.len(), 1);
-        assert!(!token.is_cancelled());
-
-        let cancelled = reg.cancel(id);
-        assert!(cancelled);
-        assert!(token.is_cancelled());
-        assert_eq!(reg.len(), 0);
-    }
-
-    #[test]
-    fn cancellation_registry_complete_removes_without_cancelling() {
-        let reg = CancellationRegistry::new();
-        let id = alloc_job_id();
-        let token = reg.register(id);
-        reg.complete(id);
-        assert_eq!(reg.len(), 0);
-        // Completing should not flip the token's cancelled flag.
-        assert!(!token.is_cancelled());
-    }
-
-    #[test]
-    fn cancellation_registry_unknown_id_is_noop() {
-        let reg = CancellationRegistry::new();
-        assert!(!reg.cancel(99999));
-    }
-
-    #[test]
-    fn cancellation_registry_cancel_all_drains_every_token() {
-        let reg = CancellationRegistry::new();
-        let t1 = reg.register(1);
-        let t2 = reg.register(2);
-        let t3 = reg.register(3);
-        reg.cancel_all();
-        assert_eq!(reg.len(), 0);
-        assert!(t1.is_cancelled());
-        assert!(t2.is_cancelled());
-        assert!(t3.is_cancelled());
-    }
-
-    #[test]
-    fn cancellation_registry_request_cancel_all_waits_for_terminal_completion() {
-        let reg = CancellationRegistry::new();
-        let t1 = reg.register(11);
-        let t2 = reg.register(12);
-        reg.request_cancel_all();
-        assert_eq!(reg.len(), 2);
-        assert!(t1.is_cancelled());
-        assert!(t2.is_cancelled());
-        reg.complete(11);
-        assert_eq!(reg.len(), 1);
-        reg.complete(12);
-        assert!(reg.is_empty());
-    }
-
-    #[test]
-    fn runtime_client_close_intake_rejects_new_work() {
-        let (intake_tx, intake_rx) = mpsc::channel::<JobEnvelope>();
-        let client = RuntimeClient::new(intake_tx);
-        assert!(client.is_accepting());
-        client.close_intake();
-        assert!(!client.is_accepting());
-        assert!(client.send(Job::Ping).is_err());
-        assert!(intake_rx.recv_timeout(Duration::from_millis(20)).is_err());
-    }
-
-    #[test]
-    fn alloc_job_id_is_strictly_monotonic() {
-        let a = alloc_job_id();
-        let b = alloc_job_id();
-        let c = alloc_job_id();
-        assert!(a < b);
-        assert!(b < c);
-    }
-
-    #[test]
-    fn runtime_client_routes_results_by_job_and_document_identity() {
-        let (intake_tx, intake_rx) = mpsc::channel::<JobEnvelope>();
-        let client = RuntimeClient::new(intake_tx);
-        let path = PathBuf::from("fixtures/private-account.pdf");
-        let first = client
-            .submit(Job::LoadDocument {
-                path: path.clone(),
-                three_page_mode: false,
-            })
-            .unwrap();
-        let second = client
-            .submit(Job::LoadDocument {
-                path,
-                three_page_mode: true,
-            })
-            .unwrap();
-        let first_envelope = intake_rx.recv().unwrap();
-        let second_envelope = intake_rx.recv().unwrap();
-        assert_ne!(first.metadata().job_id, second.metadata().job_id);
-        assert_eq!(first.metadata().document_id, second.metadata().document_id);
-        assert_eq!(first.metadata().job_id, first_envelope.metadata.job_id);
-        assert_eq!(second.metadata().job_id, second_envelope.metadata.job_id);
-        assert_eq!(
-            first.metadata().correlation_id,
-            first_envelope.metadata.correlation_id
-        );
-        let metadata_debug = format!("{:?}", first_envelope.metadata);
-        assert!(!metadata_debug.contains("fixtures"));
-        assert!(!metadata_debug.contains("private-account.pdf"));
-
-        let (broadcast_tx, broadcast_rx) = mpsc::channel();
-        let sink = ResultSink::new(
-            broadcast_tx,
-            first_envelope.metadata,
-            first_envelope.route,
-            CancellationRegistry::new(),
-        );
-        sink.send(JobResult::completed(
-            "load_document",
-            OperationDisposition::Succeeded,
-            None,
-            "document metadata loaded",
-        ))
-        .unwrap();
-        assert!(matches!(
-            first.recv_timeout(Duration::from_secs(1)),
-            Ok(JobResult::JobCompleted {
-                disposition: OperationDisposition::Succeeded,
-                ..
-            })
-        ));
-        assert!(broadcast_rx
-            .recv_timeout(Duration::from_millis(50))
-            .is_err());
-        assert!(second.try_recv().is_err());
-    }
-
-    #[test]
-    fn runtime_client_preserves_explicit_execution_mode() {
-        let (intake_tx, intake_rx) = mpsc::channel::<JobEnvelope>();
-        let client = RuntimeClient::new(intake_tx);
-
-        let interactive = client.submit(Job::Ping).unwrap();
-        let interactive_envelope = intake_rx.recv().unwrap();
-        assert_eq!(
-            interactive.metadata().execution_mode,
-            ExecutionMode::Interactive
-        );
-        assert_eq!(
-            interactive_envelope.metadata.execution_mode,
-            ExecutionMode::Interactive
-        );
-
-        let headless = client.submit_headless(Job::Ping).unwrap();
-        let headless_envelope = intake_rx.recv().unwrap();
-        assert_eq!(headless.metadata().execution_mode, ExecutionMode::Headless);
-        assert_eq!(
-            headless_envelope.metadata.execution_mode,
-            ExecutionMode::Headless
-        );
-    }
-
-    #[test]
-    fn job_ticket_cancellation_targets_its_own_job_id() {
-        let (intake_tx, intake_rx) = mpsc::channel::<JobEnvelope>();
-        let client = RuntimeClient::new(intake_tx);
-        let ticket = client.submit(Job::Ping).unwrap();
-        let _original = intake_rx.recv().unwrap();
-        ticket.cancel().unwrap();
-        let cancel = intake_rx.recv().unwrap();
-        assert!(matches!(
-            cancel.job,
-            Job::Cancel { id } if id == ticket.metadata().job_id
-        ));
-    }
-
-    #[tokio::test]
-    async fn interactive_fallback_timeout_removes_stale_route() {
-        let router: InteractiveFallbackRouter =
-            std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new()));
-        let request_id = uuid::Uuid::new_v4();
-        let (sender, receiver) = tokio::sync::oneshot::channel();
-        router.lock().await.insert(request_id, sender);
-
-        let result =
-            wait_for_interactive_choice(&router, request_id, receiver, Duration::from_millis(10))
-                .await;
-        assert_eq!(result, Err("interactive response timed out"));
-        assert!(!router.lock().await.contains_key(&request_id));
-    }
-
-    #[tokio::test]
-    async fn interactive_fallback_routes_exact_response() {
-        let router: InteractiveFallbackRouter =
-            std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new()));
-        let request_id = uuid::Uuid::new_v4();
-        let (sender, receiver) = tokio::sync::oneshot::channel();
-        router.lock().await.insert(request_id, sender);
-        let response_sender = router.lock().await.remove(&request_id).unwrap();
-        response_sender.send("offline_parser".to_string()).unwrap();
-
-        let result =
-            wait_for_interactive_choice(&router, request_id, receiver, Duration::from_secs(1))
-                .await;
-        assert_eq!(result.as_deref(), Ok("offline_parser"));
-        assert!(!router.lock().await.contains_key(&request_id));
-    }
-
-    #[tokio::test]
-    async fn lifecycle_timeout_emits_once_and_suppresses_late_results() {
-        let (tx, rx) = mpsc::channel();
-        let cancellations = CancellationRegistry::new();
-        let mut metadata = JobMetadata::for_job(&Job::Ping);
-        metadata.deadline = std::time::Instant::now() + Duration::from_millis(20);
-        let token = cancellations.register(metadata.job_id);
-        let sink = ResultSink::new(tx, metadata.clone(), None, cancellations);
-        spawn_job_lifecycle_monitor(sink.clone(), token);
-
-        let (terminal, rx) = tokio::task::spawn_blocking(move || {
-            let terminal = rx.recv_timeout(Duration::from_secs(1));
-            (terminal, rx)
-        })
-        .await
-        .unwrap();
-        assert!(matches!(
-            terminal,
-            Ok(JobResult::TimedOut { id, .. }) if id == metadata.job_id
-        ));
-        sink.send(JobResult::Pong).unwrap();
-        let late = tokio::task::spawn_blocking(move || rx.recv_timeout(Duration::from_millis(50)))
-            .await
-            .unwrap();
-        assert!(late.is_err());
-    }
-
-    #[tokio::test]
-    async fn lifecycle_cancellation_emits_once_and_suppresses_late_results() {
-        let (tx, rx) = mpsc::channel();
-        let cancellations = CancellationRegistry::new();
-        let metadata = JobMetadata::for_job(&Job::Ping);
-        let token = cancellations.register(metadata.job_id);
-        let sink = ResultSink::new(tx, metadata.clone(), None, cancellations);
-        spawn_job_lifecycle_monitor(sink.clone(), token.clone());
-
-        token.cancel();
-        let (terminal, rx) = tokio::task::spawn_blocking(move || {
-            let terminal = rx.recv_timeout(Duration::from_secs(1));
-            (terminal, rx)
-        })
-        .await
-        .unwrap();
-        assert!(matches!(
-            terminal,
-            Ok(JobResult::Cancelled { id }) if id == metadata.job_id
-        ));
-        sink.send(JobResult::Pong).unwrap();
-        let late = tokio::task::spawn_blocking(move || rx.recv_timeout(Duration::from_millis(50)))
-            .await
-            .unwrap();
-        assert!(late.is_err());
-    }
-
-    #[test]
-    fn job_result_terminal_classification_is_explicit() {
-        let intermediate =
-            JobResult::WorkflowVisualAttempt(crate::engine::workflow::VisualAttempt {
-                attempt: 1,
-                max_attempts: 3,
-                diff_score: 0.01,
-                threshold: 0.02,
-                only_intended: true,
-                message: "intermediate".into(),
-            });
-        assert!(!intermediate.is_terminal());
-        assert!(!JobResult::WorkflowParseValidated {
-            validation: crate::engine::workflow::ParseValidation {
-                total_pages: 1,
-                transactions_found: 1,
-                opening_balance: rust_decimal::Decimal::ZERO,
-                closing_balance: rust_decimal::Decimal::ZERO,
-                account_number: None,
-                completeness_score: 1.0,
-                completeness_notes: String::new(),
-                missing_rows: Vec::new(),
-            },
-            transactions: Vec::new(),
-        }
-        .is_terminal());
-        assert!(
-            JobResult::WorkflowFailed(crate::engine::workflow::WorkflowFailure::Other(
-                "failed".into()
-            ))
-            .is_terminal()
-        );
-        for disposition in [
-            OperationDisposition::Succeeded,
-            OperationDisposition::NoOp,
-            OperationDisposition::Partial,
-            OperationDisposition::Failed,
-            OperationDisposition::Cancelled,
-            OperationDisposition::TimedOut,
-        ] {
-            let terminal = JobResult::completed("done", disposition, None, "complete");
-            assert_eq!(terminal.disposition(), Some(disposition));
-            assert!(terminal.is_terminal());
-        }
-    }
-
-    #[test]
-    fn ends_gui_tracked_job_frees_success_payloads_but_not_streams() {
-        // Side-channel / intermediate
-        assert!(!JobResult::Progress {
-            label: "x".into(),
-            fraction: 0.5,
-        }
-        .ends_gui_tracked_job());
-        assert!(!JobResult::UfoLog("line".into()).ends_gui_tracked_job());
-        assert!(
-            !JobResult::DocumentLoaded {
-                layout_json: "{}".into(),
-                total_pages: 1,
-            }
-            .ends_gui_tracked_job(),
-            "DocumentLoaded chains into parse; must keep GUI wait open"
-        );
-        assert!(
-            !JobResult::WorkflowVisualAttempt(crate::engine::workflow::VisualAttempt {
-                attempt: 1,
-                max_attempts: 3,
-                diff_score: 0.01,
-                threshold: 0.02,
-                only_intended: true,
-                message: "mid".into(),
-            })
-            .ends_gui_tracked_job()
-        );
-
-        // Success / failure payloads that complete a user wait
-        assert!(JobResult::PageRendered {
-            png_bytes: vec![],
-            page: 0,
-            dpi: 150.0,
-            tag: "current".into(),
-            width_pts: 612.0,
-            height_pts: 792.0,
-        }
-        .ends_gui_tracked_job());
-        assert!(JobResult::TransactionsExtracted(vec![]).ends_gui_tracked_job());
-        assert!(
-            JobResult::UfoAutoEditResult(serde_json::json!({"status":"success"}))
-                .ends_gui_tracked_job()
-        );
-        assert!(JobResult::Error {
-            job_label: "x".into(),
-            message: "y".into(),
-        }
-        .ends_gui_tracked_job());
-        assert!(JobResult::WorkflowParseValidated {
-            validation: crate::engine::workflow::ParseValidation {
-                total_pages: 1,
-                transactions_found: 0,
-                opening_balance: rust_decimal::Decimal::ZERO,
-                closing_balance: rust_decimal::Decimal::ZERO,
-                account_number: None,
-                completeness_score: 1.0,
-                completeness_notes: String::new(),
-                missing_rows: Vec::new(),
-            },
-            transactions: Vec::new(),
-        }
-        .ends_gui_tracked_job());
-        // Strict terminal remains a subset for tracker semantics
-        assert!(JobResult::Error {
-            job_label: "x".into(),
-            message: "y".into(),
-        }
-        .is_terminal());
-        assert!(!JobResult::PageRendered {
-            png_bytes: vec![],
-            page: 0,
-            dpi: 150.0,
-            tag: "current".into(),
-            width_pts: 612.0,
-            height_pts: 792.0,
-        }
-        .is_terminal());
-    }
-
-    #[test]
-    fn terminal_tracker_emits_exactly_one_terminal_and_suppresses_followups() {
-        let (tx, rx) = mpsc::channel();
-        let tracker = TerminalTracker::new(test_sink(tx), "exactly-once-test");
-        tracker
-            .send(JobResult::WorkflowVisualAttempt(
-                crate::engine::workflow::VisualAttempt {
-                    attempt: 1,
-                    max_attempts: 3,
-                    diff_score: 0.01,
-                    threshold: 0.02,
-                    only_intended: true,
-                    message: "intermediate".into(),
-                },
-            ))
-            .unwrap();
-        tracker
-            .send(JobResult::WorkflowFailed(
-                crate::engine::workflow::WorkflowFailure::Other("expected failure".into()),
-            ))
-            .unwrap();
-        tracker
-            .send(JobResult::Error {
-                job_label: "duplicate".into(),
-                message: "must be suppressed".into(),
-            })
-            .unwrap();
-        tracker
-            .send(JobResult::Progress {
-                label: "after terminal".into(),
-                fraction: 1.0,
-            })
-            .unwrap();
-        drop(tracker);
-
-        let results: Vec<_> = rx.try_iter().collect();
-        assert_eq!(results.len(), 2);
-        assert!(matches!(results[0], JobResult::WorkflowVisualAttempt(_)));
-        assert!(matches!(results[1], JobResult::WorkflowFailed(_)));
-        assert_eq!(
-            results.iter().filter(|result| result.is_terminal()).count(),
-            1
-        );
-    }
-
-    #[test]
-    fn terminal_tracker_drop_emits_one_failure_after_only_intermediate_results() {
-        let (tx, rx) = mpsc::channel();
-        let tracker = TerminalTracker::new(test_sink(tx), "silent-task");
-        tracker
-            .send(JobResult::Progress {
-                label: "started".into(),
-                fraction: 0.1,
-            })
-            .unwrap();
-        drop(tracker);
-
-        let results: Vec<_> = rx.try_iter().collect();
-        assert_eq!(results.len(), 2);
-        assert!(matches!(results[0], JobResult::Progress { .. }));
-        assert!(matches!(
-            &results[1],
-            JobResult::Error { job_label, message }
-                if job_label == "silent-task" && message.contains("without a terminal result")
-        ));
-        assert_eq!(
-            results.iter().filter(|result| result.is_terminal()).count(),
-            1
-        );
-    }
-
-    #[test]
-    fn test_bridge_fail_loud() {
-        let (job_tx, job_rx) = mpsc::channel::<JobEnvelope>();
-        let (tokio_job_tx, tokio_job_rx) = tokio::sync::mpsc::unbounded_channel::<JobEnvelope>();
-        let (result_tx, result_rx) = mpsc::channel::<JobResult>();
-        let (watchdog, _watchdog_rx) = crate::app::watchdog::Watchdog::new();
-        let watchdog = std::sync::Arc::new(watchdog);
-        let _watchdog_for_gui = watchdog.clone();
-
-        // Immediately drop the receiver to simulate disconnect
-        drop(tokio_job_rx);
-
-        let handle = spawn_runtime_bridge(job_rx, tokio_job_tx.clone(), tokio_job_tx, result_tx);
-
-        // Send a job
-        let _ = job_tx.send(JobEnvelope::broadcast(Job::Ping));
-
-        // Expect error
-        match result_rx.recv_timeout(Duration::from_secs(2)) {
-            Ok(JobResult::Error { job_label, message }) => {
-                assert_eq!(job_label, "ping");
-                assert!(message.contains("disconnected"));
-            }
-            res => panic!("Expected bridge error, got {res:?}"),
-        }
-
-        if let Err(e) = handle.join() {
-            tracing::error!("Worker thread panicked during shutdown: {:?}", e);
-        }
-
-        // Subsequent send should fail because job_rx is dropped
-        assert!(job_tx.send(JobEnvelope::broadcast(Job::Ping)).is_err());
-    }
-
-    #[tokio::test]
-    async fn test_python_job_recursion_regression() {
-        // GIVEN: A mock setup that mirrors the Runtime's job loop
-        let (job_tx, mut job_rx) = tokio::sync::mpsc::unbounded_channel::<Job>();
-        let (python_tx, python_rx) =
-            std::sync::mpsc::channel::<(PythonJob, oneshot::Sender<PythonJobResult>)>();
-        let python_tx_clone = python_tx.clone();
-
-        // 1. A selector with PyMuPdfEngine (which sends jobs back to a channel)
-        let (_std_job_tx, std_job_rx) = std::sync::mpsc::channel::<Job>();
-        let job_tx_clone = job_tx.clone();
-        std::thread::spawn(move || {
-            while let Ok(job) = std_job_rx.recv() {
-                let _ = job_tx_clone.send(job);
-            }
-        });
-
-        let _engine = Arc::new(crate::pdf::OxidizePdfEngine::new());
-
-        // 2. The Runtime Job::Python handler (the logic we are testing)
-        let handle = tokio::spawn(async move {
-            while let Some(job) = job_rx.recv().await {
-                if let Job::Python(py_job, reply_tx) = job {
-                    dispatch_python_job(py_job, reply_tx, &python_tx_clone);
-                }
-            }
-        });
-
-        // 3. Trigger a job that would cause recursion in the old version
-        let (reply_tx, _reply_rx) = oneshot::channel();
-        job_tx
-            .send(Job::Python(
-                PythonJob::GetTextBlocks {
-                    pdf_path: "input.pdf".into(),
-                    page_num: 0,
-                },
-                reply_tx,
-            ))
-            .unwrap();
-
-        // WHEN: We wait for the message to land on the Python actor
-        let (received_job, python_rx) = tokio::task::spawn_blocking(move || {
-            let res = python_rx
-                .recv_timeout(Duration::from_secs(1))
-                .expect("Python job should be forwarded to actor");
-            (res.0, python_rx)
-        })
-        .await
-        .unwrap();
-
-        // THEN:
-        // 1. It must be the job we sent
-        assert!(matches!(received_job, PythonJob::GetTextBlocks { .. }));
-
-        // 2. Exactly ONE message must be received by the actor (no recursion)
-        let next_res = python_rx.try_recv();
-        assert!(
-            next_res.is_err(),
-            "Recursion detected: multiple messages sent to Python actor"
-        );
-
-        // Cleanup
-        drop(job_tx);
-        handle.abort();
-    }
-
-    #[test]
-    fn extraction_router_honors_selected_provider_without_unrelated_cloud_calls() {
-        use crate::app::config::DocumentParserMode;
-
-        assert_eq!(
-            extraction_provider_order(DocumentParserMode::OfflineHeuristic),
-            vec![DocumentParserMode::OfflineHeuristic]
-        );
-        assert_eq!(
-            extraction_provider_order(DocumentParserMode::LlamaParse),
-            vec![
-                DocumentParserMode::LlamaParse,
-                DocumentParserMode::OfflineHeuristic
-            ]
-        );
-        assert_eq!(
-            extraction_provider_order(DocumentParserMode::DocumentAi),
-            vec![
-                DocumentParserMode::DocumentAi,
-                DocumentParserMode::OfflineHeuristic
-            ]
-        );
-        assert_eq!(
-            extraction_provider_order(DocumentParserMode::LocalOcrs),
-            vec![DocumentParserMode::LocalOcrs]
-        );
-    }
-
-    #[test]
-    fn runtime_fallback_branch_prefers_offline_parser_when_online_backends_are_unavailable() {
-        let mut cfg = AppConfig::default();
-        cfg.document_ai = None;
-
-        let availability = cfg.detect_availability();
-        assert!(!availability.document_ai);
-
-        // The runtime should keep the offline parser as the final fallback path
-        // when neither Document AI nor Ocr-as-a-Service is configured.
-        assert!(availability.unavailable_reason("document_ai").is_some());
-        assert!(availability.unavailable_reason("llamaparse").is_some());
     }
 }
