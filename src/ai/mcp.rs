@@ -420,40 +420,19 @@ impl McpServer {
                 }
             }
             "resources/list" => {
-                let home_dir = dirs::home_dir().unwrap_or_default();
-                let brain_base = home_dir.join(".gemini").join("antigravity").join("brain");
-
-                let mut brain_dir = brain_base.to_string_lossy().to_string();
-                if let Ok(entries) = std::fs::read_dir(&brain_base) {
-                    let mut latest_time = std::time::SystemTime::UNIX_EPOCH;
-                    for entry in entries.flatten() {
-                        if let Ok(meta) = entry.metadata() {
-                            if meta.is_dir() {
-                                if let Ok(modified) = meta.modified() {
-                                    if modified > latest_time {
-                                        latest_time = modified;
-                                        brain_dir =
-                                            entry.path().to_string_lossy().replace("\\", "/");
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                // Advertise only BankFidelity-owned capabilities. This arm previously
+                // scanned ~/.gemini/antigravity/brain and exposed unrelated third-party
+                // agent state to every MCP client; that leak has been removed.
                 json!({
                     "jsonrpc": "2.0",
                     "id": req.id,
                     "result": {
                         "resources": [
                             {
-                                "uri": format!("file://{}/task.md", brain_dir),
-                                "name": "Current Task List",
-                                "mimeType": "text/markdown"
-                            },
-                            {
-                                "uri": format!("file://{}/walkthrough.md", brain_dir),
-                                "name": "Project Walkthrough",
-                                "mimeType": "text/markdown"
+                                "uriTemplate": "pdf-page://{path}?page={page}",
+                                "name": "PDF Page Raster",
+                                "description": "Rasterized statement page. Read via resources/read using uri pdf-page://<absolute_path_to_pdf>?page=<page_number> to receive a Base64 PNG.",
+                                "mimeType": "image/png"
                             }
                         ]
                     }

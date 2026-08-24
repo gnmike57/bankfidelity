@@ -45,8 +45,10 @@ impl UfoTaskResult {
             (None, None) => return paths,
         };
 
-        // Strict path extraction
-        if let Ok(re) = regex::Regex::new(r"(?i)[a-zA-Z]:\\[^<>\x22\|\?\*\n\r]+\.pdf") {
+        // Strict path extraction: Windows drive-letter paths and POSIX absolute paths.
+        let windows_re = regex::Regex::new(r"(?i)[a-zA-Z]:\\[^<>\x22\|\?\*\n\r]+\.pdf");
+        let posix_re = regex::Regex::new(r"/[A-Za-z0-9._~/-]+\.pdf");
+        for re in [windows_re, posix_re].into_iter().flatten() {
             for cap in re.find_iter(&text) {
                 let p = std::path::PathBuf::from(cap.as_str().trim());
                 if p.exists() && !paths.contains(&p) {
@@ -123,6 +125,25 @@ impl UfoClient {
         }
     }
 
+    /// Resolves the Python interpreter used to launch UFO.
+    /// Priority: PYO3_PYTHON > PYTHON_EXE > BANKFIDELITY_UFO_PYTHON >
+    /// UFO's bundled `<ufo_dir>/ufo/python_env/python.exe` > `python` on PATH.
+    /// No machine-specific absolute paths are hardcoded; configure via env vars.
+    fn resolve_python_command(ufo_dir: &std::path::Path) -> String {
+        for var in ["PYO3_PYTHON", "PYTHON_EXE", "BANKFIDELITY_UFO_PYTHON"] {
+            if let Ok(val) = std::env::var(var) {
+                if !val.trim().is_empty() {
+                    return val;
+                }
+            }
+        }
+        let bundled = ufo_dir.join("ufo").join("python_env").join("python.exe");
+        if bundled.exists() {
+            return bundled.to_string_lossy().to_string();
+        }
+        "python".to_string()
+    }
+
     fn execute_single_attempt<F>(
         request: &str,
         on_log: &mut Option<F>,
@@ -156,31 +177,7 @@ impl UfoClient {
             std::env::current_dir().unwrap_or_default()
         );
 
-        let python_cmd = if let Ok(pyo3_py) = std::env::var("PYO3_PYTHON") {
-            pyo3_py
-        } else if let Ok(py_exe) = std::env::var("PYTHON_EXE") {
-            py_exe
-        } else if ufo_dir
-            .join("ufo")
-            .join("python_env")
-            .join("python.exe")
-            .exists()
-        {
-            ufo_dir
-                .join("ufo")
-                .join("python_env")
-                .join("python.exe")
-                .to_string_lossy()
-                .to_string()
-        } else if std::path::Path::new(
-            "C:\\Users\\zbook\\Downloads\\python-3.15.0rc1-embed-amd64\\python.exe",
-        )
-        .exists()
-        {
-            "C:\\Users\\zbook\\Downloads\\python-3.15.0rc1-embed-amd64\\python.exe".to_string()
-        } else {
-            "python".to_string()
-        };
+        let python_cmd = Self::resolve_python_command(&ufo_dir);
         let mut child = Command::new(&python_cmd)
             .arg("-m")
             .arg("ufo")
@@ -218,13 +215,18 @@ impl UfoClient {
             }
         });
 
-        let reader = BufReader::new(stdout);
-        for line in reader.lines().map_while(Result::ok) {
-            tracing::info!("[UFO] {line}");
-            if let Some(cb) = on_log.as_mut() {
-                cb(line);
+        // Pump stdout on a dedicated thread so a hung UFO process that keeps
+        // its stdout open can never starve the watchdog poll below.
+        let mut on_log = on_log.take();
+        let stdout_thread = std::thread::spawn(move || {
+            let reader = BufReader::new(stdout);
+            for line in reader.lines().map_while(Result::ok) {
+                tracing::info!("[UFO] {line}");
+                if let Some(cb) = on_log.as_mut() {
+                    cb(line);
+                }
             }
-        }
+        });
 
         let start_wait = std::time::Instant::now();
         let timeout = std::time::Duration::from_secs(600);
@@ -247,6 +249,8 @@ impl UfoClient {
             }
         };
         UFO_ACTIVE_PID.store(0, std::sync::atomic::Ordering::SeqCst);
+        // Exiting/killing the child closes its pipes, releasing the pump threads.
+        let _ = stdout_thread.join();
         let _ = stderr_thread.join();
 
         let stderr_str = stderr_buf.lock().map(|s| s.clone()).unwrap_or_default();
@@ -364,5 +368,45 @@ mod tests {
         let dir = UfoClient::ufo_dir();
         std::env::remove_var("BANKFIDELITY_UFO_DIR");
         assert_eq!(dir, std::path::PathBuf::from("D:\\custom\\ufo"));
+    }
+
+    #[test]
+    fn python_env_override_is_respected_for_interpreter() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        std::env::set_var("BANKFIDELITY_UFO_PYTHON", "D:\\custom\\python.exe");
+        let cmd = UfoClient::resolve_python_command(std::path::Path::new("C:\\UFO"));
+        std::env::remove_var("BANKFIDELITY_UFO_PYTHON");
+        assert_eq!(cmd, "D:\\custom\\python.exe");
+    }
+
+    #[test]
+    fn empty_python_env_override_falls_through() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        std::env::set_var("BANKFIDELITY_UFO_PYTHON", "  ");
+        let cmd = UfoClient::resolve_python_command(std::path::Path::new("__missing__"));
+        std::env::remove_var("BANKFIDELITY_UFO_PYTHON");
+        assert_eq!(cmd, "python");
+    }
+
+    #[test]
+    fn extract_pdf_artifacts_finds_existing_files() {
+        let pdf = std::env::temp_dir().join("bankfidelity_ufo_artifact_test.pdf");
+        std::fs::write(&pdf, b"%PDF-1.4\n").expect("write temp pdf stub");
+        let result = UfoTaskResult {
+            status: "success".into(),
+            task_id: "t".into(),
+            output: Some(format!("Saved document to {}", pdf.display())),
+            error_type: None,
+            error_message: None,
+            traceback: None,
+        };
+        let found = result.extract_pdf_artifacts();
+        let _ = std::fs::remove_file(&pdf);
+        assert!(
+            found.iter().any(|p| p == &pdf),
+            "expected {:?} in {:?}",
+            pdf,
+            found
+        );
     }
 }

@@ -1204,80 +1204,80 @@ pub fn run_inner(
             Ok(exit_code::SUCCESS)
         }
         Commands::Ufo { request } => {
-            let mut attempts = 0;
             let pdf_regex = regex::Regex::new(r"(?i)[a-z]:[\\/][^<>\x22\|\?\*]+\.pdf").ok();
-            loop {
-                match crate::ai::ufo::UfoClient::dispatch_task(&request, None::<fn(String)>) {
-                    Ok(result) => {
-                        println!(
-                            "UFO Task Result:\n{}",
-                            serde_json::to_string_pretty(&result).unwrap_or_default()
-                        );
-                        if result.status == "error" {
-                            let msg = result.error_message.as_deref().unwrap_or("unknown");
-                            if attempts == 0 {
-                                tracing::warn!("UFO Error: {}. Retrying once...", msg);
-                                attempts += 1;
-                                continue;
-                            } else {
-                                tracing::error!("UFO returned error status: {}", msg);
-                                return Ok(exit_code::GENERAL);
-                            }
-                        } else {
-                            if let Some(out) = result.output.as_ref() {
-                                if out.contains(".pdf") {
-                                    tracing::info!(
-                                        "UFO successfully acquired a PDF! Handoff ready: {}",
-                                        out
-                                    );
-                                    if let Some(ref re) = pdf_regex {
-                                        if let Some(caps) = re.captures(out) {
-                                            if let Some(m) = caps.get(0) {
-                                                let pdf_path = std::path::PathBuf::from(m.as_str());
-                                                tracing::info!(
-                                                    "Auto-dispatching Reducto Parse Job for: {:?}",
-                                                    pdf_path
+            // UfoClient::dispatch_task already performs one internal retry on
+            // Hallucination errors; stacking an outer retry here multiplied
+            // expensive UFO sessions. Dispatch exactly once.
+            match crate::ai::ufo::UfoClient::dispatch_task(&request, None::<fn(String)>) {
+                Ok(result) => {
+                    println!(
+                        "UFO Task Result:\n{}",
+                        serde_json::to_string_pretty(&result).unwrap_or_default()
+                    );
+                    if result.status == "error" {
+                        let msg = result.error_message.as_deref().unwrap_or("unknown");
+                        tracing::error!("UFO returned error status: {}", msg);
+                        eprintln!("X UFO task failed: {msg}");
+                        return Ok(exit_code::GENERAL);
+                    }
+                    if let Some(out) = result.output.as_ref() {
+                        if out.contains(".pdf") {
+                            tracing::info!(
+                                "UFO successfully acquired a PDF! Handoff ready: {}",
+                                out
+                            );
+                            if let Some(ref re) = pdf_regex {
+                                if let Some(caps) = re.captures(out) {
+                                    if let Some(m) = caps.get(0) {
+                                        let pdf_path = std::path::PathBuf::from(m.as_str());
+                                        tracing::info!(
+                                            "Auto-dispatching Reducto Parse Job for: {:?}",
+                                            pdf_path
+                                        );
+                                        let _ = job_tx.send_headless(
+                                            crate::app::runtime::Job::ExtractTransactions {
+                                                path: pdf_path,
+                                                parser_mode:
+                                                    crate::app::config::DocumentParserMode::Reducto,
+                                            },
+                                        );
+                                        match wait_for_terminal_result(&job_rx) {
+                                            Ok(
+                                                crate::app::runtime::JobResult::TransactionsExtracted(
+                                                    transactions,
+                                                ),
+                                            ) => {
+                                                println!(
+                                                    "--- E2E SUCCESS: PARSED TRANSACTIONS ---"
                                                 );
-                                                let _ = job_tx.send_headless(crate::app::runtime::Job::ExtractTransactions {
-                                                    path: pdf_path,
-                                                    parser_mode: crate::app::config::DocumentParserMode::Reducto,
-                                                });
-                                                match wait_for_terminal_result(&job_rx) {
-                                                    Ok(crate::app::runtime::JobResult::TransactionsExtracted(transactions)) => {
-                                                        println!("--- E2E SUCCESS: PARSED TRANSACTIONS ---");
-                                                        for t in transactions {
-                                                            println!("{:?}", t);
-                                                        }
-                                                        return Ok(exit_code::SUCCESS);
-                                                    }
-                                                    Ok(other) => {
-                                                        tracing::error!("Unexpected terminal result: {:?}", other);
-                                                        return Ok(exit_code::GENERAL);
-                                                    }
-                                                    Err((label, err)) => {
-                                                        tracing::error!("Job '{}' failed: {}", label, err);
-                                                        return Ok(exit_code::GENERAL);
-                                                    }
+                                                for t in transactions {
+                                                    println!("{:?}", t);
                                                 }
+                                                return Ok(exit_code::SUCCESS);
+                                            }
+                                            Ok(other) => {
+                                                tracing::error!(
+                                                    "Unexpected terminal result: {:?}",
+                                                    other
+                                                );
+                                                return Ok(exit_code::GENERAL);
+                                            }
+                                            Err((label, err)) => {
+                                                tracing::error!("Job '{}' failed: {}", label, err);
+                                                return Ok(exit_code::GENERAL);
                                             }
                                         }
                                     }
                                 }
                             }
-                            return Ok(exit_code::SUCCESS);
                         }
                     }
-                    Err(e) => {
-                        if attempts == 0 {
-                            tracing::warn!("UFO dispatch failed: {}. Retrying once...", e);
-                            attempts += 1;
-                            continue;
-                        } else {
-                            tracing::error!("UFO dispatch failed: {}", e);
-                            eprintln!("UFO dispatch failed: {e}");
-                            return Ok(exit_code::GENERAL);
-                        }
-                    }
+                    Ok(exit_code::SUCCESS)
+                }
+                Err(e) => {
+                    tracing::error!("UFO dispatch failed: {}", e);
+                    eprintln!("X UFO dispatch failed: {e}");
+                    Ok(exit_code::GENERAL)
                 }
             }
         }
@@ -1304,10 +1304,7 @@ pub fn run_inner(
                     }
                     return Ok(exit_code::SUCCESS);
                 }
-                crate::app::nlp_router::NlpCommand::Unknown {
-                    raw,
-                    suggestions,
-                } => {
+                crate::app::nlp_router::NlpCommand::Unknown { raw, suggestions } => {
                     println!("❓ Unknown command: \"{}\"", raw);
                     println!("💡 Suggestions:");
                     for s in suggestions {
@@ -1341,10 +1338,11 @@ pub fn run_inner(
                     return Ok(exit_code::SUCCESS);
                 }
                 crate::app::nlp_router::NlpCommand::FontAnalysis => {
-                    println!("🔤 Extracting and analyzing font metrics from {:?}...", path);
-                    let _ = job_tx.send_headless(Job::AnalyzeFonts {
-                        path: path.clone(),
-                    });
+                    println!(
+                        "🔤 Extracting and analyzing font metrics from {:?}...",
+                        path
+                    );
+                    let _ = job_tx.send_headless(Job::AnalyzeFonts { path: path.clone() });
                     let _ = wait_for_terminal_result(&job_rx);
                     return Ok(exit_code::SUCCESS);
                 }
@@ -1408,7 +1406,9 @@ pub fn run_inner(
                     let _ = job_tx.send_headless(Job::AdjustDatePeriods {
                         input: path.clone(),
                         output: out_path,
-                        mode: crate::engine::date_adjust::DateAdjustMode::ShiftDays(*shift_days as i64),
+                        mode: crate::engine::date_adjust::DateAdjustMode::ShiftDays(
+                            *shift_days as i64,
+                        ),
                     });
                     let _ = wait_for_terminal_result(&job_rx);
                     return Ok(exit_code::SUCCESS);
@@ -1426,34 +1426,27 @@ pub fn run_inner(
                     return Ok(exit_code::SUCCESS);
                 }
                 crate::app::nlp_router::NlpCommand::UfoAutomate { task_prompt } => {
-                    println!("🛸 Dispatching task to Microsoft UFO: \"{}\"", task_prompt);
-                    let mut attempts = 0;
-                    loop {
-                        match crate::ai::ufo::UfoClient::dispatch_task(
-                            task_prompt,
-                            Some(|line| println!("[UFO] {line}")),
-                        ) {
-                            Ok(result) => {
-                                println!("✅ UFO automation task completed. Status: {}", result.status);
-                                let artifacts = result.extract_pdf_artifacts();
-                                if !artifacts.is_empty() {
-                                    println!("📄 Intercepted artifacts:");
-                                    for art in &artifacts {
-                                        println!("   • {:?}", art);
-                                    }
-                                }
-                                return Ok(exit_code::SUCCESS);
-                            }
-                            Err(e) => {
-                                if attempts == 0 {
-                                    tracing::warn!("UFO dispatch failed: {}. Retrying once...", e);
-                                    attempts += 1;
-                                    continue;
-                                } else {
-                                    eprintln!("❌ UFO dispatch failed: {e}");
-                                    return Ok(exit_code::GENERAL);
+                    println!("Dispatching task to Microsoft UFO: \"{}\"", task_prompt);
+                    // dispatch_task already retries Hallucination internally;
+                    // no outer retry loop here (it stacked duplicate sessions).
+                    match crate::ai::ufo::UfoClient::dispatch_task(
+                        task_prompt,
+                        Some(|line| println!("[UFO] {line}")),
+                    ) {
+                        Ok(result) => {
+                            println!("UFO automation task completed. Status: {}", result.status);
+                            let artifacts = result.extract_pdf_artifacts();
+                            if !artifacts.is_empty() {
+                                println!("Intercepted artifacts:");
+                                for art in &artifacts {
+                                    println!("   - {:?}", art);
                                 }
                             }
+                            return Ok(exit_code::SUCCESS);
+                        }
+                        Err(e) => {
+                            eprintln!("X UFO dispatch failed: {e}");
+                            return Ok(exit_code::GENERAL);
                         }
                     }
                 }

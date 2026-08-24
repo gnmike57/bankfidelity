@@ -24,6 +24,13 @@ To automate manual GUI interactions or complex web-to-PDF downloads, utilize the
 2. **MCP Autonomous Tooling**: UFO will connect natively to the BankFidelity MCP Server to execute tools. UFO has been strictly instructed via `prompts/get` to balance extraction speed (`extract_batch`) with perfect layout aesthetics (`modify_text` + `verify_layout`).
 3. **Visual Verification**: UFO will natively pull `pdf-page://<path>?page=<num>` to receive a 150 DPI rendering of the target document, allowing it to "see" exactly what the Rust backend sees.
 
+### MCP Surface & Security Note
+The **canonical MCP server** for the UFO loop is the native Rust server (`cargo run -- mcp`, `src/ai/mcp.rs`). It speaks JSON-RPC 2.0 over **stdio only** — it never binds a network port — so only local processes you launch can invoke its tools. Treat any process that can spawn this binary as trusted with full document-editing capability.
+
+`scripts/mcp_server.py` (HTTP/SSE on :8765) is an auxiliary bridge for remote/web agents and is **not** part of the UFO loop; avoid running both surfaces with divergent expectations.
+
+Run `scripts/setup_ufo.ps1` once after building: it clones/patches UFO **and registers the BankFidelity MCP server** into UFO's config (`ufo/config/mcp_servers.json`) so the Rust → UFO → MCP → Rust loop works without manual steps.
+
 ## 4. Troubleshooting & Fallbacks
 
 > [!CAUTION]

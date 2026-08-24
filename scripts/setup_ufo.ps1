@@ -29,3 +29,48 @@ if (Test-Path $patcherScript) {
 }
 
 Write-Host "UFO Setup Complete."
+
+
+# ---------------------------------------------------------------------------
+# Register the BankFidelity MCP Server so UFO can call back natively.
+# Without this step the Rust->UFO leg works, but UFO cannot reach BankFidelity
+# tools (modify_text, verify_layout, pdf-page:// vision, etc.). Idempotent.
+# ---------------------------------------------------------------------------
+$exeCandidates = @(
+    Join-Path $PWD "target\release\dual-core-pdf-pipeline.exe"
+    Join-Path $PWD "target\debug\dual-core-pdf-pipeline.exe"
+)
+$bankfidelityExe = $exeCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+
+if ($bankfidelityExe) {
+    $mcpConfigDir = Join-Path $ufoPath "ufo\config"
+    $mcpConfigPath = Join-Path $mcpConfigDir "mcp_servers.json"
+    if (-Not (Test-Path $mcpConfigDir)) { New-Item -ItemType Directory -Force -Path $mcpConfigDir | Out-Null }
+
+    $config = if (Test-Path $mcpConfigPath) {
+        Get-Content $mcpConfigPath -Raw | ConvertFrom-Json
+    } else {
+        [PSCustomObject]@{ mcpServers = [PSCustomObject]@{} }
+    }
+
+    $entry = [PSCustomObject]@{
+        command   = $bankfidelityExe
+        args      = @("mcp")
+        transport = "stdio"
+    }
+
+    if ($config.PSObject.Properties["mcpServers"]) {
+        if ($config.mcpServers.PSObject.Properties["bankfidelity"]) {
+            $config.mcpServers.bankfidelity = $entry
+        } else {
+            $config.mcpServers | Add-Member -MemberType NoteProperty -Name "bankfidelity" -Value $entry
+        }
+    } else {
+        $config | Add-Member -MemberType NoteProperty -Name "mcpServers" -Value ([PSCustomObject]@{ bankfidelity = $entry })
+    }
+
+    $config | ConvertTo-Json -Depth 10 | Set-Content -Path $mcpConfigPath
+    Write-Host "Registered BankFidelity MCP server ($bankfidelityExe) -> $mcpConfigPath"
+} else {
+    Write-Warning "BankFidelity binary not found in target\. Build first (cargo build --release), then rerun scripts/setup_ufo.ps1 to enable the UFO -> MCP tooling leg."
+}

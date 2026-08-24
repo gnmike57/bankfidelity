@@ -733,6 +733,8 @@ impl AppConfig {
                 .map(|d| d.has_auth())
                 .unwrap_or(false),
 
+            mindee: self.mindee_api_key.is_some(),
+            reducto: std::env::var("REDUCTO_API_KEY").is_ok_and(|k| !k.trim().is_empty()),
             llamaparse: self.llamaparse_api_key.is_some(),
             pdfrest: self.pdfrest_api_key.is_some(),
             pymupdf_pro: self.pro_editing_available(),
@@ -769,7 +771,9 @@ pub struct ApiAvailability {
     /// Google Document AI processor + auth are fully configured.
     pub document_ai: bool,
     /// `MINDEE_API_KEY` is set.
-
+    pub mindee: bool,
+    /// `REDUCTO_API_KEY` is set (layout-agnostic transaction-transfer parser).
+    pub reducto: bool,
     /// `LLAMAPARSE_API_KEY` is set.
     pub llamaparse: bool,
     /// `PDFREST_API_KEY` is set.
@@ -793,6 +797,8 @@ impl ApiAvailability {
             "groq" => self.groq_api_key = false,
             "openrouter" => self.openrouter_api_key = false,
             "mistral" => self.mistral_api_key = false,
+            "mindee" => self.mindee = false,
+            "reducto" => self.reducto = false,
 
             "llamaparse" => self.llamaparse = false,
             "document ai" | "document ai (vertex)" => self.document_ai = false,
@@ -843,6 +849,12 @@ impl ApiAvailability {
                     Some("OCR model files not found. Download text-detection.rten and text-recognition.rten into the models/ directory.")
                 }
             }
+            "mindee" if !self.mindee => {
+                Some("MINDEE_API_KEY not configured. Set it in Settings -> API Keys or .env.")
+            }
+            "reducto" if !self.reducto => {
+                Some("REDUCTO_API_KEY not configured. Set it in .env to enable the Reducto parser.")
+            }
             _ => None,
         }
     }
@@ -854,6 +866,8 @@ impl ApiAvailability {
             gemini_vertex = self.gemini_vertex,
             mistral_api = self.mistral_api_key,
             document_ai = self.document_ai,
+            mindee = self.mindee,
+            reducto = self.reducto,
             llamaparse = self.llamaparse,
             pdfrest = self.pdfrest,
             pymupdf_pro = self.pymupdf_pro,
