@@ -34,8 +34,9 @@ if not exist "%BF_DIR%\" (
 
 :: Validate Python Environment
 set "UFO_ROOT=C:\ufo\ufo"
-set "PYTHON_EXE=%UFO_ROOT%\python_env\python.exe"
-if not exist "%PYTHON_EXE%" (
+set "PYTHON_EXE="
+if exist "%UFO_ROOT%\python_env\python.exe" set "PYTHON_EXE=%UFO_ROOT%\python_env\python.exe"
+if not defined PYTHON_EXE (
     for /f "delims=" %%P in ('where python.exe 2^>nul') do set "PYTHON_EXE=%%P"
 )
 
@@ -150,7 +151,12 @@ goto MAIN_MENU
 
 :RUN_AUDIT
 echo !ESC![96m   RUNNING UFO SEQUENTIAL ARCHITECTURE AUDIT!ESC![0m
-cd /d "%UFO_ROOT%"
-"%PYTHON_EXE%" "%UFO_ROOT%\scripts\audit_e2e_sequential.py"
+if exist "%UFO_ROOT%\scripts\audit_e2e_sequential.py" (
+    cd /d "%UFO_ROOT%"
+    "%PYTHON_EXE%" "%UFO_ROOT%\scripts\audit_e2e_sequential.py"
+) else (
+    echo !ESC![91m[ERROR] audit_e2e_sequential.py not found at %UFO_ROOT%\scripts\!ESC![0m
+    echo !ESC![93m[HINT] Re-run scripts\setup_ufo.ps1 to provision UFO helper scripts.!ESC![0m
+)
 pause
 goto MAIN_MENU

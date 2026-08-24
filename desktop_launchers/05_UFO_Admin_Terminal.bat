@@ -17,9 +17,15 @@ echo ======================================================================
 echo.
 
 set "UFO_ROOT=C:\ufo\ufo"
-set "PYTHON_EXE=%UFO_ROOT%\python_env\python.exe"
-if not exist "%PYTHON_EXE%" (
+set "PYTHON_EXE="
+if exist "%UFO_ROOT%\python_env\python.exe" set "PYTHON_EXE=%UFO_ROOT%\python_env\python.exe"
+if not defined PYTHON_EXE (
     for /f "delims=" %%P in ('where python.exe 2^>nul') do set "PYTHON_EXE=%%P"
+)
+if not defined PYTHON_EXE (
+    echo [ERROR] No Python interpreter found. Install UFO python_env or add python.exe to PATH.
+    pause
+    exit /b 1
 )
 
 cd /d "%UFO_ROOT%"
@@ -39,7 +45,7 @@ if /i "%user_task%"=="exit" exit /b
 if /i "%user_task%"=="smoke" (
     call scripts\smoke_test_e2e.bat
 ) else (
-    "%PYTHON_EXE%" -m ufo --task "%user_task%"
+    "%PYTHON_EXE%" -m ufo --task "Manual_%RANDOM%" --request "%user_task%"
 )
 echo.
 goto loop

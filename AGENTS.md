@@ -1,5 +1,14 @@
 # AGENTS.md
 
+## Single source of truth: the runtime
+
+`src/app/runtime.rs` is the ONLY live runtime module (job orchestration,
+cancellation, parser chain, interactive fallback). There is no
+`src/app/runtime/` directory; a historical dead fork of that name was deleted.
+Never treat any other file as a reference for current runtime behavior, and
+never recreate the directory fork — `tests/static_analysis.rs`
+(`test_zombie_runtime_fork_directory_is_gone`) fails the suite if it returns.
+
 ## Project type
 
 Rust desktop/CLI project using Cargo (v1.0.0).

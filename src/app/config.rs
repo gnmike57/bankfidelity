@@ -382,7 +382,11 @@ impl Default for AppConfig {
             document_ai: None,
 
             pymupdf_pro_key: None,
-            passphrase: "DEV_PASSPHRASE".into(),
+            // SECURITY INVARIANT: no usable default passphrase. Production
+            // paths must fail fast via [`AppConfig::encryption_passphrase`]
+            // ("DUAL_CORE_PASSPHRASE not set") instead of silently encrypting
+            // local caches with a known constant.
+            passphrase: String::new(),
             otel_endpoint: None,
             otel_service_name: "dual-core-pdf-pipeline".into(),
             log_dir: PathBuf::from("./logs"),
@@ -638,6 +642,28 @@ impl AppConfig {
         }
 
         errors
+    }
+
+    /// Fail-fast accessor for the local-cache encryption passphrase.
+    ///
+    /// # Invariant (loud, not silent)
+    ///
+    /// Production paths that derive encryption keys MUST call this instead of
+    /// reading `passphrase` directly. An empty passphrase means
+    /// `DUAL_CORE_PASSPHRASE` was not set; silently encrypting with an empty
+    /// or well-known constant is a security hole, so this returns a
+    /// [`ConfigError::MissingRequired`] naming the variable instead.
+    ///
+    /// Dev-mode length shortening (`is_dev_mode`) is unaffected: it only
+    /// relaxes the *minimum length* checks in [`Self::validate`] and
+    /// [`Self::from_env`], never the requirement that a passphrase exists.
+    pub fn encryption_passphrase(&self) -> Result<&str, ConfigError> {
+        if self.passphrase.is_empty() {
+            return Err(ConfigError::MissingRequired(
+                "DUAL_CORE_PASSPHRASE".to_string(),
+            ));
+        }
+        Ok(&self.passphrase)
     }
 
     /// Reports whether PyMuPDF Pro per-segment editing/rendering (Subsystem B)
@@ -1108,6 +1134,45 @@ mod tests {
 
         let errors = cfg.validate();
         assert!(errors.iter().any(|e| e.contains("DUAL_CORE_PASSPHRASE")));
+    }
+
+    #[test]
+    fn default_config_does_not_validate_in_non_dev_mode() {
+        let mut cfg = AppConfig::default();
+        assert!(
+            cfg.passphrase.is_empty(),
+            "default config must not ship a usable passphrase"
+        );
+        cfg.is_dev_mode = false;
+        let errors = cfg.validate();
+        assert!(
+            !errors.is_empty(),
+            "default config must NOT validate in non-dev mode"
+        );
+        assert!(errors.iter().any(|e| e.contains("DUAL_CORE_PASSPHRASE")));
+    }
+
+    #[test]
+    fn encryption_passphrase_fails_fast_when_unset() {
+        let cfg = AppConfig::default();
+        let err = cfg
+            .encryption_passphrase()
+            .expect_err("empty passphrase must fail fast");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("DUAL_CORE_PASSPHRASE"),
+            "error should name the missing variable, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn encryption_passphrase_returns_value_when_set() {
+        let mut cfg = AppConfig::default();
+        cfg.passphrase = "a-real-passphrase-from-env".into();
+        assert_eq!(
+            cfg.encryption_passphrase().unwrap(),
+            "a-real-passphrase-from-env"
+        );
     }
 
     #[test]

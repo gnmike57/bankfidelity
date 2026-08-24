@@ -62,7 +62,7 @@ set "task="
 set /p "task=!ESC![97m  Task:>!ESC![0m "
 if not "%task%"=="" (
     cd /d "%UFO_ROOT%"
-    "%PYTHON_EXE%" -m ufo --task "%task%"
+    "%PYTHON_EXE%" -m ufo --task "Manual_%RANDOM%" --request "%task%"
 )
 pause
 goto :menu
@@ -121,8 +121,12 @@ cls
 echo !ESC![93m ══════════════════════════════════════════════════════════════!ESC![0m
 echo !ESC![93;1m  RUNNING SEQUENTIAL ARCHITECTURE AUDIT!ESC![0m
 echo !ESC![93m ══════════════════════════════════════════════════════════════!ESC![0m
-cd /d "%UFO_ROOT%"
-"%PYTHON_EXE%" "%UFO_ROOT%\scripts\audit_e2e_sequential.py"
+if exist "%UFO_ROOT%\scripts\audit_e2e_sequential.py" (
+    cd /d "%UFO_ROOT%"
+    "%PYTHON_EXE%" "%UFO_ROOT%\scripts\audit_e2e_sequential.py"
+) else (
+    echo !ESC![91m[ERROR] audit_e2e_sequential.py not found at %UFO_ROOT%\scripts\!ESC![0m
+)
 pause
 goto :menu
 

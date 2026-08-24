@@ -59,7 +59,7 @@ pub const ENV_VARS: &[EnvVarSpec] = &[
         summary: "PyMuPDF Pro license key (trial or commercial).",
         enables: "Per-segment editing/rendering (Subsystem B). Split/merge work without it.",
         setup_hint: "Obtain from https://pymupdf.io/ and keep it out of version control. Both 24-char 'hFKt'-prefixed trial keys and commercial license keys (≥16 chars) are accepted; splitting and merging run regardless of this key.",
-        example: "s50Hve2NbxCLVLIVqEU3lzFY",
+        example: "<paste-your-pymupdf-pro-key-here>",
     },
     EnvVarSpec {
         name: "GEMINI_API_KEY",
@@ -321,5 +321,23 @@ mod tests {
         assert_eq!(Requirement::Required.label(), "REQUIRED");
         assert_eq!(Requirement::Optional.label(), "OPTIONAL");
         assert_eq!(Requirement::Recommended.label(), "RECOMMENDED");
+    }
+
+    #[test]
+    fn examples_contain_no_key_shaped_strings() {
+        // A 24-char alphanumeric string looks exactly like a real PyMuPDF Pro
+        // trial key. The published catalogue must only ever carry obvious
+        // placeholders, never key-shaped strings that could be mistaken for
+        // (or leaked as) real credentials.
+        let key_shaped =
+            |s: &str| s.chars().count() == 24 && s.chars().all(|c| c.is_ascii_alphanumeric());
+        for spec in ENV_VARS {
+            assert!(
+                !key_shaped(spec.example),
+                "{}: example '{}' looks like a real license key; use an obvious placeholder",
+                spec.name,
+                spec.example
+            );
+        }
     }
 }

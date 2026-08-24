@@ -10,6 +10,11 @@ for /f %%a in ('echo prompt $E^| cmd') do set "ESC=%%a"
 set "UFO_ROOT=C:\ufo\ufo"
 set "PYTHON_EXE=%UFO_ROOT%\python_env\python.exe"
 set "PYTHONPATH=%UFO_ROOT%"
+if not exist "%PYTHON_EXE%" (
+    echo [FATAL] python_env not found at %PYTHON_EXE%.
+    pause
+    exit /b 1
+)
 cd /d "%UFO_ROOT%"
 
 :menu
@@ -56,6 +61,10 @@ goto menu
 :audit
 cls
 echo !ESC![93m[Audit] Running UFO Sequential E2E Architecture Audit...!ESC![0m
-"%PYTHON_EXE%" scripts\audit_e2e_sequential.py
+if exist scripts\audit_e2e_sequential.py (
+    "%PYTHON_EXE%" scripts\audit_e2e_sequential.py
+) else (
+    echo !ESC![91m[ERROR] scripts\audit_e2e_sequential.py not found in %UFO_ROOT%.!ESC![0m
+)
 pause
 goto menu

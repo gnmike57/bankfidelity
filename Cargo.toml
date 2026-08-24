@@ -69,6 +69,7 @@ jsonwebtoken = { version = "10", features = ["rust_crypto"] }
 serde_yaml = "0.9.0"
 regex = "1.12.3"
 sha2 = "0.10"
+hkdf = "0.12"
 rfd = "0.14"
 tempfile = "3.27.0"
 egui_extras = { version = "0.30", features = ["svg", "image", "all_loaders"] }
@@ -99,6 +100,8 @@ imageproc = "0.25"
 zeroize = "1.9.0"
 flate2 = "1.1"
 tar = "0.4"
+# Runtime RNG for per-cache KDF salt generation (docai_cache).
+rand = "0.8"
 
 # Recommendation #2/#7: small LRU cache for rendered pages + text blocks.
 lru = "0.18"

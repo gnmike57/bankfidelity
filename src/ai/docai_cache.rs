@@ -15,6 +15,15 @@
 //!
 //! Anything in any field of the key flips the hash; nothing collides.
 //!
+//! # Encryption key derivation (v2)
+//!
+//! Entry payloads are encrypted with ChaCha20-Poly1305 using a key derived
+//! via **HKDF-SHA256** (`ikm = DUAL_CORE_PASSPHRASE`, random per-cache salt
+//! persisted in `<root>/kdf.salt`, domain-separated `info`). Earlier versions
+//! used bare `SHA256(passphrase)`; those entries cannot be decrypted under
+//! the v2 key schedule and are treated as misses — i.e. upgrading invalidates
+//! old caches once, by design.
+//!
 //! Entries never expire automatically. Run `dual-core docai-cache prune` to
 //! garbage-collect (future CLI subcommand). Until then, callers are
 //! free to delete `audit/cache/docai/` whenever they want a clean slate.
@@ -25,13 +34,30 @@ use chacha20poly1305::{
     aead::{Aead, KeyInit},
     ChaCha20Poly1305, Nonce,
 };
+use hkdf::Hkdf;
+use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::ai::document_ai::BankStatement;
 
-const CACHE_FORMAT_VERSION: u32 = 1;
+/// v2: encryption keys are derived with salted HKDF-SHA256 instead of bare
+/// SHA256(passphrase). v1 entries cannot be decrypted under the v2 key
+/// schedule and are treated as misses — upgrading invalidates old caches
+/// once, by design.
+const CACHE_FORMAT_VERSION: u32 = 2;
+
+/// Name of the per-cache salt file persisted beside the cached entries.
+const KDF_SALT_FILE_NAME: &str = "kdf.salt";
+/// Magic header for the salt file ("BKFS" = BankFidelity KDF Salt).
+const KDF_SALT_MAGIC: [u8; 4] = *b"BKFS";
+/// Salt file layout version so future KDF migrations can be detected.
+const KDF_SALT_FILE_VERSION: u8 = 1;
+/// Salt length in bytes (256-bit).
+const KDF_SALT_LEN: usize = 32;
+/// HKDF `info` binding: domain-separates this cache's key derivation.
+const KDF_INFO: &[u8] = b"bankfidelity/docai-cache/v2";
 
 /// On-disk cache entry. The `format_version` lets us bump the layout later
 /// (e.g. add new fields to BankStatement) and treat older entries as misses.
@@ -51,6 +77,10 @@ pub enum CacheError {
     Decode(#[from] serde_json::Error),
     #[error("encryption error: {0}")]
     Encryption(String),
+    #[error(
+        "DUAL_CORE_PASSPHRASE not set: refusing to derive cache encryption keys from an empty passphrase"
+    )]
+    EmptyPassphrase,
 }
 
 pub struct DocAiCache {
@@ -68,11 +98,17 @@ impl DocAiCache {
     }
 
     pub fn open(root: PathBuf, passphrase: &str) -> Result<Self, CacheError> {
+        if passphrase.is_empty() {
+            // Loud failure: never derive keys from an empty secret.
+            return Err(CacheError::EmptyPassphrase);
+        }
         std::fs::create_dir_all(&root)?;
-        let mut hasher = Sha256::new();
-        hasher.update(passphrase.as_bytes());
-        let key_bytes = hasher.finalize();
-        let cipher = ChaCha20Poly1305::new(&key_bytes);
+        let salt = load_or_create_salt(&root)?;
+        let hk = Hkdf::<Sha256>::new(Some(&salt[..]), passphrase.as_bytes());
+        let mut key_bytes = [0u8; 32];
+        hk.expand(KDF_INFO, &mut key_bytes)
+            .map_err(|e| CacheError::Encryption(format!("HKDF expand failed: {e}")))?;
+        let cipher = ChaCha20Poly1305::new((&key_bytes).into());
         Ok(Self { root, cipher })
     }
 
@@ -191,6 +227,43 @@ fn hex_lower(bytes: &[u8]) -> String {
     s
 }
 
+/// Loads the per-cache KDF salt from `<root>/kdf.salt`, creating a fresh
+/// random salt on first use. The file carries a magic header and layout
+/// version so future KDF migrations can be detected explicitly.
+///
+/// An unrecognized or corrupt salt file is regenerated, which invalidates
+/// existing entries (they become undecryptable misses).
+fn load_or_create_salt(root: &Path) -> Result<[u8; KDF_SALT_LEN], CacheError> {
+    let path = root.join(KDF_SALT_FILE_NAME);
+    if let Ok(data) = std::fs::read(&path) {
+        let header_len = KDF_SALT_MAGIC.len() + 1;
+        if data.len() == header_len + KDF_SALT_LEN
+            && data[..KDF_SALT_MAGIC.len()] == KDF_SALT_MAGIC
+            && data[KDF_SALT_MAGIC.len()] == KDF_SALT_FILE_VERSION
+        {
+            let mut salt = [0u8; KDF_SALT_LEN];
+            salt.copy_from_slice(&data[header_len..]);
+            return Ok(salt);
+        }
+        tracing::warn!(
+            "[docai_cache] unrecognized {} header; regenerating (existing entries will be invalidated)",
+            path.display()
+        );
+    }
+    let mut salt = [0u8; KDF_SALT_LEN];
+    rand::thread_rng().fill_bytes(&mut salt);
+    let mut file_data = Vec::with_capacity(KDF_SALT_MAGIC.len() + 1 + KDF_SALT_LEN);
+    file_data.extend_from_slice(&KDF_SALT_MAGIC);
+    file_data.push(KDF_SALT_FILE_VERSION);
+    file_data.extend_from_slice(&salt);
+    std::fs::write(&path, &file_data)?;
+    tracing::info!(
+        "[docai_cache] generated new per-cache KDF salt at {}",
+        path.display()
+    );
+    Ok(salt)
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
@@ -273,5 +346,61 @@ mod tests {
         let cache = DocAiCache::open(dir.path().to_path_buf(), "testpass").unwrap();
         std::fs::write(dir.path().join("badkey.json"), "{not json").unwrap();
         assert!(cache.get("badkey").is_none());
+    }
+
+    #[test]
+    fn empty_passphrase_is_rejected_loudly() {
+        let dir = tempdir().unwrap();
+        let err = match DocAiCache::open(dir.path().to_path_buf(), "") {
+            Err(e) => e,
+            Ok(_) => panic!("empty passphrase must fail fast"),
+        };
+        assert!(
+            matches!(err, CacheError::EmptyPassphrase),
+            "empty passphrase must fail fast, got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn wrong_passphrase_cannot_decrypt_entries() {
+        let dir = tempdir().unwrap();
+        let stmt = sample_statement();
+        {
+            let cache = DocAiCache::open(dir.path().to_path_buf(), "alpha").unwrap();
+            cache.put("key1", &stmt).unwrap();
+        }
+        let reopened = DocAiCache::open(dir.path().to_path_buf(), "beta").unwrap();
+        assert!(
+            reopened.get("key1").is_none(),
+            "cache opened with the wrong passphrase must not decrypt entries"
+        );
+    }
+
+    #[test]
+    fn same_passphrase_reopens_with_persisted_salt() {
+        let dir = tempdir().unwrap();
+        let stmt = sample_statement();
+        {
+            let cache = DocAiCache::open(dir.path().to_path_buf(), "stable-pass").unwrap();
+            cache.put("key1", &stmt).unwrap();
+        }
+        let reopened = DocAiCache::open(dir.path().to_path_buf(), "stable-pass").unwrap();
+        assert!(
+            reopened.get("key1").is_some(),
+            "reopening with the same passphrase must reuse the persisted salt"
+        );
+    }
+
+    #[test]
+    fn salt_file_is_versioned_and_persisted_beside_cache() {
+        let dir = tempdir().unwrap();
+        let _ = DocAiCache::open(dir.path().to_path_buf(), "pw").unwrap();
+        let data = std::fs::read(dir.path().join(KDF_SALT_FILE_NAME)).expect("kdf.salt must exist");
+        assert_eq!(&data[0..4], &KDF_SALT_MAGIC, "salt file must carry magic");
+        assert_eq!(
+            data[4], KDF_SALT_FILE_VERSION,
+            "salt file must be versioned"
+        );
+        assert_eq!(data.len(), 4 + 1 + KDF_SALT_LEN);
     }
 }

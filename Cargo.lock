@@ -2294,6 +2294,7 @@ dependencies = [
  "enigo",
  "flate2",
  "futures-util",
+ "hkdf",
  "image",
  "image-compare",
  "image_hasher",
