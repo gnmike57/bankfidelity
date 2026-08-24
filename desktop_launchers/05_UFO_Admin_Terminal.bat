@@ -6,7 +6,7 @@ title UFO Interactive Desktop Shell (Elevated)
 net session >nul 2>&1
 if %errorlevel% neq 0 (
     echo Requesting administrative privileges...
-    powershell -Command "Start-Process cmd -ArgumentList '/c cd /d C:\ufo\ufo & C:\Users\zbook\Desktop\05_UFO_Admin_Terminal.bat' -Verb RunAs"
+    powershell -Command "Start-Process cmd -ArgumentList '/c cd /d C:\ufo\ufo & \""%~f0\""' -Verb RunAs"
     exit /b
 )
 
@@ -16,7 +16,13 @@ echo  Full Rights: Screenshots, Telemetry, UI Control, Admin Access
 echo ======================================================================
 echo.
 
-cd /d C:\ufo\ufo
+set "UFO_ROOT=C:\ufo\ufo"
+set "PYTHON_EXE=%UFO_ROOT%\python_env\python.exe"
+if not exist "%PYTHON_EXE%" (
+    for /f "delims=" %%P in ('where python.exe 2^>nul') do set "PYTHON_EXE=%%P"
+)
+
+cd /d "%UFO_ROOT%"
 
 echo You are now operating with full desktop context and admin privileges.
 echo The GetForegroundWindow API will now function correctly.
@@ -33,7 +39,7 @@ if /i "%user_task%"=="exit" exit /b
 if /i "%user_task%"=="smoke" (
     call scripts\smoke_test_e2e.bat
 ) else (
-    python -m ufo --task "%user_task%"
+    "%PYTHON_EXE%" -m ufo --task "%user_task%"
 )
 echo.
 goto loop

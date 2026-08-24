@@ -6,7 +6,7 @@ title UFO Automated E2E Test (Elevated)
 net session >nul 2>&1
 if %errorlevel% neq 0 (
     echo Requesting administrative privileges...
-    powershell -Command "Start-Process cmd -ArgumentList '/c cd /d C:\ufo\ufo & C:\Users\zbook\Desktop\06_Run_UFO_E2E_Test.bat' -Verb RunAs"
+    powershell -Command "Start-Process cmd -ArgumentList '/c cd /d C:\ufo\ufo & \""%~f0\""' -Verb RunAs"
     exit /b
 )
 
