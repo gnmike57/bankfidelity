@@ -6212,7 +6212,7 @@ Additional Context:\n{context}",
                                     let client = std::sync::Arc::new(client);
                                     let p = path.clone();
                                     block_on_from_blocking_context(async move {
-                                        client.parse_statement(&p)
+                                        client.parse_statement(&p).await
                                     })
                                     .map_err(|e| e.to_string())
                                 } else {
