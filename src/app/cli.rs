@@ -952,7 +952,7 @@ fn run_extract_batch(
                     for attempt in 1..=(retries + 1) {
                         let submitted = job_tx.send_headless(Job::ExtractTransactions {
                             path: input.clone(),
-                            parser_mode: crate::app::config::DocumentParserMode::OfflineHeuristic,
+                            parser_mode: crate::app::config::DocumentParserMode::from_env(),
                         });
                         if submitted.is_err() {
                             final_result = Some(BatchExtractionFileResult {
@@ -1706,7 +1706,7 @@ pub fn run_inner(
                 Ok(JobResult::DocumentLoaded { .. }) => {
                     let _ = job_tx.send_headless(Job::ExtractTransactions {
                         path: input,
-                        parser_mode: crate::app::config::DocumentParserMode::OfflineHeuristic,
+                        parser_mode: crate::app::config::DocumentParserMode::from_env(),
                     });
                     match wait_for_terminal_result(&job_rx) {
                         Ok(JobResult::TransactionsExtracted(transactions)) => {

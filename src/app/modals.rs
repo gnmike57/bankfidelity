@@ -465,6 +465,11 @@ impl AppModals for MyApp {
                         egui::ComboBox::from_id_salt("doc_parser_mode")
                             .selected_text(self.settings.document_parser.label())
                             .show_ui(ui, |ui| {
+                                ui.selectable_value(
+                                    &mut self.settings.document_parser,
+                                    DocumentParserMode::Reducto,
+                                    DocumentParserMode::Reducto.label(),
+                                );
                                 capability_selectable_value(
                                     ui,
                                     &mut self.settings.document_parser,

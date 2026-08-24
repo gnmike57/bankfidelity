@@ -1484,7 +1484,10 @@ fn extraction_provider_order(
             DocumentParserMode::OfflineHeuristic,
         ],
         DocumentParserMode::LocalOcrs => vec![DocumentParserMode::LocalOcrs],
-        DocumentParserMode::Reducto => vec![DocumentParserMode::Reducto],
+        DocumentParserMode::Reducto => vec![
+            DocumentParserMode::Reducto,
+            DocumentParserMode::OfflineHeuristic,
+        ],
     }
 }
 
@@ -8126,7 +8129,13 @@ Additional Context:\n{context}",
                                                     }).await.unwrap_or(0)
                                     };
                                     let final_version = version.clone().unwrap_or_else(|| {
-                                        "pretrained-bankstatement-v5.0-2023-12-06".to_string()
+                                        cfg.document_ai
+                                            .as_ref()
+                                            .map(|d| d.effective_default_version().to_string())
+                                            .unwrap_or_else(|| {
+                                                crate::app::config::DEFAULT_DOCAI_PROCESSOR_VERSION
+                                                    .to_string()
+                                            })
                                     });
                                     match doc_ai
                                         .parse_smart_batch(&input, Some(&final_version), page_count)

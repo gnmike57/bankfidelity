@@ -32,8 +32,11 @@ impl LocalLlmClient {
             .unwrap_or_else(|_| reqwest::Client::new());
         let http = reqwest_middleware::ClientBuilder::new(reqwest_client).build();
 
+        // Single local-LLM story: an OpenAI-compatible endpoint on port 11434
+        // (Ollama's default; llama-server can bind there too). Docs, the
+        // BankFidelity skill, and .env.example all state 11434.
         let base_url = std::env::var("LOCAL_LLM_URL")
-            .unwrap_or_else(|_| "http://127.0.0.1:8080/v1".to_string());
+            .unwrap_or_else(|_| "http://127.0.0.1:11434/v1".to_string());
 
         Self { http, base_url }
     }

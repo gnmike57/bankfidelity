@@ -122,7 +122,7 @@ impl Default for AppSettings {
             advanced_mode: false,
             remote_engine_url: String::new(),
             ai_provider: crate::app::config::AiProviderMode::default(),
-            document_parser: crate::app::config::DocumentParserMode::default(),
+            document_parser: crate::app::config::DocumentParserMode::from_env(),
             verification_renderer: crate::app::config::VerificationMode::default(),
             visual_diff_threshold: default_visual_threshold(),
             max_visual_attempts: default_max_visual_attempts(),
@@ -586,7 +586,8 @@ impl MyApp {
             credential_validation_status: None,
             api_keys_seeded: true,
             pending_autofix: None,
-            selected_parser_version: "pretrained-bankstatement-v5.0-2023-12-06".to_string(),
+            selected_parser_version: crate::app::config::DEFAULT_DOCAI_PROCESSOR_VERSION
+                .to_string(),
             docai_versions: Vec::new(),
             docai_versions_loading: false,
             docai_training_status: None,
@@ -1964,7 +1965,7 @@ impl MyApp {
                                     crate::app::runtime::Job::ExtractTransactions {
                                         path: std::path::PathBuf::from(&self.input_path),
                                         parser_mode:
-                                            crate::app::config::DocumentParserMode::LlamaParse,
+                                            crate::app::config::DocumentParserMode::from_env(),
                                     },
                                 );
                             }
@@ -4084,7 +4085,11 @@ impl MyApp {
                 egui::ComboBox::from_id_salt("parser_version_select")
                     .selected_text(self.selected_parser_version.split('-').nth(2).unwrap_or(&self.selected_parser_version))
                     .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut self.selected_parser_version, "pretrained-bankstatement-v5.0-2023-12-06".to_string(), "v5.0 (Default)");
+                        ui.selectable_value(
+                            &mut self.selected_parser_version,
+                            crate::app::config::DEFAULT_DOCAI_PROCESSOR_VERSION.to_string(),
+                            "v5.0 (Default)",
+                        );
                         ui.selectable_value(&mut self.selected_parser_version, "pretrained-bankstatement-v4.0-2023-07-31".to_string(), "v4.0");
                         ui.selectable_value(&mut self.selected_parser_version, "pretrained-bankstatement-v3.0-2022-05-16".to_string(), "v3.0");
                         ui.selectable_value(&mut self.selected_parser_version, "pretrained-bankstatement-v2.0-2021-12-10".to_string(), "v2.0");

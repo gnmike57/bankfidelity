@@ -92,6 +92,12 @@ impl ProKeyStatus {
     }
 }
 
+/// Current Google-managed Bank Statement processor version used as the
+/// default when the user has not picked one explicitly. Single source of
+/// truth — previously this string was duplicated across the GUI state and
+/// the runtime fallback.
+pub const DEFAULT_DOCAI_PROCESSOR_VERSION: &str = "pretrained-bankstatement-v5.0-2023-12-06";
+
 #[derive(Debug, Clone, Default)]
 pub struct DocumentAiConfig {
     pub project_id: String,
@@ -110,6 +116,22 @@ pub struct DocumentAiConfig {
     pub gcs_output_uri: String,
     /// Passphrase for encrypting the local Document AI cache
     pub passphrase: String,
+    /// Configured default processor version override
+    /// (`DOCUMENT_AI_PROCESSOR_VERSION`). Empty means "use
+    /// [`DEFAULT_DOCAI_PROCESSOR_VERSION`]".
+    pub default_processor_version: String,
+}
+
+impl DocumentAiConfig {
+    /// Effective default processor version: the configured override if set,
+    /// otherwise the built-in [`DEFAULT_DOCAI_PROCESSOR_VERSION`].
+    pub fn effective_default_version(&self) -> &str {
+        if self.default_processor_version.is_empty() {
+            DEFAULT_DOCAI_PROCESSOR_VERSION
+        } else {
+            &self.default_processor_version
+        }
+    }
 }
 
 /// How the Gemini calls authenticate.
@@ -251,6 +273,23 @@ pub enum DocumentParserMode {
 }
 
 impl DocumentParserMode {
+    /// Resolves the active parser from `DOCUMENT_PARSER_MODE`.
+    /// Default is Reducto; unknown/empty values keep the Reducto default.
+    pub fn from_env() -> Self {
+        match std::env::var("DOCUMENT_PARSER_MODE")
+            .unwrap_or_default()
+            .trim()
+            .to_lowercase()
+            .as_str()
+        {
+            "llamaparse" => Self::LlamaParse,
+            "document_ai" | "document-ai" => Self::DocumentAi,
+            "offline_heuristic" | "offline-heuristic" | "offline" => Self::OfflineHeuristic,
+            "local_ocrs" | "local-ocrs" => Self::LocalOcrs,
+            _ => Self::Reducto,
+        }
+    }
+
     pub fn label(self) -> &'static str {
         match self {
             Self::Reducto => "Reducto",
@@ -512,6 +551,8 @@ impl AppConfig {
                     adc_path: adc_path.unwrap_or_default(),
                     gcs_output_uri,
                     passphrase: String::new(), // Filled in by AppConfig later
+                    default_processor_version: clean_key(env::var("DOCUMENT_AI_PROCESSOR_VERSION"))
+                        .unwrap_or_default(),
                 })
             }
             _ => None,
@@ -1117,6 +1158,7 @@ mod tests {
             api_key: "".into(),
             gcs_output_uri: "".into(),
             passphrase: "".into(),
+            default_processor_version: "".into(),
         });
         assert!(cfg.has_ai_for_balancing());
 
@@ -1190,6 +1232,7 @@ mod tests {
             api_key: "".into(),
             gcs_output_uri: "".into(),
             passphrase: "".into(),
+            default_processor_version: "".into(),
         });
         cfg.llamaparse_api_key = Some("llama".into());
         cfg.pdfrest_api_key = Some("pdfrest".into());
