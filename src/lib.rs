@@ -1,4 +1,4 @@
-//! Bank Statement Fidelity Editor v1.0.0
+//! Bank Statement Fidelity Editor
 //! Public API
 
 #![allow(missing_docs)]

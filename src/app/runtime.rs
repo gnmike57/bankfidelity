@@ -8015,6 +8015,43 @@ Additional Context:\n{context}",
                 let mut current_parser_mode = parser_mode;
                 let mut stmt = loop {
                     match current_parser_mode {
+                        DocumentParserMode::Reducto => {
+                            match crate::ai::reducto::ReductoClient::from_app_config(&cfg) {
+                                Ok(client) => match client.parse_statement(&input).await {
+                                    Ok(s) => break s,
+                                    Err(e) => {
+                                        if let Some(next) = interactive_fallback_or_continue!(
+                                            cfg,
+                                            router,
+                                            res_tx,
+                                            format!("Reducto parse failed: {e}"),
+                                            Some(DocumentParserMode::LlamaParse)
+                                        ) {
+                                            current_parser_mode = next;
+                                            continue;
+                                        } else {
+                                            let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowFailure::FidelityCheckFailed(format!("Reducto error: {e}"))));
+                                            return;
+                                        }
+                                    }
+                                },
+                                Err(_) => {
+                                    if let Some(next) = interactive_fallback_or_continue!(
+                                        cfg,
+                                        router,
+                                        res_tx,
+                                        "Reducto client init failed".to_string(),
+                                        Some(DocumentParserMode::LlamaParse)
+                                    ) {
+                                        current_parser_mode = next;
+                                        continue;
+                                    } else {
+                                        let _ = res_tx.send(JobResult::WorkflowFailed(crate::engine::workflow::WorkflowFailure::FidelityCheckFailed("Reducto client init failed".to_string())));
+                                        return;
+                                    }
+                                }
+                            }
+                        }
                         DocumentParserMode::DocumentAi => {
                             let _ = res_tx.send(JobResult::Progress {
                                 label: "Parsing with Document AI".into(),
