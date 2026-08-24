@@ -2,6 +2,11 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use std::io::{self, BufRead, Write};
 
+/// The MCP protocol revision this server speaks. Must be a real, published
+/// protocol date from the Model Context Protocol specification — clients
+/// negotiate on this value during the `initialize` handshake.
+const MCP_PROTOCOL_VERSION: &str = "2025-06-18";
+
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 struct JsonRpcRequest {
@@ -18,30 +23,48 @@ pub struct McpServer;
 
 impl McpServer {
     pub fn start() {
-        tracing::info!("Starting BankFidelity MCP Server on stdio...");
         let stdin = io::stdin();
+        let mut reader = stdin.lock();
         let mut stdout = io::stdout();
+        Self::serve(&mut reader, &mut stdout);
+    }
 
-        // Send initialization capability (MCP handshake)
-        // Usually, the client sends "initialize", but we just listen for standard JSON-RPC.
+    /// Core stdio loop. Generic over reader/writer so tests can inject pipes.
+    ///
+    /// # Panic freedom
+    ///
+    /// This loop must never panic: malformed input is answered with a
+    /// JSON-RPC parse-error envelope and skipped; a failed stdout write means
+    /// the client is gone, so the loop logs and shuts down cleanly instead of
+    /// panicking (a panic here would take down the whole orchestrator).
+    fn serve<R: BufRead, W: Write>(reader: &mut R, writer: &mut W) {
+        tracing::info!("Starting BankFidelity MCP Server on stdio...");
 
-        for line in stdin.lock().lines() {
+        for line in reader.lines() {
             let line = match line {
                 Ok(l) => l,
-                Err(_) => break,
+                Err(e) => {
+                    tracing::error!("MCP: stdin read failed ({e}); shutting down cleanly");
+                    break;
+                }
             };
+
+            if line.trim().is_empty() {
+                continue;
+            }
 
             match serde_json::from_str::<JsonRpcRequest>(&line) {
                 Ok(req) => {
                     let is_notification = req.id.is_none();
                     let response = Self::handle_request(req);
-                    if !is_notification {
-                        #[allow(clippy::unwrap_used, clippy::expect_used)]
-                        {
-                            let response_str = serde_json::to_string(&response).unwrap();
-                            writeln!(stdout, "{}", response_str).expect("MCP: stdout write failed");
-                            stdout.flush().expect("MCP: stdout flush failed");
-                        }
+                    if is_notification {
+                        continue;
+                    }
+                    if !Self::write_response(writer, &response) {
+                        // Broken/closed stdout: the client is gone. There is
+                        // nothing sensible left to serve — exit cleanly.
+                        tracing::warn!("MCP: stdout unavailable; shutting down cleanly");
+                        break;
                     }
                 }
                 Err(e) => {
@@ -50,7 +73,62 @@ impl McpServer {
                         line,
                         e
                     );
+                    // JSON-RPC 2.0: parse errors get an error envelope with a
+                    // null id. Best effort — if stdout is also gone, stop.
+                    let envelope = json!({
+                        "jsonrpc": "2.0",
+                        "id": Value::Null,
+                        "error": { "code": -32700, "message": "Parse error" }
+                    });
+                    if !Self::write_response(writer, &envelope) {
+                        tracing::warn!("MCP: stdout unavailable; shutting down cleanly");
+                        break;
+                    }
                 }
+            }
+        }
+
+        tracing::info!("MCP Server stdio loop ended.");
+    }
+
+    /// Serialize and write one JSON-RPC message followed by a newline.
+    ///
+    /// # Panic freedom
+    ///
+    /// Serialization failure falls back to a JSON-RPC internal-error envelope;
+    /// if even that cannot be serialized the message is dropped (logged).
+    /// Returns `false` only when the underlying stream is unusable.
+    fn write_response<S: serde::Serialize, W: Write>(writer: &mut W, response: &S) -> bool {
+        let payload = match serde_json::to_string(response) {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::error!(
+                    "MCP: response serialization failed ({e}); falling back to error envelope"
+                );
+                match serde_json::to_string(&json!({
+                    "jsonrpc": "2.0",
+                    "id": Value::Null,
+                    "error": {
+                        "code": -32603,
+                        "message": "Internal error: response could not be serialized"
+                    }
+                })) {
+                    Ok(s) => s,
+                    Err(e2) => {
+                        tracing::error!(
+                            "MCP: error envelope also failed to serialize ({e2}); dropping response"
+                        );
+                        return true;
+                    }
+                }
+            }
+        };
+
+        match writeln!(writer, "{payload}").and_then(|()| writer.flush()) {
+            Ok(()) => true,
+            Err(e) => {
+                tracing::error!("MCP: stdout write failed ({e})");
+                false
             }
         }
     }
@@ -62,13 +140,13 @@ impl McpServer {
                     "jsonrpc": "2.0",
                     "id": req.id,
                     "result": {
-                        "protocolVersion": "2026-07-28",
+                        "protocolVersion": MCP_PROTOCOL_VERSION,
                         "capabilities": {
                             "tools": {}
                         },
                         "serverInfo": {
                             "name": "BankFidelity MCP",
-                            "version": "1.0.0"
+                            "version": env!("CARGO_PKG_VERSION")
                         }
                     }
                 })
@@ -570,5 +648,108 @@ impl McpServer {
                 })
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+    use super::*;
+    use std::sync::{Arc, Mutex};
+
+    /// Writer that always fails like a closed/broken stdout pipe and counts
+    /// how many times a write was attempted.
+    struct BrokenPipeWriter {
+        attempts: Arc<Mutex<usize>>,
+    }
+
+    impl Write for BrokenPipeWriter {
+        fn write(&mut self, _buf: &[u8]) -> io::Result<usize> {
+            *self.attempts.lock().unwrap() += 1;
+            Err(io::Error::new(io::ErrorKind::BrokenPipe, "client gone"))
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn broken_stdout_pipe_shuts_down_cleanly_without_panicking() {
+        let attempts = Arc::new(Mutex::new(0));
+        let mut writer = BrokenPipeWriter {
+            attempts: Arc::clone(&attempts),
+        };
+        // Two valid requests: if the loop kept going after the broken pipe,
+        // a second write would be attempted.
+        let input = b"{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\"}\n\
+                      {\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"ping\"}\n";
+        let mut reader: &[u8] = input;
+
+        // Must return normally (no panic, no hang).
+        McpServer::serve(&mut reader, &mut writer);
+
+        assert_eq!(
+            *attempts.lock().unwrap(),
+            1,
+            "loop must stop after the first failed stdout write"
+        );
+    }
+
+    #[test]
+    fn malformed_input_yields_parse_error_envelope_and_loop_continues() {
+        let mut out: Vec<u8> = Vec::new();
+        let input = b"this is not json\n{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"ping\"}\n";
+        let mut reader: &[u8] = input;
+
+        McpServer::serve(&mut reader, &mut out);
+
+        let text = String::from_utf8(out).unwrap();
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines.len(), 2, "parse error envelope + ping response");
+        assert!(
+            lines[0].contains("-32700"),
+            "first reply must be a JSON-RPC parse error"
+        );
+        assert!(
+            lines[1].contains("\"id\":7"),
+            "the request after the malformed line must still be served"
+        );
+    }
+
+    #[test]
+    fn serialization_failure_falls_back_to_error_envelope_not_panic() {
+        struct Unserializable;
+        impl serde::Serialize for Unserializable {
+            fn serialize<S: serde::Serializer>(&self, _s: S) -> Result<S::Ok, S::Error> {
+                Err(serde::ser::Error::custom("nope"))
+            }
+        }
+
+        let mut out: Vec<u8> = Vec::new();
+        let ok = McpServer::write_response(&mut out, &Unserializable);
+        assert!(ok, "serialization fallback must not report stream failure");
+        let text = String::from_utf8(out).unwrap();
+        assert!(
+            text.contains("-32603"),
+            "fallback must be an internal-error envelope, got: {text}"
+        );
+    }
+
+    #[test]
+    fn initialize_advertises_package_version_and_supported_protocol() {
+        let req = JsonRpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(1)),
+            method: "initialize".into(),
+            params: None,
+        };
+        let resp = McpServer::handle_request(req);
+        assert_eq!(resp["result"]["protocolVersion"], MCP_PROTOCOL_VERSION);
+        assert_eq!(
+            resp["result"]["serverInfo"]["version"],
+            env!("CARGO_PKG_VERSION"),
+            "serverInfo.version must come from Cargo.toml, not a hardcoded string"
+        );
+        assert_eq!(resp["result"]["serverInfo"]["name"], "BankFidelity MCP");
     }
 }

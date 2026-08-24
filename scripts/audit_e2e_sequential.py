@@ -89,7 +89,7 @@ def mcp_handshake(exe, timeout=20.0):
         resp = _rpc(
             exe,
             {"jsonrpc": "2.0", "id": 1, "method": "initialize",
-             "params": {"protocolVersion": "2026-07-28"}},
+             "params": {"protocolVersion": "2025-06-18"}},
             timeout,
         )
         name = resp.get("result", {}).get("serverInfo", {}).get("name", "")
