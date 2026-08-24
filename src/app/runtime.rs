@@ -7,12 +7,18 @@ use crate::pdf::ReplaceOutcome;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{mpsc, Arc, Condvar, Mutex};
 use std::thread;
 use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
 use tracing::Instrument;
 use uuid::Uuid;
+
+mod parser_chain;
+use self::parser_chain::interactive_fallback_or_continue;
+use self::parser_chain::{
+    extraction_provider_order, wait_for_interactive_choice, InteractiveFallbackRouter,
+};
 
 /// Opaque per-job handle. The runtime returns one when a job is enqueued;
 /// callers can later `Job::Cancel` it.
@@ -249,7 +255,9 @@ impl JobTicket {
 /// Cloneable; the runtime keeps one and the dispatcher keeps another.
 #[derive(Clone, Default)]
 pub struct CancellationRegistry {
-    inner: Arc<Mutex<HashMap<JobId, CancellationToken>>>,
+    /// Token map paired with a condvar so waiters (graceful shutdown) are
+    /// woken on every completion instead of polling with sleeps.
+    inner: Arc<(Mutex<HashMap<JobId, CancellationToken>>, Condvar)>,
 }
 
 impl CancellationRegistry {
@@ -261,7 +269,7 @@ impl CancellationRegistry {
     /// can pass it into the spawned task).
     pub fn register(&self, id: JobId) -> CancellationToken {
         let token = CancellationToken::new();
-        if let Ok(mut g) = self.inner.lock() {
+        if let Ok(mut g) = self.inner.0.lock() {
             g.insert(id, token.clone());
         }
         token
@@ -269,26 +277,29 @@ impl CancellationRegistry {
 
     /// Cancel and remove the token for `id`. No-op if unknown.
     pub fn cancel(&self, id: JobId) -> bool {
-        let token = self.inner.lock().ok().and_then(|mut g| g.remove(&id));
-        if let Some(t) = token {
-            t.cancel();
-            true
-        } else {
-            false
+        let token = self.inner.0.lock().ok().and_then(|mut g| g.remove(&id));
+        self.inner.1.notify_all();
+        match token {
+            Some(t) => {
+                t.cancel();
+                true
+            }
+            None => false,
         }
     }
 
     /// Drop the token for `id` (job has finished naturally).
     pub fn complete(&self, id: JobId) {
-        if let Ok(mut g) = self.inner.lock() {
+        if let Ok(mut g) = self.inner.0.lock() {
             g.remove(&id);
         }
+        self.inner.1.notify_all();
     }
 
     /// Request cancellation for every in-flight job while retaining registry
     /// entries until their exactly-once terminal result confirms completion.
     pub fn request_cancel_all(&self) {
-        if let Ok(g) = self.inner.lock() {
+        if let Ok(g) = self.inner.0.lock() {
             for token in g.values() {
                 token.cancel();
             }
@@ -297,16 +308,45 @@ impl CancellationRegistry {
 
     /// Force-clear every job token after a bounded graceful wait has expired.
     pub fn cancel_all(&self) {
-        if let Ok(mut g) = self.inner.lock() {
+        if let Ok(mut g) = self.inner.0.lock() {
             for (_, token) in g.drain() {
                 token.cancel();
             }
         }
+        self.inner.1.notify_all();
+    }
+
+    /// Blocks until the registry is empty (all in-flight jobs completed) or
+    /// `timeout` elapses. Wakes on each completion via condvar rather than
+    /// polling with sleeps. Returns `true` when the registry drained cleanly.
+    pub fn wait_until_empty(&self, timeout: std::time::Duration) -> bool {
+        let deadline = std::time::Instant::now() + timeout;
+        let (lock, cvar) = &*self.inner;
+        let mut guard = match lock.lock() {
+            Ok(g) => g,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        while !guard.is_empty() {
+            let now = std::time::Instant::now();
+            if now >= deadline {
+                return false;
+            }
+            let remaining = deadline.saturating_duration_since(now);
+            let (next_guard, wait_result) = match cvar.wait_timeout(guard, remaining) {
+                Ok(result) => result,
+                Err(poisoned) => poisoned.into_inner(),
+            };
+            guard = next_guard;
+            if wait_result.timed_out() {
+                return guard.is_empty();
+            }
+        }
+        true
     }
 
     /// How many jobs are currently registered.
     pub fn len(&self) -> usize {
-        self.inner.lock().map(|g| g.len()).unwrap_or(0)
+        self.inner.0.lock().map(|g| g.len()).unwrap_or(0)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -1465,50 +1505,9 @@ impl ResultSink {
     }
 }
 
-type InteractiveFallbackRouter = std::sync::Arc<
-    tokio::sync::Mutex<std::collections::HashMap<uuid::Uuid, tokio::sync::oneshot::Sender<String>>>,
->;
-
-fn extraction_provider_order(
-    selected: crate::app::config::DocumentParserMode,
-) -> Vec<crate::app::config::DocumentParserMode> {
-    use crate::app::config::DocumentParserMode;
-    match selected {
-        DocumentParserMode::OfflineHeuristic => vec![DocumentParserMode::OfflineHeuristic],
-        DocumentParserMode::LlamaParse => vec![
-            DocumentParserMode::LlamaParse,
-            DocumentParserMode::OfflineHeuristic,
-        ],
-        DocumentParserMode::DocumentAi => vec![
-            DocumentParserMode::DocumentAi,
-            DocumentParserMode::OfflineHeuristic,
-        ],
-        DocumentParserMode::LocalOcrs => vec![DocumentParserMode::LocalOcrs],
-        DocumentParserMode::Reducto => vec![
-            DocumentParserMode::Reducto,
-            DocumentParserMode::OfflineHeuristic,
-        ],
-    }
-}
-
-async fn wait_for_interactive_choice(
-    router: &InteractiveFallbackRouter,
-    request_id: uuid::Uuid,
-    receiver: tokio::sync::oneshot::Receiver<String>,
-    timeout: std::time::Duration,
-) -> Result<String, &'static str> {
-    match tokio::time::timeout(timeout, receiver).await {
-        Ok(Ok(choice)) => Ok(choice),
-        Ok(Err(_)) => {
-            router.lock().await.remove(&request_id);
-            Err("response channel closed")
-        }
-        Err(_) => {
-            router.lock().await.remove(&request_id);
-            Err("interactive response timed out")
-        }
-    }
-}
+// Parser-chain plumbing (fallback router, provider order, interactive
+// fallback waiter/macro) lives in the properly declared submodule
+// `src/app/runtime/parser_chain.rs`.
 
 fn spawn_job_lifecycle_monitor(
     result_sink: ResultSink,
@@ -1603,6 +1602,35 @@ impl Drop for TerminalTrackerInner {
     }
 }
 
+/// Blocks on `fut` from a synchronous context without deadlocking or
+/// panicking under any runtime flavor.
+///
+/// - Multi-thread runtime: `block_in_place` + `Handle::block_on` (safe there).
+/// - Current-thread runtime or no runtime: `block_in_place` panics ("cannot
+///   block inside a current_thread runtime"), so the future runs on a scratch
+///   thread with its own single-thread runtime instead.
+fn block_on_from_blocking_context<F, T>(fut: F) -> T
+where
+    F: std::future::Future<Output = T> + Send + 'static,
+    T: Send + 'static,
+{
+    match tokio::runtime::Handle::try_current() {
+        Ok(handle) if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread => {
+            tokio::task::block_in_place(|| handle.block_on(fut))
+        }
+        Ok(_) | Err(_) => std::thread::spawn(move || {
+            #[allow(clippy::expect_used)] // scratch runtime build is effectively infallible
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("failed to build scratch tokio runtime");
+            rt.block_on(fut)
+        })
+        .join()
+        .unwrap_or_else(|payload| std::panic::resume_unwind(payload)),
+    }
+}
+
 pub struct Runtime {
     tokio_rt: Option<tokio::runtime::Runtime>,
     runtime_client: RuntimeClient,
@@ -1622,11 +1650,9 @@ impl Runtime {
 
         self.runtime_client.close_intake();
         self.cancellations.request_cancel_all();
-        let deadline = std::time::Instant::now() + timeout;
-        while !self.cancellations.is_empty() && std::time::Instant::now() < deadline {
-            std::thread::sleep(std::time::Duration::from_millis(10));
-        }
-        let clean = self.cancellations.is_empty();
+        // Condvar-woken drain: registered jobs notify the registry on
+        // completion, so shutdown sleeps until woken instead of polling.
+        let clean = self.cancellations.wait_until_empty(timeout);
         if !clean {
             self.cancellations.cancel_all();
         }
@@ -6181,9 +6207,9 @@ Additional Context:\n{context}",
                         match provider {
                             crate::app::config::DocumentParserMode::Reducto => {
                                 if let Ok(client) = crate::ai::reducto::ReductoClient::from_app_config(&cfg) {
-                                    tokio::task::block_in_place(|| {
-                                        tokio::runtime::Handle::current().block_on(client.parse_statement(&path))
-                                    }).map_err(|e| e.to_string())
+                                    let p = path.clone();
+                                    block_on_from_blocking_context(client.parse_statement(&p))
+                                        .map_err(|e| e.to_string())
                                 } else {
                                     Err("Reducto client init failed".into())
                                 }
@@ -7999,70 +8025,6 @@ Additional Context:\n{context}",
 
                 // ---€ Tier 1: Determine parsing strategy -------------------€
                 use crate::app::config::DocumentParserMode;
-
-                macro_rules! interactive_fallback_or_continue {
-                                ($cfg:expr, $router:expr, $res_tx:expr, $err:expr, $next_parser:expr) => {{
-                                    if $cfg.interactive_fallbacks && $res_tx.is_interactive() {
-                                        let mut req = crate::engine::interactive_fallback::InteractiveFallbackRequest::new(
-                                            "Document Parsing",
-                                            $err.to_string(),
-                                        );
-
-                                        if $cfg.document_ai.is_some() {
-                                            req = req.add_alternative(
-                                                "document_ai",
-                                                "Try Document AI Again",
-                                                None,
-                                            );
-                                        }
-                                        if $cfg.llamaparse_api_key.is_some() {
-                                            req = req.add_alternative(
-                                                "llamaparse",
-                                                "Try LlamaParse",
-                                                None,
-                                            );
-                                        }
-                                        if !ignore_offline_fallback {
-                                            req = req.add_alternative(
-                                                "offline_parser",
-                                                "Fall back to Offline Parser (Local)",
-                                                None,
-                                            );
-                                        }
-                                        req = req.add_alternative("cancel", "Cancel Workflow", None);
-
-                                        let (tx, rx) = tokio::sync::oneshot::channel();
-                                        let request_id = req.id;
-                                        {
-                                            let mut map = $router.lock().await;
-                                            map.insert(request_id, tx);
-                                        }
-                                        let _ = $res_tx.send(JobResult::InteractiveFallbackRequired(req));
-                                        let choice = wait_for_interactive_choice(
-                                            &$router,
-                                            request_id,
-                                            rx,
-                                            std::time::Duration::from_secs(300),
-                                        )
-                                        .await
-                                        .unwrap_or_else(|reason| {
-                                            tracing::warn!("[parser] Interactive fallback {reason}; cancelling workflow");
-                                            "cancel".to_string()
-                                        });
-                                        match choice.as_str() {
-
-                                            "document_ai" => Some(DocumentParserMode::DocumentAi),
-                                            "llamaparse" => Some(DocumentParserMode::LlamaParse),
-                                            "offline_parser" => Some(DocumentParserMode::OfflineHeuristic),
-                                            _ => None,
-                                        }
-                                    } else if $next_parser.is_some() && !ignore_offline_fallback {
-                                        Some(DocumentParserMode::OfflineHeuristic)
-                                    } else {
-                                        None
-                                    }
-                                }};
-                            }
 
                 let mut current_parser_mode = parser_mode;
                 let mut stmt = loop {
