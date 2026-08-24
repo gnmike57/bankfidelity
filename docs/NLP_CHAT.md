@@ -180,16 +180,18 @@ To use a local Ollama model instead of cloud providers:
 # Install Ollama
 curl -fsSL https://ollama.com/install.sh | sh
 
-# Pull a model
-ollama pull llama3.2
+# Pull the Qwen 2.5 Coder 7B model (the model BankFidelity requests)
+ollama pull qwen2.5-coder-7b-instruct-q4_k_m
 
-# Configure BankFidelity to use it
-echo "LOCAL_LLM_URL=http://localhost:11434" >> bank-statement-fidelity-editor.env
-echo "LOCAL_LLM_MODEL=llama3.2" >> bank-statement-fidelity-editor.env
-
-# Build with local-llm feature
-cargo build --release --features local-llm
+# Point BankFidelity at Ollama's OpenAI-compatible endpoint.
+# This is also the built-in default, so this step is only needed
+# if your server listens somewhere else.
+echo "LOCAL_LLM_URL=http://localhost:11434/v1" >> .env
 ```
+
+> **Note:** There is no `LOCAL_LLM_MODEL` variable — the client always
+> requests the `qwen2.5-coder-7b-instruct-q4_k_m` model. Serve that model
+> (or an alias of it) on whatever endpoint `LOCAL_LLM_URL` points to.
 
 Then in the Command Palette, append `using local llm` to any AI command:
 ```

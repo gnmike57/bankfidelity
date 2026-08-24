@@ -188,7 +188,7 @@ The project uses a multi-backend architecture where every pipeline stage has aut
 
 | Stage | Primary | Fallback Chain |
 |---|---|---|
-| Document Parsing | Mindee → LlamaParse → Document AI | → offline_parser (PyMuPDF built-in) |
+| Document Parsing | Reducto (default) → Document AI → LlamaParse | → offline_parser (PyMuPDF built-in) |
 | AI Validation | Gemini (API Key or Vertex) | → graceful skip (score=0.7) |
 | Balance Analysis | Gemini AI | → local balance::process_and_reconcile() |
 | PDF Editing | PyMuPDF (via PyO3) | → Pdfium → Typst Reconstruct |

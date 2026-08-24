@@ -70,7 +70,7 @@ The application works offline, but cloud parsers drastically improve extraction 
 ### Dual-Core & Offline AI Setup (New in v1.0.0)
 To enable the advanced UI automation and fully offline intent routing features:
 1. **Microsoft UFO**: Install Microsoft UFO at `C:\UFO`. The `dual-core-pdf-pipeline ufo` command natively hooks into this directory to automate UI tasks.
-2. **Qwen 7B (Local LLM)**: Run a local instance of `llama-server.exe` on port `11434` with the Qwen 2.5 Coder 7B model. BankFidelity will automatically detect it and route complex intent/math reasoning completely offline.
+2. **Qwen 7B (Local LLM)**: Run an OpenAI-compatible local server on port `11434` with the Qwen 2.5 Coder 7B model — either Ollama (`ollama serve`, then `ollama pull qwen2.5-coder-7b-instruct-q4_k_m`) or `llama-server.exe`. BankFidelity connects to `http://127.0.0.1:11434/v1` by default (override with `LOCAL_LLM_URL`) and routes complex intent/math reasoning completely offline.
 
 ---
 

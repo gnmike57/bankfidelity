@@ -4,7 +4,7 @@ The **Bank Statement Fidelity Editor** is built on a high-performance Rust core 
 
 ## High-Level Data Flow
 
-1. **Extraction (Read):** A PDF is loaded. The pipeline attempts to extract geometry and text using cloud AI parsers (Mindee, LlamaParse). If these fail or are unavailable, it falls back to a local, deterministic PyMuPDF geometry extractor.
+1. **Extraction (Read):** A PDF is loaded. The pipeline attempts to extract geometry and text using cloud AI parsers — Reducto by default, with Document AI and LlamaParse as fallbacks. If these fail or are unavailable, it falls back to a local, deterministic PyMuPDF geometry extractor.
 2. **Analysis (Math):** The exact-decimal ledger engine recalculates every running balance. If an edit introduces an imbalance, the Smart Balance Engine (optionally powered by Gemini) proposes a cascading adjustment plan.
 3. **Modification (Write):** Edits are targeted by their exact bounding box and original text identity. The `pdf/` engine modifies the underlying PDF stream bytes in-place, preserving original font dictionaries, kerning, and color.
 4. **Verification (Audit):** The output PDF is re-parsed locally. Mandatory gates verify structural integrity, edit membership, and mathematical consistency. A cryptographic JSON manifest is generated and appended to the document.

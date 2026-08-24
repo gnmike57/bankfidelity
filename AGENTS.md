@@ -153,8 +153,9 @@ The project uses the following API keys (all optional except DUAL_CORE_PASSPHRAS
 |---|---|---|
 | DUAL_CORE_PASSPHRASE | Encryption (required) | None |
 | GEMINI_API_KEY | AI balance, vision, validation | Manual-only mode |
-| MINDEE_API_KEY | Cloud parser (Mindee) | offline_parser |
-| LLAMAPARSE_API_KEY | Default parser (LLM) | offline_parser |
+| REDUCTO_API_KEY | Default cloud parser (Reducto) | offline_parser |
+| MINDEE_API_KEY | Optional legacy cloud parser (Mindee) | offline_parser |
+| LLAMAPARSE_API_KEY | Alternative cloud parser (LLM) | offline_parser |
 | DOCUMENT_AI_* | Google ML parser | offline_parser |
 | PDFREST_API_KEY | Cloud verification render | Local Pdfium |
 | APPLITOOLS_API_KEY | Visual AI testing | SSIM-only |

@@ -1,8 +1,7 @@
 # BankFidelity — Remaining Work Tracker
 
 This document tracks remaining steps for packaging and release of the current
-crate version (`1.1.1` in `Cargo.toml`). Target packaging tag is TBD (was
-historically sketched as v1.4.0).
+crate version (`2.0.0` in `Cargo.toml`). Target packaging tag is TBD.
 
 ## 1. GUI `__DISPATCH:` Signal Routing — DONE
 
@@ -48,7 +47,7 @@ Both installers must bundle or auto-download Pdfium (`pdfium.dll` /
 
 **Status:** Pending explicit tag choice.
 
-- Confirm crate version in `Cargo.toml` (currently `1.1.1`).
+- Confirm crate version in `Cargo.toml` (currently `2.0.0`).
 - Tag `vX.Y.Z` and push; release workflow uploads portable bundles.
 - Env readiness: `DUAL_CORE_PASSPHRASE` required; `PYMUPDF_PRO_KEY` required
   for full PyMuPDF Pro edit path (native/offline fallbacks still operate);
