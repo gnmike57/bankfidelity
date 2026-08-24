@@ -471,7 +471,7 @@ pub fn extract_dollar_amount(s: &str) -> Option<f64> {
     }
 
     for token in s.split_whitespace() {
-        let cleaned = token.replace('$', "").replace(',', "");
+        let cleaned = token.replace(['$', ','], "");
         if let Ok(v) = cleaned.parse::<f64>() {
             if v > 0.0 {
                 return Some(v);
@@ -516,11 +516,11 @@ pub fn levenshtein_distance(s1: &str, s2: &str) -> usize {
 
     let mut matrix = vec![vec![0usize; len2 + 1]; len1 + 1];
 
-    for i in 0..=len1 {
-        matrix[i][0] = i;
+    for (i, row) in matrix.iter_mut().enumerate().take(len1 + 1) {
+        row[0] = i;
     }
-    for j in 0..=len2 {
-        matrix[0][j] = j;
+    for (j, cell) in matrix[0].iter_mut().enumerate().take(len2 + 1) {
+        *cell = j;
     }
 
     for i in 1..=len1 {
@@ -764,5 +764,63 @@ mod tests {
         assert_eq!(parse("docter"), NlpCommand::Doctor);
         assert_eq!(parse("health check"), NlpCommand::Doctor);
         assert_eq!(parse("typst reconstruct"), NlpCommand::TypstReconstruct);
+        assert_eq!(parse("reload config"), NlpCommand::ReloadConfig);
+        assert_eq!(parse("font analysis"), NlpCommand::FontAnalysis);
+    }
+
+    #[test]
+    fn test_verify_modes() {
+        assert_eq!(
+            parse("verify fidelity"),
+            NlpCommand::Verify {
+                mode: "full".to_string()
+            }
+        );
+        assert_eq!(
+            parse("xray check"),
+            NlpCommand::Verify {
+                mode: "xray".to_string()
+            }
+        );
+        assert_eq!(
+            parse("ssim visual test"),
+            NlpCommand::Verify {
+                mode: "ssim".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn test_ufo_automation() {
+        let cmd = parse("ufo download bank statement from Chrome");
+        assert_eq!(
+            cmd,
+            NlpCommand::UfoAutomate {
+                task_prompt: "download bank statement from Chrome".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn test_ai_edit_and_unknown() {
+        let cmd = parse("change salary to $4500");
+        match cmd {
+            NlpCommand::AiEdit {
+                instruction,
+                provider,
+            } => {
+                assert_eq!(instruction, "change salary to $4500");
+                assert_eq!(provider, "reducto");
+            }
+            _ => panic!("Expected AiEdit variant"),
+        }
+
+        let unknown = parse("xyzqwerty nonexistent command");
+        match unknown {
+            NlpCommand::Unknown { suggestions, .. } => {
+                assert!(!suggestions.is_empty());
+            }
+            _ => panic!("Expected Unknown variant"),
+        }
     }
 }

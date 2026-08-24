@@ -308,12 +308,13 @@ impl ReductoClient {
         let chunks = self.parse_document(pdf_path).await?;
         let markdown = chunks.to_string();
 
-        let mut statement = crate::ai::llamaparse::LlamaParseClient::from_app_config(
+        let client = crate::ai::llamaparse::LlamaParseClient::from_app_config(
             &crate::app::config::AppConfig::default(),
         )
-        .unwrap()
-        .parse_markdown_to_statement(&markdown)
         .map_err(|e| ReductoError::System(e.to_string()))?;
+        let mut statement = client
+            .parse_markdown_to_statement(&markdown)
+            .map_err(|e| ReductoError::System(e.to_string()))?;
         statement.ensure_canonical_metadata();
         Ok(statement)
     }

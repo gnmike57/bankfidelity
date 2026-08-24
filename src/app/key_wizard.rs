@@ -225,7 +225,7 @@ mod tests {
 
     #[test]
     fn test_wizard_completeness_check() {
-        let mut state = KeyWizardState::new();
+        let mut state = KeyWizardState::default();
         assert!(!state.is_complete(), "Should not be complete with no keys");
 
         state.values.insert(

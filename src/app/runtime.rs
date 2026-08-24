@@ -5111,9 +5111,9 @@ Additional Context:\n{context}",
                         let _ = res_tx.send(JobResult::Error {
                             job_label: "ai_command".into(),
                             message: format!(
-                                "Command not recognised: \"{}\". Try: undo, balance, verify, extract, \
+                                "Command not recognised: \"{}{}\". Try: undo, balance, verify, extract, \
                                 transfer to [bank], shift dates forward N days, or describe an edit.",
-                                format!("{}{}", raw, sugg_str)
+                                raw, sugg_str
                             ),
                         });
                     }
