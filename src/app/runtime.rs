@@ -6207,9 +6207,14 @@ Additional Context:\n{context}",
                         match provider {
                             crate::app::config::DocumentParserMode::Reducto => {
                                 if let Ok(client) = crate::ai::reducto::ReductoClient::from_app_config(&cfg) {
+                                    // Owned handles so the future is 'static: the
+                                    // blocking helper may run it on a scratch thread.
+                                    let client = std::sync::Arc::new(client);
                                     let p = path.clone();
-                                    block_on_from_blocking_context(client.parse_statement(&p))
-                                        .map_err(|e| e.to_string())
+                                    block_on_from_blocking_context(async move {
+                                        client.parse_statement(&p)
+                                    })
+                                    .map_err(|e| e.to_string())
                                 } else {
                                     Err("Reducto client init failed".into())
                                 }
@@ -8039,7 +8044,8 @@ Additional Context:\n{context}",
                                             router,
                                             res_tx,
                                             format!("Reducto parse failed: {e}"),
-                                            Some(DocumentParserMode::LlamaParse)
+                                            Some(DocumentParserMode::LlamaParse),
+                                            ignore_offline_fallback
                                         ) {
                                             current_parser_mode = next;
                                             continue;
@@ -8055,7 +8061,8 @@ Additional Context:\n{context}",
                                         router,
                                         res_tx,
                                         "Reducto client init failed".to_string(),
-                                        Some(DocumentParserMode::LlamaParse)
+                                        Some(DocumentParserMode::LlamaParse),
+                                        ignore_offline_fallback
                                     ) {
                                         current_parser_mode = next;
                                         continue;
@@ -8131,7 +8138,8 @@ Additional Context:\n{context}",
                                                     router,
                                                     res_tx,
                                                     "AI Fidelity Math Check Failed",
-                                                    Some(DocumentParserMode::LlamaParse)
+                                                    Some(DocumentParserMode::LlamaParse),
+                                                    ignore_offline_fallback
                                                 ) {
                                                     current_parser_mode = next;
                                                     continue;
@@ -8151,7 +8159,8 @@ Additional Context:\n{context}",
                                                 router,
                                                 res_tx,
                                                 format!("Document AI parse failed: {e}"),
-                                                Some(DocumentParserMode::LlamaParse)
+                                                Some(DocumentParserMode::LlamaParse),
+                                                ignore_offline_fallback
                                             ) {
                                                 current_parser_mode = next;
                                                 continue;
@@ -8169,7 +8178,8 @@ Additional Context:\n{context}",
                                         router,
                                         res_tx,
                                         format!("Document AI not configured: {e}"),
-                                        Some(DocumentParserMode::LlamaParse)
+                                        Some(DocumentParserMode::LlamaParse),
+                                        ignore_offline_fallback
                                     ) {
                                         current_parser_mode = next;
                                         continue;
@@ -8200,7 +8210,8 @@ Additional Context:\n{context}",
                                             router,
                                             res_tx,
                                             format!("LlamaParse parse failed: {e}"),
-                                            Some(DocumentParserMode::DocumentAi)
+                                            Some(DocumentParserMode::DocumentAi),
+                                            ignore_offline_fallback
                                         ) {
                                             current_parser_mode = next;
                                             continue;
@@ -8217,7 +8228,8 @@ Additional Context:\n{context}",
                                         router,
                                         res_tx,
                                         format!("LlamaParse not configured: {e}"),
-                                        Some(DocumentParserMode::DocumentAi)
+                                        Some(DocumentParserMode::DocumentAi),
+                                        ignore_offline_fallback
                                     ) {
                                         current_parser_mode = next;
                                         continue;
@@ -8252,7 +8264,8 @@ Additional Context:\n{context}",
                                         router,
                                         res_tx,
                                         format!("Offline parser failed: {e}"),
-                                        None::<DocumentParserMode>
+                                        None::<DocumentParserMode>,
+                                        ignore_offline_fallback
                                     ) {
                                         current_parser_mode = next;
                                         continue;
@@ -8273,7 +8286,8 @@ Additional Context:\n{context}",
                                         router,
                                         res_tx,
                                         format!("Offline parser panicked: {e}"),
-                                        None::<DocumentParserMode>
+                                        None::<DocumentParserMode>,
+                                        ignore_offline_fallback
                                     ) {
                                         current_parser_mode = next;
                                         continue;

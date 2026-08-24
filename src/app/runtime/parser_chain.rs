@@ -63,16 +63,22 @@ pub(crate) async fn wait_for_interactive_choice(
 /// # Expansion-site requirements
 ///
 /// This macro is textually expanded inside the `WorkflowParseAndValidate`
-/// loop in `src/app/runtime.rs` and therefore expects these identifiers to
-/// be in scope at the **expansion site**:
+/// loop in `src/app/runtime.rs`. Macro hygiene resolves local variables at
+/// the *definition* site, so every run-scoped value is an explicit parameter:
 ///
-/// - `ignore_offline_fallback: bool` — whether the offline fallback may be
-///   offered/auto-selected for this run.
-/// - `JobResult` — the runtime result enum (in scope in `runtime.rs`).
+/// - `$allow_offline` — the run's `ignore_offline_fallback: bool`.
+/// - `JobResult` — resolved via the expansion site's imports (`runtime.rs`).
 ///
 /// Everything else is either a macro parameter or a fully qualified path.
 macro_rules! interactive_fallback_or_continue {
-    ($cfg:expr, $router:expr, $res_tx:expr, $err:expr, $next_parser:expr) => {{
+    (
+        $cfg:expr,
+        $router:expr,
+        $res_tx:expr,
+        $err:expr,
+        $next_parser:expr,
+        $allow_offline:expr $(,)?
+    ) => {{
         if $cfg.interactive_fallbacks && $res_tx.is_interactive() {
             let mut req = crate::engine::interactive_fallback::InteractiveFallbackRequest::new(
                 "Document Parsing",
@@ -85,7 +91,7 @@ macro_rules! interactive_fallback_or_continue {
             if $cfg.llamaparse_api_key.is_some() {
                 req = req.add_alternative("llamaparse", "Try LlamaParse", None);
             }
-            if ignore_offline_fallback {
+            if $allow_offline {
                 req = req.add_alternative(
                     "offline_parser",
                     "Fall back to Offline Parser (Local)",
@@ -118,7 +124,7 @@ macro_rules! interactive_fallback_or_continue {
                 "offline_parser" => Some(crate::app::config::DocumentParserMode::OfflineHeuristic),
                 _ => None,
             }
-        } else if $next_parser.is_some() && ignore_offline_fallback {
+        } else if $next_parser.is_some() && $allow_offline {
             Some(crate::app::config::DocumentParserMode::OfflineHeuristic)
         } else {
             None
