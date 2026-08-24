@@ -8,17 +8,15 @@ import gc
 import hashlib
 import importlib
 import importlib.metadata
-import json
 import os
 import platform
 import sys
 import time
 import traceback
 import uuid
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
-
-from verify_runtime_manifest import verify as verify_runtime_manifest
+from typing import Any
 
 from bridge_protocol import (
     OPERATIONS,
@@ -28,6 +26,7 @@ from bridge_protocol import (
     canonical_json,
     parse_request,
 )
+from verify_runtime_manifest import verify as verify_runtime_manifest
 
 
 def _sha256_file(path: str | os.PathLike[str]) -> str:
@@ -82,7 +81,7 @@ class MutationTransaction:
     @classmethod
     def prepare(
         cls, request: Mapping[str, Any]
-    ) -> tuple[dict[str, Any], "MutationTransaction | None"]:
+    ) -> tuple[dict[str, Any], MutationTransaction | None]:
         if request["operation"] not in MUTATING_OPERATIONS:
             return dict(request), None
         payload = dict(request["payload"])

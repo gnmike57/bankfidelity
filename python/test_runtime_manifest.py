@@ -61,12 +61,11 @@ class RuntimeManifestTests(unittest.TestCase):
     def test_package_version_drift_is_rejected(self) -> None:
         with mock.patch.object(
             runtime_manifest.importlib.metadata, "version", return_value="0.0.0"
+        ), self.assertRaisesRegex(
+            runtime_manifest.RuntimeManifestError,
+            "PyMuPDF 0.0.0 does not match 1.28.2",
         ):
-            with self.assertRaisesRegex(
-                runtime_manifest.RuntimeManifestError,
-                "PyMuPDF 0.0.0 does not match 1.28.2",
-            ):
-                runtime_manifest.verify("base")
+            runtime_manifest.verify("base")
 
 
 if __name__ == "__main__":

@@ -1,6 +1,5 @@
 import os
 import sys
-import json
 
 # Add scripts directory to path to import python modules
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../scripts')))

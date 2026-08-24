@@ -12,7 +12,6 @@ import unittest
 from pathlib import Path
 
 import pymupdf
-
 from bridge_protocol import OPERATIONS, PROTOCOL_VERSION, ProtocolError, parse_response
 from worker import classify_error
 

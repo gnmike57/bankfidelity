@@ -9,7 +9,8 @@ from __future__ import annotations
 import json
 import re
 import uuid
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 PROTOCOL_VERSION = "1.0.0"
 OPERATIONS = (

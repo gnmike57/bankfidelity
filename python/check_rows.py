@@ -1,5 +1,6 @@
 import pymupdf
 import pymupdf_pro_integration as ppi
+
 doc = pymupdf.open("AU Bank Statements/bankwest_example.pdf")
 words = doc[0].get_text("words")
 rows = ppi._transaction_rows(words)

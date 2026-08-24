@@ -4,15 +4,16 @@ Exercises every backend in the stack against the 4 control PDFs.
 Produces scored evaluation matrix.
 """
 
-import pymupdf
+import hashlib
 import json
 import os
-import sys
-import time
 import re
 import subprocess
-import hashlib
+import sys
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+import pymupdf
 
 # ============================================================================
 # CONFIGURATION
@@ -229,6 +230,7 @@ def test1_offline_heuristic(pdf_path, gt):
 
 def test1_mindee_api(pdf_path, gt):
     import time
+
     import requests
 
     start = time.time()
@@ -409,8 +411,9 @@ def test1_docai_api(pdf_path, gt):
         }
 
     try:
-        import requests
         import base64
+
+        import requests
 
         with open(pdf_path, "rb") as f:
             content = base64.b64encode(f.read()).decode()
@@ -786,8 +789,9 @@ def test3_gemini(pdf_path, gt):
         }
 
     try:
-        import requests
         import base64
+
+        import requests
 
         with open(pdf_path, "rb") as f:
             pdf_b64 = base64.b64encode(f.read()).decode()
@@ -901,9 +905,10 @@ def test3_groq(pdf_path, gt):
         }
 
     try:
-        import requests
-        import pymupdf
         import json
+
+        import pymupdf
+        import requests
 
         doc = pymupdf.open(pdf_path)
         full_text = ""
@@ -1003,9 +1008,10 @@ def test3_openrouter(pdf_path, gt):
         }
 
     try:
-        import requests
-        import pymupdf
         import json
+
+        import pymupdf
+        import requests
 
         doc = pymupdf.open(pdf_path)
         full_text = ""
@@ -1103,8 +1109,9 @@ def test3_docai(pdf_path, gt):
         }
 
     try:
-        import requests
         import base64
+
+        import requests
 
         with open(pdf_path, "rb") as f:
             content = base64.b64encode(f.read()).decode()
@@ -1231,8 +1238,7 @@ def test4_ssim_base(pdf_path, gt):
 
                 score = tile_diff / (tile_pixels * 255 * 3) if tile_pixels > 0 else 0
                 tile_scores.append(score)
-                if score > max_local_diff:
-                    max_local_diff = score
+                max_local_diff = max(max_local_diff, score)
 
         # Perceptual hash comparison
         hashlib.md5(samples1).hexdigest()
@@ -1362,8 +1368,9 @@ def test4_gemini_vision(pdf_path, gt):
         }
 
     try:
-        import requests
         import base64
+
+        import requests
 
         # Render pages as images
         doc = pymupdf.open(pdf_path)
@@ -1567,9 +1574,10 @@ def test7_groq_pii(pdf_path, gt):
 # TEST 8: FORENSIC EVASION
 # ============================================================================
 def test8_pymupdfpro(pdf_path, gt):
-    import time
-    import fitz
     import os
+    import time
+
+    import fitz
 
     start = time.time()
 
@@ -1765,8 +1773,8 @@ def test5_openrouter_transfer(pdf_path, gt):
 # TEST 6: GUI E2E AUTOMATION
 # ============================================================================
 def test6_gui_automation(pdf_path, gt):
-    import time
     import subprocess
+    import time
 
     start = time.time()
     try:

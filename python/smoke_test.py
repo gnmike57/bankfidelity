@@ -11,7 +11,6 @@ from pathlib import Path
 
 import pymupdf
 
-
 ROOT = Path(__file__).resolve().parents[1]
 BRIDGE_PATH = ROOT / "python" / "pymupdf_pro_integration.py"
 

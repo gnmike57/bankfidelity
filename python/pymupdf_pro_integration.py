@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 PyMuPDF Pro Smart Targeted Editor v2.1
 - Get all text blocks with accurate bounding boxes
@@ -50,9 +49,9 @@ try:
     _PYMUPDF_AVAILABLE = True
 except ImportError:
     _PYMUPDF_AVAILABLE = False
+import gc
 import json
 import math
-import gc
 
 _FONT_RESOURCE_PROFILES = None
 
@@ -65,7 +64,7 @@ _FONT_RESOURCE_PROFILES = None
 # working, and turns an opaque "PyEngine init failed" into an actionable error
 # at the exact call site.
 try:
-    import pymupdf.pro  # noqa: F401  (registers the pymupdf.pro submodule)
+    import pymupdf.pro
     _PYMUPDF_PRO_AVAILABLE = True
     _PYMUPDF_PRO_IMPORT_ERROR = None
 except Exception as _e:  # ImportError or any loader-level failure
@@ -665,8 +664,7 @@ def _normalized_money_identity(value):
     text = re.sub(r"\s+(?:CR|DR)\s*$", "", text)
     text = re.sub(r"^(?:AUD\s*)?\$?", "", text)
     text = text.replace(",", "").strip()
-    if text.startswith("+"):
-        text = text[1:]
+    text = text.removeprefix("+")
     try:
         amount = Decimal(text)
     except (InvalidOperation, ValueError):
@@ -2897,8 +2895,7 @@ def _neighbour_left_edge(page, rect_obj, exclude_span_id: str = "") -> float:
                 # Strictly to the right (with a 0.5pt tolerance to avoid
                 # picking up the original span on the redaction edge).
                 if bbox[0] > rect_obj.x1 + 0.5:
-                    if bbox[0] < right_edge:
-                        right_edge = bbox[0]
+                    right_edge = min(right_edge, bbox[0])
     # Leave a small gutter so we do not kiss the neighbour.
     return max(rect_obj.x1, right_edge - 1.0)
 
@@ -3397,7 +3394,7 @@ def _insert_kerned_text(
             adv = float(f.text_length(ch, fontsize=fontsize)) * h_scale
         except Exception:
             adv = fontsize * 0.5
-        pair_kern = float((kern_map or {}).get((chars[i], chars[i + 1]), 0.0))
+        pair_kern = float((kern_map or {}).get((ch, chars[i + 1]), 0.0))
         step = adv + pair_kern + extra_spacing
         cx += dx * step
         cy += dy * step
@@ -4076,13 +4073,7 @@ def apply_many_edits(pdf_path: str, output_path: str, edits: list, font_path: st
         elif method == "supplied":
             emit_fontname = insert_font_name
             measure_font = supplied_measure_font
-        elif method == "verified-standard14":
-            emit_fontname = _fallback_standard14(original_font_name)
-            try:
-                measure_font = pymupdf.Font(fontname=emit_fontname)
-            except Exception:
-                measure_font = None
-        elif is_std14:
+        elif method == "verified-standard14" or is_std14:
             emit_fontname = _fallback_standard14(original_font_name)
             try:
                 measure_font = pymupdf.Font(fontname=emit_fontname)
@@ -4541,7 +4532,6 @@ def analyze_background(pdf_path: str, page_num: int, rect: list) -> tuple[bool, 
         return (True, (1.0, 1.0, 1.0))
 
 
-import re
 
 def _get_all_transactions_legacy(pdf_path: str):
     """Extract ALL transactions using geometry clustering and header regex detection."""
@@ -5470,11 +5460,12 @@ def dry_run_edit_preview(
 
 
 def extract_font_with_fonttools(pdf_path: str, output_path: str):
+
     import pymupdf
-    import os
     try:
-        from fontTools.ttLib import TTFont
         from io import BytesIO
+
+        from fontTools.ttLib import TTFont
     except ImportError:
         return {"success": False, "error": "fonttools not installed"}
 
@@ -5651,6 +5642,7 @@ def remove_pages(pdf_path: str, output_path: str, page_indices: list):
 def extract_font(pdf_path: str, output_path: str, font_name: str = ""):
     """Extract a font from a PDF and save it as a valid TTF/OTF using fonttools."""
     import io
+
     from fontTools.ttLib import TTFont
 
     _ensure_pro_unlocked()

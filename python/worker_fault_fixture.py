@@ -3,13 +3,18 @@
 
 from __future__ import annotations
 
-import json
 import os
 import sys
 import time
 from pathlib import Path
 
-from bridge_protocol import OPERATIONS, PROTOCOL_VERSION, build_response, canonical_json, parse_request
+from bridge_protocol import (
+    OPERATIONS,
+    PROTOCOL_VERSION,
+    build_response,
+    canonical_json,
+    parse_request,
+)
 
 MODE = os.environ.get("PYTHON_WORKER_FAULT_MODE", "none")
 STATE = Path(os.environ.get("PYTHON_WORKER_FAULT_STATE", "worker-fault.state"))

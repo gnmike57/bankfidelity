@@ -2,7 +2,6 @@ import importlib.util
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = Path(__file__).with_name("pymupdf_pro_integration.py")
 SPEC = importlib.util.spec_from_file_location("westpac_description_bridge", MODULE_PATH)

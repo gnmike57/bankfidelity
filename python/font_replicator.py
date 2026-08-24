@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Stage 11 - Font creation cascade.
 
@@ -32,14 +31,10 @@ The cache lives at `cache/fonts/` and is populated lazily on first use.
 The cascade entry point is `replicate_font_for_chars`.
 """
 
-import io
 import json
 import os
-import shutil
 import sys
-import tempfile
 import unicodedata
-from typing import Dict, List, Optional, Tuple
 
 
 # Public alias kept for back-compat with old callers.
@@ -76,7 +71,7 @@ def _ensure_cache_dir() -> str:
 # Tier 1: composite glyph synthesis
 # ---------------------------------------------------------------------------
 
-def _decompose_to_components(ch: str) -> List[str]:
+def _decompose_to_components(ch: str) -> list[str]:
     """Return the NFD decomposition of `ch` as a list of single-codepoint
     strings. For precomposed letters this typically returns
     [base, combining_mark]. Returns [ch] if the char has no decomposition.
@@ -90,8 +85,8 @@ def _decompose_to_components(ch: str) -> List[str]:
 def _try_composite_synthesis(
     original_font_path: str,
     output_path: str,
-    missing_chars: List[str],
-) -> Tuple[List[str], List[str]]:
+    missing_chars: list[str],
+) -> tuple[list[str], list[str]]:
     """Try to build each missing precomposed character from existing
     components in the original subset. Returns (synthesised, still_missing).
 
@@ -335,8 +330,8 @@ def _try_subset_extension(
     original_font_path: str,
     donor_font_path: str,
     output_path: str,
-    missing_chars: List[str],
-) -> Tuple[List[str], List[str]]:
+    missing_chars: list[str],
+) -> tuple[list[str], list[str]]:
     """Copy missing glyphs from `donor_font_path` into the original subset.
     Returns (extended_with, still_missing).
     """
@@ -488,7 +483,7 @@ def _try_subset_extension(
 # Tier 3: Gemini Vision identification
 # ---------------------------------------------------------------------------
 
-def _identify_typeface_via_gemini(font_name: str, glyph_image_path: str) -> Optional[str]:
+def _identify_typeface_via_gemini(font_name: str, glyph_image_path: str) -> str | None:
     """Ask Gemini Vision which typeface the rasterised glyphs match.
     Returns the donor's local cache path if a known font is identified,
     None otherwise.
@@ -519,8 +514,8 @@ def _identify_typeface_via_gemini(font_name: str, glyph_image_path: str) -> Opti
         return None
 
     try:
-        with io.open(manifest_path, "r", encoding="utf-8") as f:
-            manifest: Dict[str, str] = json.load(f)
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            manifest: dict[str, str] = json.load(f)
     except Exception as e:
         print(f"[fr] manifest load failed: {e}", file=sys.stderr)
         return None
@@ -531,7 +526,7 @@ def _identify_typeface_via_gemini(font_name: str, glyph_image_path: str) -> Opti
     try:
         import base64
         import urllib.request
-        with io.open(glyph_image_path, "rb") as f:
+        with open(glyph_image_path, "rb") as f:
             img_b64 = base64.b64encode(f.read()).decode("ascii")
 
         candidates = sorted(manifest.keys())
@@ -624,9 +619,9 @@ def _rasterise_subset(font_path: str, output_path: str, sample_chars: str = "ABC
 def replicate_font_for_chars(
     pdf_path: str,
     font_name: str,
-    missing_chars: List[str],
+    missing_chars: list[str],
     output_dir: str,
-) -> Dict:
+) -> dict:
     """Top-level cascade. Returns:
 
         {
@@ -690,7 +685,7 @@ def replicate_font_for_chars(
                                 break
                     if content:
                         original_font_path = os.path.join(output_dir, f"original_subset.{ext or 'ttf'}")
-                        with io.open(original_font_path, "wb") as out:
+                        with open(original_font_path, "wb") as out:
                             out.write(content)
                         break
             if original_font_path:
@@ -757,7 +752,7 @@ def replicate_font_for_chars(
     }
 
 
-def _pick_local_donor(font_name: str) -> Optional[str]:
+def _pick_local_donor(font_name: str) -> str | None:
     """Pick a local cached donor for `font_name`.
 
     Stage F / Item #16: among manifest entries that match by name, prefer the
@@ -771,7 +766,7 @@ def _pick_local_donor(font_name: str) -> Optional[str]:
     if not os.path.isfile(manifest_path):
         return None
     try:
-        with io.open(manifest_path, "r", encoding="utf-8") as f:
+        with open(manifest_path, "r", encoding="utf-8") as f:
             manifest = json.load(f)
     except Exception:
         return None
