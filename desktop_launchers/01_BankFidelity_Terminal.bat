@@ -54,6 +54,15 @@ set "PYTHONHOME=!PYTHON_DIR!"
 set "PYTHONPATH=!PYTHON_DIR!Lib\site-packages;!PYTHON_DIR!Lib;!PYTHON_DIR!DLLs;%UFO_ROOT%"
 set "PATH=!PYTHON_DIR!;C:\msys64\mingw64\bin;%USERPROFILE%\.cargo\bin;C:\Program Files\nodejs;!PATH!"
 
+:: ---------------------------------------------------------------------------
+:: Pin BankFidelity pipeline defaults for every session launched here.
+:: Reducto = default extraction parser; auto = PyMuPDF Pro Primary editor.
+:: Pre-set either variable externally to override.
+:: ---------------------------------------------------------------------------
+if not defined DOCUMENT_PARSER_MODE set "DOCUMENT_PARSER_MODE=reducto"
+if not defined PDF_ENGINE_MODE set "PDF_ENGINE_MODE=auto"
+
+
 :: Optional Matrix Intro
 if not defined SKIP_MATRIX (
     if exist "%~dp0BankFidelity_Matrix.ps1" (
