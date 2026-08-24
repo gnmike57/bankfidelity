@@ -154,3 +154,62 @@ def check_logs_writable(ufo_dir):
     except OSError as exc:
         record("ufo-logs-writable", "FAIL", str(exc))
 
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--ufo-dir",
+                        default=os.environ.get("BANKFIDELITY_UFO_DIR", r"C:\ufo\ufo"))
+    parser.add_argument("--bankfidelity-dir", default=r"C:\bankfidelity\bankfidelity")
+    parser.add_argument("--exe", default=None,
+                        help="explicit path to the dual-core-pdf-pipeline executable")
+    args = parser.parse_args()
+
+    ufo_dir = Path(args.ufo_dir)
+    bf_dir = Path(args.bankfidelity_dir)
+
+    print("=" * 72)
+    print("BANKFIDELITY // UFO SEQUENTIAL E2E ARCHITECTURE AUDIT")
+    print("=" * 72)
+
+    check_python_env()
+
+    if ufo_dir.is_dir():
+        record("ufo-install-root", "PASS", str(ufo_dir))
+        check_ufo_layout(ufo_dir)
+    else:
+        record("ufo-install-root", "FAIL",
+               f"not found: {ufo_dir} (run scripts/setup_ufo.ps1)")
+
+    exe = find_bankfidelity_exe(args.exe)
+    if exe:
+        record("bankfidelity-binary", "PASS", str(exe))
+    else:
+        record("bankfidelity-binary", "FAIL",
+               "dual-core-pdf-pipeline.exe not found (cargo build --release)")
+        record("mcp-initialize", "SKIP", "no binary")
+        record("mcp-tools-list", "SKIP", "no binary")
+
+    if bf_dir.is_dir():
+        record("bankfidelity-repo", "PASS", str(bf_dir))
+        check_api_keys(bf_dir)
+    else:
+        record("bankfidelity-repo", "FAIL", f"not found: {bf_dir}")
+
+    if exe and ufo_dir.is_dir():
+        mcp_handshake(exe)
+
+    if ufo_dir.is_dir():
+        check_logs_writable(ufo_dir)
+
+    fails = sum(1 for _, s, _ in RESULTS if s == "FAIL")
+    skips = sum(1 for _, s, _ in RESULTS if s == "SKIP")
+    passes = sum(1 for _, s, _ in RESULTS if s == "PASS")
+    print("=" * 72)
+    print(f"RESULT: {passes} passed, {fails} failed, {skips} skipped")
+    print("VERDICT:", "E2E CHAIN HEALTHY" if fails == 0 else "E2E CHAIN DEGRADED")
+    return 0 if fails == 0 else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+

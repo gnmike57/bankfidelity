@@ -30,6 +30,23 @@ if (Test-Path $patcherScript) {
 
 Write-Host "UFO Setup Complete."
 
+# ---------------------------------------------------------------------------
+# Deploy the BankFidelity E2E architecture audit script into UFO's scripts/
+# directory so the desktop launchers (01[9], 02[6], 04[4]) can invoke it.
+# ---------------------------------------------------------------------------
+$auditSource = Join-Path $PWD "scripts\audit_e2e_sequential.py"
+$auditTarget = Join-Path $ufoPath "scripts\audit_e2e_sequential.py"
+if (Test-Path $auditSource) {
+    if (-Not (Test-Path (Join-Path $ufoPath "scripts"))) {
+        New-Item -ItemType Directory -Force -Path (Join-Path $ufoPath "scripts") | Out-Null
+    }
+    Copy-Item -Force $auditSource $auditTarget
+    Write-Host "Deployed E2E audit script -> $auditTarget"
+} else {
+    Write-Warning "audit_e2e_sequential.py not found at $auditSource; launchers will show a graceful error."
+}
+
+
 
 # ---------------------------------------------------------------------------
 # Register the BankFidelity MCP Server so UFO can call back natively.
