@@ -234,8 +234,10 @@ impl AiProviderMode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DocumentParserMode {
-    /// LlamaParse (API-based document parser using LLMs for extraction).
+    /// Reducto API (API-based document parser returning structured JSON for tables/fields).
     #[default]
+    Reducto,
+    /// LlamaParse (API-based document parser using LLMs for extraction).
     LlamaParse,
     /// Pure Rust heuristic parsing (regex + layout), highly accurate for standard banking formats.
     OfflineHeuristic,
@@ -251,6 +253,7 @@ pub enum DocumentParserMode {
 impl DocumentParserMode {
     pub fn label(self) -> &'static str {
         match self {
+            Self::Reducto => "Reducto",
             Self::DocumentAi => "Google Document AI",
 
             Self::LlamaParse => "LlamaParse",

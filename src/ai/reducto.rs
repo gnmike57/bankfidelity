@@ -278,4 +278,50 @@ impl ReductoClient {
         let classify_res: ReductoResponse = res.json().await?;
         Ok(classify_res.result.classification.unwrap_or_default())
     }
+
+    pub async fn parse_statement(&self, pdf_path: &Path) -> Result<crate::ai::document_ai::BankStatement, ReductoError> {
+        let chunks = self.parse_document(pdf_path).await?;
+        let markdown = chunks.to_string(); 
+        
+        let mut statement = crate::ai::llamaparse::LlamaParseClient::from_app_config(&crate::app::config::AppConfig::default())
+            .unwrap()
+            .parse_markdown_to_statement(&markdown)
+            .map_err(|e| ReductoError::System(e.to_string()))?;
+        statement.ensure_canonical_metadata();
+        Ok(statement)
+    }
+
+    pub async fn parse_statement_for_transfer(&self, pdf_path: &Path) -> Result<crate::ai::document_ai::BankStatement, ReductoError> {
+        self.parse_statement(pdf_path).await
+    }
+
+    pub async fn edit_document(&self, pdf_path: &Path, edit_instructions: &str) -> Result<serde_json::Value, ReductoError> {
+        let file_id = self.upload_document(pdf_path).await?;
+        
+        #[derive(serde::Serialize)]
+        struct EditRequest {
+            input: String,
+            edit_instructions: String,
+        }
+        
+        let req = EditRequest {
+            input: file_id,
+            edit_instructions: edit_instructions.to_string(),
+        };
+
+        let res = self.raw_http
+            .post(format!("{}/edit", "https://platform.reducto.ai"))
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("Content-Type", "application/json")
+            .json(&req)
+            .send()
+            .await?;
+
+        if !res.status().is_success() {
+            return Err(ReductoError::Api(res.status(), res.text().await?));
+        }
+
+        let edit_res: ReductoResponse = res.json().await?;
+        Ok(edit_res.result.chunks.unwrap_or(serde_json::Value::Null))
+    }
 }

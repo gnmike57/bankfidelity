@@ -1484,6 +1484,7 @@ fn extraction_provider_order(
             DocumentParserMode::OfflineHeuristic,
         ],
         DocumentParserMode::LocalOcrs => vec![DocumentParserMode::LocalOcrs],
+        DocumentParserMode::Reducto => vec![DocumentParserMode::Reducto],
     }
 }
 
@@ -2525,6 +2526,29 @@ Additional Context:\n{context}",
                                                 .map_err(anyhow::Error::from)
                                         },
                                         wdog_docai,
+                                    )
+                                    .await
+                                    .ok(),
+                                )
+                            }));
+                        }
+
+                        // 1.5. Reducto
+                        if let Ok(reducto) = crate::ai::reducto::ReductoClient::from_app_config(&cfg) {
+                            let p = pdf_path.clone();
+                            let wdog_reducto = wdog.clone();
+                            tasks.push(tokio::spawn(async move {
+                                (
+                                    "Reducto",
+                                    crate::engine::pro_edit::perform_pro_edit(
+                                        "Reducto",
+                                        async {
+                                            reducto
+                                                .parse_statement_for_transfer(&p)
+                                                .await
+                                                .map_err(anyhow::Error::from)
+                                        },
+                                        wdog_reducto,
                                     )
                                     .await
                                     .ok(),
@@ -6103,6 +6127,15 @@ Additional Context:\n{context}",
 
                     let attempt: Result<crate::ai::document_ai::BankStatement, String> =
                         match provider {
+                            crate::app::config::DocumentParserMode::Reducto => {
+                                if let Ok(client) = crate::ai::reducto::ReductoClient::from_app_config(&cfg) {
+                                    tokio::task::block_in_place(|| {
+                                        tokio::runtime::Handle::current().block_on(client.parse_statement(&path))
+                                    }).map_err(|e| e.to_string())
+                                } else {
+                                    Err("Reducto client init failed".into())
+                                }
+                            }
                             crate::app::config::DocumentParserMode::LlamaParse => {
                                 match crate::ai::llamaparse::LlamaParseClient::from_app_config(&cfg) {
                                     Ok(client) => crate::engine::pro_edit::perform_pro_edit(

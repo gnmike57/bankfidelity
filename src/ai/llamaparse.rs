@@ -394,7 +394,7 @@ impl LlamaParseClient {
         ))
     }
 
-    fn parse_markdown_to_statement(
+    pub fn parse_markdown_to_statement(
         &self,
         markdown: &str,
     ) -> Result<BankStatement, LlamaParseError> {

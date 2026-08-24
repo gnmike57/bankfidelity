@@ -672,6 +672,7 @@ impl AppModals for MyApp {
                         )
                     }
                     DocumentParserMode::LocalOcrs => {}
+                    DocumentParserMode::Reducto => {}
                     DocumentParserMode::OfflineHeuristic => {}
                 }
 
