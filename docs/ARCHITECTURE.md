@@ -12,9 +12,11 @@ The **Bank Statement Fidelity Editor** is built on a high-performance Rust core 
 ## Directory Structure
 
 > **Note:** `src/app/runtime.rs` is the **single source of truth** for the job
-> runtime (orchestration, cancellation, parser chain). There is no
-> `src/app/runtime/` directory — a historical dead-code fork of that name was
-> removed, and `tests/static_analysis.rs` guards against its return.
+> runtime (orchestration, cancellation, parser chain). Its only submodule is
+> `src/app/runtime/parser_chain.rs` (declared via `mod parser_chain;`). A
+> historical dead-code fork of that directory name was removed, and
+> `tests/static_analysis.rs` fails the suite if undeclared files ever appear
+> there again.
 
 | Directory | Purpose | Key Files / Modules |
 | :--- | :--- | :--- |

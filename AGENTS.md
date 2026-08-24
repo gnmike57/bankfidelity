@@ -3,11 +3,14 @@
 ## Single source of truth: the runtime
 
 `src/app/runtime.rs` is the ONLY live runtime module (job orchestration,
-cancellation, parser chain, interactive fallback). There is no
-`src/app/runtime/` directory; a historical dead fork of that name was deleted.
-Never treat any other file as a reference for current runtime behavior, and
-never recreate the directory fork — `tests/static_analysis.rs`
-(`test_zombie_runtime_fork_directory_is_gone`) fails the suite if it returns.
+cancellation, parser chain, interactive fallback). Its only submodule is
+`src/app/runtime/parser_chain.rs`, declared via `mod parser_chain;`.
+A historical dead fork of that directory name (core.rs, client.rs, jobs.rs,
+python_job.rs, tracking.rs) was deleted. Never treat any other file as a
+reference for current runtime behavior, and never place undeclared `.rs`
+files in that directory — `tests/static_analysis.rs`
+(`test_zombie_runtime_fork_files_are_declared_or_absent`) fails the suite
+if one appears.
 
 ## Project type
 

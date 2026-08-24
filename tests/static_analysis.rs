@@ -19,19 +19,49 @@ fn test_no_pymupdf_in_split_merge() {
 /// Guardrail against the "zombie fork" regression.
 ///
 /// `src/app/runtime.rs` is the single live runtime module. Historically, a
-/// duplicate `src/app/runtime/` directory (core.rs, client.rs, jobs.rs,
-/// python_job.rs, tracking.rs) existed alongside it as dead, never-compiled
-/// code that kept being mistaken for the real implementation. It was removed;
-/// this test fails the suite if anyone reintroduces it.
+/// dead fork lived in `src/app/runtime/` (core.rs, client.rs, jobs.rs,
+/// python_job.rs, tracking.rs) as never-compiled duplicate code that kept
+/// being mistaken for the real implementation. It was removed.
+///
+/// Today the directory may exist ONLY for submodules that
+/// `src/app/runtime.rs` explicitly declares (e.g. `mod parser_chain;`).
+/// Any `.rs` file in that directory without a matching declaration is dead
+/// code by construction — this test fails the suite if one appears.
 #[test]
-fn test_zombie_runtime_fork_directory_is_gone() {
-    let zombie_dir = Path::new("src/app/runtime");
+fn test_zombie_runtime_fork_files_are_declared_or_absent() {
+    let runtime_dir = Path::new("src/app/runtime");
+    if !runtime_dir.exists() {
+        return; // No submodules at all is fine.
+    }
+    let runtime_rs =
+        fs::read_to_string("src/app/runtime.rs").expect("src/app/runtime.rs must exist");
+    let declares = |stem: &str| {
+        runtime_rs.lines().any(|line| {
+            let trimmed = line.trim();
+            trimmed == format!("mod {stem};")
+                || trimmed == format!("pub mod {stem};")
+                || trimmed == format!("pub(crate) mod {stem};")
+        })
+    };
+    let mut undeclared = Vec::new();
+    for entry in fs::read_dir(runtime_dir).expect("read src/app/runtime dir") {
+        let path = entry.expect("dir entry").path();
+        if path.extension().is_some_and(|ext| ext == "rs") {
+            let stem = path
+                .file_stem()
+                .expect("file stem")
+                .to_string_lossy()
+                .to_string();
+            if !declares(&stem) {
+                undeclared.push(path.display().to_string());
+            }
+        }
+    }
     assert!(
-        !zombie_dir.exists(),
-        "ZOMBIE FORK DETECTED: 'src/app/runtime/' must not exist. \
-         'src/app/runtime.rs' is the single source of truth for the runtime. \
-         If you need new runtime code, extend 'src/app/runtime.rs' or create a \
-         properly declared module — never an undeclared sibling directory."
+        undeclared.is_empty(),
+        "ZOMBIE FORK DETECTED: undeclared .rs files under src/app/runtime/ \
+         are dead code that is never compiled:\n{}",
+        undeclared.join("\n")
     );
 }
 
