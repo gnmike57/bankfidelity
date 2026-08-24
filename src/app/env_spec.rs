@@ -55,7 +55,7 @@ pub const ENV_VARS: &[EnvVarSpec] = &[
     },
     EnvVarSpec {
         name: "PYMUPDF_PRO_KEY",
-        requirement: Requirement::Optional,
+        requirement: Requirement::Recommended,
         summary: "PyMuPDF Pro license key (trial or commercial).",
         enables: "Per-segment editing/rendering (Subsystem B). Split/merge work without it.",
         setup_hint: "Obtain from https://pymupdf.io/ and keep it out of version control. Both 24-char 'hFKt'-prefixed trial keys and commercial license keys (≥16 chars) are accepted; splitting and merging run regardless of this key.",

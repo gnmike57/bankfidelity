@@ -1,9 +1,7 @@
 use reqwest::StatusCode;
-use reqwest_middleware::ClientWithMiddleware;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use crate::app::config::AppConfig;
-use crate::ai::document_ai::BankStatement;
 use tokio::fs;
 
 const REDUCTO_API_BASE: &str = "https://platform.reducto.ai";
@@ -113,26 +111,23 @@ struct ReductoResult {
 }
 
 pub struct ReductoClient {
-    http: ClientWithMiddleware,
     raw_http: reqwest::Client,
     api_key: String,
 }
 
 impl ReductoClient {
-    pub fn from_app_config(cfg: &AppConfig) -> Result<Self, ReductoError> {
+    pub fn from_app_config(_cfg: &AppConfig) -> Result<Self, ReductoError> {
         let api_key = std::env::var("REDUCTO_API_KEY").unwrap_or_default();
         if api_key.is_empty() {
             return Err(ReductoError::MissingConfig("REDUCTO_API_KEY is not set"));
         }
 
-        let http = crate::app::config::global_http_client();
         let raw_http = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(120))
             .build()
             .unwrap_or_default();
 
         Ok(Self {
-            http,
             raw_http,
             api_key,
         })

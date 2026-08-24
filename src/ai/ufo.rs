@@ -1,4 +1,3 @@
-use serde_json::{json, Value};
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
@@ -72,6 +71,31 @@ impl UfoClient {
     /// Returns `Err` when UFO is missing, the process fails to start, or the
     /// UFO process exits non-zero. Concurrent dispatches cancel the previous task.
     pub fn dispatch_task<F>(request: &str, mut on_log: Option<F>) -> Result<UfoTaskResult, UfoError>
+    where
+        F: FnMut(String) + Send + 'static,
+    {
+        let mut attempts = 0;
+        let max_attempts = 2;
+        loop {
+            attempts += 1;
+            let res = Self::execute_single_attempt(request, &mut on_log);
+            match res {
+                Ok(r) => return Ok(r),
+                Err(e) => {
+                    if attempts >= max_attempts {
+                        return Err(e);
+                    }
+                    if let UfoError::Hallucination(msg) = &e {
+                        tracing::warn!("UFO Hallucinated (attempt {}/{}): {}. Retrying...", attempts, max_attempts, msg);
+                        continue;
+                    }
+                    return Err(e);
+                }
+            }
+        }
+    }
+
+    fn execute_single_attempt<F>(request: &str, on_log: &mut Option<F>) -> Result<UfoTaskResult, UfoError>
     where
         F: FnMut(String) + Send + 'static,
     {

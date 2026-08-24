@@ -150,9 +150,9 @@ async fn verify_pymupdf_pro(config: &AppConfig) -> VerificationResult {
     if key.is_none() || key.is_some_and(|k| k.is_empty()) {
         return VerificationResult {
             service: "PyMuPDF Pro".to_string(),
-            status: VerificationStatus::Failed,
+            status: VerificationStatus::Partial,
             latency_ms: start.elapsed().as_millis() as u64,
-            error_message: Some("PYMUPDF_PRO_KEY not configured".to_string()),
+            error_message: Some("PYMUPDF_PRO_KEY not configured. Degraded Mode: falling back to native rendering".to_string()),
             guidance: Some(
                 "Set PYMUPDF_PRO_KEY environment variable with your PyMuPDF Pro license key. \
                  Obtain from https://pymupdf.io/"

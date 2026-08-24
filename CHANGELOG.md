@@ -4,10 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v2.0.0] - 2026-08-24
+
 ### Added
 - **Native multi-line multi-span edit parity:** `find_multiline_native_targets` filters spans by tall field rect (Python multi-span rules), joins wrap lines, and blanks trailing operators after rewrite; expanded unit tests.
 - **package-lock.json tracking:** Node/Applitools dependency lockfile is committed for deterministic installs; WiX packaging artifacts (`wix.zip`, `wix_bin/`) remain ignored.
 - **Automated Stress Testing Harness:** Added a comprehensive stress testing benchmark suite (`au_transfer_stress.rs`) and result evaluation framework (`tests/stress_results/stress_test_evaluation.md`) for document processing backends. Evaluates PyMuPDF, Document AI, Mindee, LlamaParse, pdfRest, Applitools, and various LLMs for correctness, fidelity, and latency across 7 axes.
+- **Production Readiness:** Purged deprecated `reducto.rs` and `ufo.rs` parser stubs, migrated to active UFO endpoints, deleted development MongoDB scripts.
+- **Packaging Architecture:** WiX MSI build step in GitHub Actions for Windows installer (`wix.zip`), bundled `libpdfium.dylib` into macOS `Resources/` via `scripts/build_mac_app.sh`.
+- **Graceful Degradation:** Modified API verification and Doctor CLI to explicitly query `config.pymupdf_pro_key` and output a "Degraded Mode" warning instead of full failure.
 
 ### Fixed
 - **GUI `in_flight` single-path accounting:** Job wait slots free only via `ends_gui_tracked_job` drain path (no double decrement / leak on UFO/error paths).
@@ -17,7 +22,7 @@ All notable changes to this project will be documented in this file.
 - **GUI window title version:** Uses `CARGO_PKG_VERSION` instead of stale `v0.5.0`.
 - **Clippy CI:** Collapse nested `if` in `python_executable_is_usable`.
 
-## [v1.0.0] - 2026-07-05
+## [v1.1.1] - 2026-08-21
 
 ### Added
 - **Automated Bug Reporting & Beta Repair Loop:** Integrated interactive fallback UI and webhook telemetry for rapid crash capture and log aggregation during the beta testing phase (`docs/BETA_TESTING.md`).
@@ -82,6 +87,8 @@ All notable changes to this project will be documented in this file.
 - **Legacy Stubs**: Removed placeholder parsing and fake manual heuristics in Python integration and text_editor components.
 
 <!-- link references -->
-[v1.0.0]: https://github.com/maryjpww-star/bank-statement-fidelity-editor/compare/v0.5.0...v1.0.0
-[v0.5.0]: https://github.com/maryjpww-star/bank-statement-fidelity-editor/compare/v0.4.0...v0.5.0
-[v0.4.0]: https://github.com/maryjpww-star/bank-statement-fidelity-editor/releases/tag/v0.4.0
+[v2.0.0]: https://github.com/gnmike57/bankfidelity/compare/v1.1.1...v2.0.0
+[v1.1.1]: https://github.com/gnmike57/bankfidelity/compare/v1.0.0...v1.1.1
+[v1.0.0]: https://github.com/gnmike57/bankfidelity/compare/v0.5.0...v1.0.0
+[v0.5.0]: https://github.com/gnmike57/bankfidelity/compare/v0.4.0...v0.5.0
+[v0.4.0]: https://github.com/gnmike57/bankfidelity/releases/tag/v0.4.0

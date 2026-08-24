@@ -157,7 +157,7 @@
                                 Id='pdfium_dll'
                                 Name='pdfium.dll'
                                 DiskId='1'
-                                Source='C:\bankfidelity\bankfidelity\pdfium.dll'
+                                Source='pdfium.dll'
                                 KeyPath='yes'/>
                         </Component>
                     </Directory>
