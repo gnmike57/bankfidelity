@@ -50,7 +50,10 @@ fn main() {
     let _telemetry_guard = app::telemetry::init(&config);
 
     println!("╔════════════════════════════════════════════════════════════╗");
-    println!("║   Bank Statement Fidelity Editor v{:<39}║", env!("CARGO_PKG_VERSION"));
+    println!(
+        "║   Bank Statement Fidelity Editor v{:<39}║",
+        env!("CARGO_PKG_VERSION")
+    );
     println!("║   100% Visual Fidelity • Smart Targeted Editing           ║");
     println!("╚════════════════════════════════════════════════════════════╝\n");
 

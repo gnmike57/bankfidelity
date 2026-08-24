@@ -2155,11 +2155,17 @@ Additional Context:\n{context}",
                     )
                 })
                 .await
-                .unwrap_or_else(|e| Err(crate::ai::ufo::UfoError::Unknown(format!("Tokio spawn_blocking panicked: {e}"))));
+                .unwrap_or_else(|e| {
+                    Err(crate::ai::ufo::UfoError::Unknown(format!(
+                        "Tokio spawn_blocking panicked: {e}"
+                    )))
+                });
 
                 match result {
                     Ok(val) => {
-                        let _ = res_tx.send(JobResult::UfoAutoEditResult(serde_json::to_value(val).unwrap_or(serde_json::Value::Null)));
+                        let _ = res_tx.send(JobResult::UfoAutoEditResult(
+                            serde_json::to_value(val).unwrap_or(serde_json::Value::Null),
+                        ));
                     }
                     Err(e) => {
                         let _ = res_tx.send(JobResult::Error {
@@ -2534,7 +2540,9 @@ Additional Context:\n{context}",
                         }
 
                         // 1.5. Reducto
-                        if let Ok(reducto) = crate::ai::reducto::ReductoClient::from_app_config(&cfg) {
+                        if let Ok(reducto) =
+                            crate::ai::reducto::ReductoClient::from_app_config(&cfg)
+                        {
                             let p = pdf_path.clone();
                             let wdog_reducto = wdog.clone();
                             tasks.push(tokio::spawn(async move {
@@ -4919,10 +4927,10 @@ Additional Context:\n{context}",
                             message: format!("__DISPATCH:Balance:{}:{}", auto_apply, t),
                         });
                     }
-                    NlpCommand::Verify => {
+                    NlpCommand::Verify { mode } => {
                         let _ = res_tx.send(JobResult::Error {
                             job_label: "ai_command_dispatch".into(),
-                            message: "__DISPATCH:Verify".into(),
+                            message: format!("__DISPATCH:Verify:{}", mode),
                         });
                     }
                     NlpCommand::Extract { provider } => {
@@ -4931,10 +4939,46 @@ Additional Context:\n{context}",
                             message: format!("__DISPATCH:Extract:{}", provider),
                         });
                     }
-                    NlpCommand::Transfer { target_bank } => {
+                    NlpCommand::Transfer {
+                        target_bank,
+                        source_bank,
+                    } => {
+                        let src = source_bank.unwrap_or_default();
                         let _ = res_tx.send(JobResult::Error {
                             job_label: "ai_command_dispatch".into(),
-                            message: format!("__DISPATCH:Transfer:{}", target_bank),
+                            message: format!("__DISPATCH:Transfer:{}:{}", target_bank, src),
+                        });
+                    }
+                    NlpCommand::TypstReconstruct => {
+                        let _ = res_tx.send(JobResult::Error {
+                            job_label: "ai_command_dispatch".into(),
+                            message: "__DISPATCH:TypstReconstruct".into(),
+                        });
+                    }
+                    NlpCommand::UfoAutomate { task_prompt } => {
+                        let _ = res_tx.send(JobResult::Error {
+                            job_label: "ai_command_dispatch".into(),
+                            message: format!("__DISPATCH:UfoAutomate:{}", task_prompt),
+                        });
+                    }
+                    NlpCommand::FontAnalysis => {
+                        let _ = res_tx.send(JobResult::Error {
+                            job_label: "ai_command_dispatch".into(),
+                            message: "__DISPATCH:FontAnalysis".into(),
+                        });
+                    }
+                    NlpCommand::ClarificationRequired {
+                        reason,
+                        suggestions,
+                        ..
+                    } => {
+                        let _ = res_tx.send(JobResult::Error {
+                            job_label: "ai_command".into(),
+                            message: format!(
+                                "Clarification required: {}. Suggestions: {}",
+                                reason,
+                                suggestions.join(", ")
+                            ),
                         });
                     }
                     NlpCommand::AdjustDates { shift_days } => {
@@ -5058,13 +5102,18 @@ Additional Context:\n{context}",
                             }
                         }
                     }
-                    NlpCommand::Unknown { raw } => {
+                    NlpCommand::Unknown { raw, suggestions } => {
+                        let sugg_str = if suggestions.is_empty() {
+                            String::new()
+                        } else {
+                            format!(" Suggestions: {}", suggestions.join(", "))
+                        };
                         let _ = res_tx.send(JobResult::Error {
                             job_label: "ai_command".into(),
                             message: format!(
                                 "Command not recognised: \"{}\". Try: undo, balance, verify, extract, \
                                 transfer to [bank], shift dates forward N days, or describe an edit.",
-                                raw
+                                format!("{}{}", raw, sugg_str)
                             ),
                         });
                     }

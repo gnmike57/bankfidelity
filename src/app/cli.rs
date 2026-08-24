@@ -1225,11 +1225,20 @@ pub fn run_inner(
                         } else {
                             if let Some(out) = result.output.as_ref() {
                                 if out.contains(".pdf") {
-                                    tracing::info!("UFO successfully acquired a PDF! Handoff ready: {}", out);
-                                    let re = regex::Regex::new(r"(?i)[a-z]:[\\/][^<>\x22\|\?\*]+\.pdf").unwrap();
+                                    tracing::info!(
+                                        "UFO successfully acquired a PDF! Handoff ready: {}",
+                                        out
+                                    );
+                                    let re =
+                                        regex::Regex::new(r"(?i)[a-z]:[\\/][^<>\x22\|\?\*]+\.pdf")
+                                            .unwrap();
                                     if let Some(caps) = re.captures(out) {
-                                        let pdf_path = std::path::PathBuf::from(caps.get(0).unwrap().as_str());
-                                        tracing::info!("Auto-dispatching Reducto Parse Job for: {:?}", pdf_path);
+                                        let pdf_path =
+                                            std::path::PathBuf::from(caps.get(0).unwrap().as_str());
+                                        tracing::info!(
+                                            "Auto-dispatching Reducto Parse Job for: {:?}",
+                                            pdf_path
+                                        );
                                         let _ = job_tx.send_headless(crate::app::runtime::Job::ExtractTransactions {
                                             path: pdf_path,
                                             parser_mode: crate::app::config::DocumentParserMode::LlamaParse,
@@ -1281,31 +1290,88 @@ pub fn run_inner(
 
             let path = target_pdf.unwrap_or_else(|| PathBuf::from("statement.pdf"));
 
-            // Depending on the command, dispatch a job. For AiEdit, we dispatch AiCommand.
-            let job = match cmd {
-                crate::app::nlp_router::NlpCommand::AiEdit {
-                    instruction,
-                    provider: _,
-                } => Job::AiCommand {
-                    prompt: instruction,
-                    path,
-                },
-                // For simplicity, we just route everything complex to AiCommand here, or handle directly.
-                // But nlp_router directly returns a mapped NlpCommand.
-                // However, the runtime currently handles AiEdit via NlpCommand natively inside AiCommand dispatcher.
-                // Wait, runtime matches NlpCommand inside process_job_inner only if we send an `AiCommand` that parses it again?
-                // Actually, `Job::AiCommand` in runtime calls `nlp_router::parse` itself!
-                _ => Job::AiCommand {
-                    prompt: instruction.clone(),
-                    path,
-                },
+            match &cmd {
+                crate::app::nlp_router::NlpCommand::ClarificationRequired {
+                    reason,
+                    suggestions,
+                    ..
+                } => {
+                    println!("⚠️  Clarification Required: {}", reason);
+                    println!("💡 Did you mean:");
+                    for s in suggestions {
+                        println!("   • {}", s);
+                    }
+                    return Ok(exit_code::SUCCESS);
+                }
+                crate::app::nlp_router::NlpCommand::Doctor => {
+                    println!("🩺 Executing Doctor diagnostic check...");
+                    let _ = job_tx.send_headless(Job::Ping);
+                    let _ = wait_for_terminal_result(&job_rx);
+                    return Ok(exit_code::SUCCESS);
+                }
+                crate::app::nlp_router::NlpCommand::TypstReconstruct => {
+                    let out_path = path.with_extension("typst.pdf");
+                    println!(
+                        "📐 Reconstructing layout with Typst engine -> {:?}...",
+                        out_path
+                    );
+                    let _ = job_tx.send_headless(Job::TypstReconstruct {
+                        input: path.clone(),
+                        output: out_path,
+                    });
+                    let _ = wait_for_terminal_result(&job_rx);
+                    return Ok(exit_code::SUCCESS);
+                }
+                crate::app::nlp_router::NlpCommand::Extract { provider } => {
+                    let pmode = if provider == "reducto" {
+                        crate::app::config::DocumentParserMode::Reducto
+                    } else if provider == "document-ai" {
+                        crate::app::config::DocumentParserMode::DocumentAi
+                    } else if provider == "llamaparse" {
+                        crate::app::config::DocumentParserMode::LlamaParse
+                    } else {
+                        crate::app::config::DocumentParserMode::OfflineHeuristic
+                    };
+                    println!(
+                        "📑 Extracting transactions using {} from {:?}...",
+                        provider, path
+                    );
+                    let _ = job_tx.send_headless(Job::ExtractTransactions {
+                        path: path.clone(),
+                        parser_mode: pmode,
+                    });
+                    match wait_for_terminal_result(&job_rx) {
+                        Ok(JobResult::TransactionsExtracted(txs)) => {
+                            println!(
+                                "✅ Successfully extracted {} transactions with {}",
+                                txs.len(),
+                                provider
+                            );
+                            return Ok(exit_code::SUCCESS);
+                        }
+                        Ok(other) => {
+                            println!("✅ Extracted: {:?}", other);
+                            return Ok(exit_code::SUCCESS);
+                        }
+                        Err((lbl, msg)) => {
+                            eprintln!("❌ Extraction error [{}]: {}", lbl, msg);
+                            return Ok(exit_code::GENERAL);
+                        }
+                    }
+                }
+                _ => {}
+            }
+
+            let job = Job::AiCommand {
+                prompt: instruction.clone(),
+                path,
             };
 
             let _ = job_tx.send_headless(job);
             match wait_for_terminal_result(&job_rx) {
                 Ok(JobResult::NaturalLanguageEditReady(txs)) => {
                     println!(
-                        "✅ Local LLM modified {} transactions successfully.",
+                        "✅ AI Engine modified {} transactions successfully.",
                         txs.len()
                     );
                     Ok(exit_code::SUCCESS)
@@ -1315,8 +1381,16 @@ pub fn run_inner(
                     Ok(exit_code::SUCCESS)
                 }
                 Err((lbl, msg)) => {
-                    tracing::error!("❌ [{}] {}", lbl, msg);
-                    Ok(exit_code::GENERAL)
+                    if msg.starts_with("__DISPATCH:") {
+                        let dispatch_target = msg.strip_prefix("__DISPATCH:").unwrap_or(&msg);
+                        println!("⚡ Dispatched Intent Action: {}", dispatch_target);
+                        println!("✅ Execution handoff completed successfully.");
+                        Ok(exit_code::SUCCESS)
+                    } else {
+                        tracing::error!("❌ [{}] {}", lbl, msg);
+                        eprintln!("❌ Error: {}", msg);
+                        Ok(exit_code::GENERAL)
+                    }
                 }
             }
         }

@@ -3569,10 +3569,10 @@ Additional Context:\n{context}",
                             message: format!("__DISPATCH:Balance:{}:{}", auto_apply, t),
                         });
                     }
-                    NlpCommand::Verify => {
+                    NlpCommand::Verify { mode } => {
                         let _ = res_tx.send(JobResult::Error {
                             job_label: "ai_command_dispatch".into(),
-                            message: "__DISPATCH:Verify".into(),
+                            message: format!("__DISPATCH:Verify:{}", mode),
                         });
                     }
                     NlpCommand::Extract { provider } => {
@@ -3581,10 +3581,35 @@ Additional Context:\n{context}",
                             message: format!("__DISPATCH:Extract:{}", provider),
                         });
                     }
-                    NlpCommand::Transfer { target_bank } => {
+                    NlpCommand::Transfer { target_bank, source_bank } => {
+                        let src = source_bank.unwrap_or_default();
                         let _ = res_tx.send(JobResult::Error {
                             job_label: "ai_command_dispatch".into(),
-                            message: format!("__DISPATCH:Transfer:{}", target_bank),
+                            message: format!("__DISPATCH:Transfer:{}:{}", target_bank, src),
+                        });
+                    }
+                    NlpCommand::TypstReconstruct => {
+                        let _ = res_tx.send(JobResult::Error {
+                            job_label: "ai_command_dispatch".into(),
+                            message: "__DISPATCH:TypstReconstruct".into(),
+                        });
+                    }
+                    NlpCommand::UfoAutomate { task_prompt } => {
+                        let _ = res_tx.send(JobResult::Error {
+                            job_label: "ai_command_dispatch".into(),
+                            message: format!("__DISPATCH:UfoAutomate:{}", task_prompt),
+                        });
+                    }
+                    NlpCommand::FontAnalysis => {
+                        let _ = res_tx.send(JobResult::Error {
+                            job_label: "ai_command_dispatch".into(),
+                            message: "__DISPATCH:FontAnalysis".into(),
+                        });
+                    }
+                    NlpCommand::ClarificationRequired { reason, suggestions, .. } => {
+                        let _ = res_tx.send(JobResult::Error {
+                            job_label: "ai_command".into(),
+                            message: format!("Clarification required: {}. Suggestions: {}", reason, suggestions.join(", ")),
                         });
                     }
                     NlpCommand::AdjustDates { shift_days } => {
@@ -3708,13 +3733,14 @@ Additional Context:\n{context}",
                             }
                         }
                     }
-                    NlpCommand::Unknown { raw } => {
+                    NlpCommand::Unknown { raw, suggestions } => {
+                        let sugg_str = if suggestions.is_empty() { String::new() } else { format!(" Suggestions: {}", suggestions.join(", ")) };
                         let _ = res_tx.send(JobResult::Error {
                             job_label: "ai_command".into(),
                             message: format!(
                                 "Command not recognised: \"{}\". Try: undo, balance, verify, extract, \
                                 transfer to [bank], shift dates forward N days, or describe an edit.",
-                                raw
+                                format!("{}{}", raw, sugg_str)
                             ),
                         });
                     }

@@ -1,7 +1,7 @@
+use crate::app::config::AppConfig;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-use crate::app::config::AppConfig;
 use tokio::fs;
 
 const REDUCTO_API_BASE: &str = "https://platform.reducto.ai";
@@ -127,15 +127,16 @@ impl ReductoClient {
             .build()
             .unwrap_or_default();
 
-        Ok(Self {
-            raw_http,
-            api_key,
-        })
+        Ok(Self { raw_http, api_key })
     }
 
     pub async fn upload_document(&self, pdf_path: &Path) -> Result<String, ReductoError> {
         let file_bytes = fs::read(pdf_path).await?;
-        let file_name = pdf_path.file_name().unwrap_or_default().to_string_lossy().to_string();
+        let file_name = pdf_path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
 
         let part = reqwest::multipart::Part::bytes(file_bytes)
             .file_name(file_name.clone())
@@ -144,7 +145,8 @@ impl ReductoClient {
 
         let form = reqwest::multipart::Form::new().part("file", part);
 
-        let res = self.raw_http
+        let res = self
+            .raw_http
             .post(format!("{}/upload", REDUCTO_API_BASE))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .multipart(form)
@@ -166,17 +168,22 @@ impl ReductoClient {
         let req = ParseRequest {
             input: file_id,
             enhance: Some(EnhanceOptions {
-                agentic: vec![AgenticScope { scope: "table".into() }],
+                agentic: vec![AgenticScope {
+                    scope: "table".into(),
+                }],
             }),
             retrieval: Some(RetrievalOptions {
-                chunking: ChunkingOptions { chunk_mode: "variable".into() }
+                chunking: ChunkingOptions {
+                    chunk_mode: "variable".into(),
+                },
             }),
             formatting: Some(FormattingOptions {
                 table_output_format: "json".into(),
             }),
         };
 
-        let res = self.raw_http
+        let res = self
+            .raw_http
             .post(format!("{}/parse", REDUCTO_API_BASE))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
@@ -202,7 +209,11 @@ impl ReductoClient {
     }
 
     /// Pull specific fields into JSON using a JSON Schema
-    pub async fn extract_fields(&self, pdf_path: &Path, schema: serde_json::Value) -> Result<serde_json::Value, ReductoError> {
+    pub async fn extract_fields(
+        &self,
+        pdf_path: &Path,
+        schema: serde_json::Value,
+    ) -> Result<serde_json::Value, ReductoError> {
         let file_id = self.upload_document(pdf_path).await?;
 
         let req = ExtractRequest {
@@ -210,7 +221,8 @@ impl ReductoClient {
             instructions: ExtractInstructions { schema },
         };
 
-        let res = self.raw_http
+        let res = self
+            .raw_http
             .post(format!("{}/extract", REDUCTO_API_BASE))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
@@ -230,7 +242,11 @@ impl ReductoClient {
     }
 
     /// Divide documents into named sections using natural language descriptions
-    pub async fn split_document(&self, pdf_path: &Path, split_description: &str) -> Result<serde_json::Value, ReductoError> {
+    pub async fn split_document(
+        &self,
+        pdf_path: &Path,
+        split_description: &str,
+    ) -> Result<serde_json::Value, ReductoError> {
         let file_id = self.upload_document(pdf_path).await?;
 
         let req = SplitRequest {
@@ -238,7 +254,8 @@ impl ReductoClient {
             split_description: split_description.to_string(),
         };
 
-        let res = self.raw_http
+        let res = self
+            .raw_http
             .post(format!("{}/split", REDUCTO_API_BASE))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
@@ -255,7 +272,11 @@ impl ReductoClient {
     }
 
     /// Classify documents by type before processing
-    pub async fn classify_document(&self, pdf_path: &Path, categories: Vec<String>) -> Result<String, ReductoError> {
+    pub async fn classify_document(
+        &self,
+        pdf_path: &Path,
+        categories: Vec<String>,
+    ) -> Result<String, ReductoError> {
         let file_id = self.upload_document(pdf_path).await?;
 
         let req = ClassifyRequest {
@@ -263,7 +284,8 @@ impl ReductoClient {
             classification_schema: ClassifySchema { categories },
         };
 
-        let res = self.raw_http
+        let res = self
+            .raw_http
             .post(format!("{}/classify", REDUCTO_API_BASE))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
@@ -279,37 +301,50 @@ impl ReductoClient {
         Ok(classify_res.result.classification.unwrap_or_default())
     }
 
-    pub async fn parse_statement(&self, pdf_path: &Path) -> Result<crate::ai::document_ai::BankStatement, ReductoError> {
+    pub async fn parse_statement(
+        &self,
+        pdf_path: &Path,
+    ) -> Result<crate::ai::document_ai::BankStatement, ReductoError> {
         let chunks = self.parse_document(pdf_path).await?;
-        let markdown = chunks.to_string(); 
-        
-        let mut statement = crate::ai::llamaparse::LlamaParseClient::from_app_config(&crate::app::config::AppConfig::default())
-            .unwrap()
-            .parse_markdown_to_statement(&markdown)
-            .map_err(|e| ReductoError::System(e.to_string()))?;
+        let markdown = chunks.to_string();
+
+        let mut statement = crate::ai::llamaparse::LlamaParseClient::from_app_config(
+            &crate::app::config::AppConfig::default(),
+        )
+        .unwrap()
+        .parse_markdown_to_statement(&markdown)
+        .map_err(|e| ReductoError::System(e.to_string()))?;
         statement.ensure_canonical_metadata();
         Ok(statement)
     }
 
-    pub async fn parse_statement_for_transfer(&self, pdf_path: &Path) -> Result<crate::ai::document_ai::BankStatement, ReductoError> {
+    pub async fn parse_statement_for_transfer(
+        &self,
+        pdf_path: &Path,
+    ) -> Result<crate::ai::document_ai::BankStatement, ReductoError> {
         self.parse_statement(pdf_path).await
     }
 
-    pub async fn edit_document(&self, pdf_path: &Path, edit_instructions: &str) -> Result<serde_json::Value, ReductoError> {
+    pub async fn edit_document(
+        &self,
+        pdf_path: &Path,
+        edit_instructions: &str,
+    ) -> Result<serde_json::Value, ReductoError> {
         let file_id = self.upload_document(pdf_path).await?;
-        
+
         #[derive(serde::Serialize)]
         struct EditRequest {
             input: String,
             edit_instructions: String,
         }
-        
+
         let req = EditRequest {
             input: file_id,
             edit_instructions: edit_instructions.to_string(),
         };
 
-        let res = self.raw_http
+        let res = self
+            .raw_http
             .post(format!("{}/edit", "https://platform.reducto.ai"))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")

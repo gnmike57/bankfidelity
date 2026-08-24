@@ -33,7 +33,30 @@ impl From<String> for UfoError {
     }
 }
 
+impl UfoTaskResult {
+    /// Programmatically intercepts generated PDF artifacts from the UFO output log / result string
+    /// using strict regex: `(?i)[a-z]:\\[^<>\x22\|\?\*]+\.pdf`
+    pub fn extract_pdf_artifacts(&self) -> Vec<std::path::PathBuf> {
+        let mut paths = Vec::new();
+        let text = match (&self.output, &self.error_message) {
+            (Some(out), Some(err)) => format!("{}\n{}", out, err),
+            (Some(out), None) => out.clone(),
+            (None, Some(err)) => err.clone(),
+            (None, None) => return paths,
+        };
 
+        // Strict path extraction
+        if let Ok(re) = regex::Regex::new(r"(?i)[a-zA-Z]:\\[^<>\x22\|\?\*\n\r]+\.pdf") {
+            for cap in re.find_iter(&text) {
+                let p = std::path::PathBuf::from(cap.as_str().trim());
+                if p.exists() && !paths.contains(&p) {
+                    paths.push(p);
+                }
+            }
+        }
+        paths
+    }
+}
 
 pub struct UfoClient;
 
@@ -86,7 +109,12 @@ impl UfoClient {
                         return Err(e);
                     }
                     if let UfoError::Hallucination(msg) = &e {
-                        tracing::warn!("UFO Hallucinated (attempt {}/{}): {}. Retrying...", attempts, max_attempts, msg);
+                        tracing::warn!(
+                            "UFO Hallucinated (attempt {}/{}): {}. Retrying...",
+                            attempts,
+                            max_attempts,
+                            msg
+                        );
                         continue;
                     }
                     return Err(e);
@@ -95,7 +123,10 @@ impl UfoClient {
         }
     }
 
-    fn execute_single_attempt<F>(request: &str, on_log: &mut Option<F>) -> Result<UfoTaskResult, UfoError>
+    fn execute_single_attempt<F>(
+        request: &str,
+        on_log: &mut Option<F>,
+    ) -> Result<UfoTaskResult, UfoError>
     where
         F: FnMut(String) + Send + 'static,
     {
@@ -129,7 +160,12 @@ impl UfoClient {
             pyo3_py
         } else if let Ok(py_exe) = std::env::var("PYTHON_EXE") {
             py_exe
-        } else if ufo_dir.join("ufo").join("python_env").join("python.exe").exists() {
+        } else if ufo_dir
+            .join("ufo")
+            .join("python_env")
+            .join("python.exe")
+            .exists()
+        {
             ufo_dir
                 .join("ufo")
                 .join("python_env")
@@ -197,9 +233,13 @@ impl UfoClient {
                 Ok(Some(s)) => break s,
                 Ok(None) => {
                     if start_wait.elapsed() > timeout {
-                        tracing::error!("UFO task timed out after 10 minutes. Killing process tree.");
+                        tracing::error!(
+                            "UFO task timed out after 10 minutes. Killing process tree."
+                        );
                         kill_process_tree(child.id());
-                        return Err(UfoError::Crash("UFO task timed out (indefinite hang detected)".into()));
+                        return Err(UfoError::Crash(
+                            "UFO task timed out (indefinite hang detected)".into(),
+                        ));
                     }
                     std::thread::sleep(std::time::Duration::from_millis(500));
                 }
@@ -220,8 +260,12 @@ impl UfoClient {
                         let err_msg = res.error_message.clone().unwrap_or_default();
                         let err_type = res.error_type.as_deref().unwrap_or("");
                         match err_type {
-                            "ValueError" | "AssertionError" => return Err(UfoError::Hallucination(err_msg)),
-                            "ImportError" | "ModuleNotFoundError" => return Err(UfoError::Dependency(err_msg)),
+                            "ValueError" | "AssertionError" => {
+                                return Err(UfoError::Hallucination(err_msg))
+                            }
+                            "ImportError" | "ModuleNotFoundError" => {
+                                return Err(UfoError::Dependency(err_msg))
+                            }
                             _ => return Err(UfoError::Crash(err_msg)),
                         }
                     }
@@ -229,11 +273,14 @@ impl UfoClient {
                 }
                 Err(e) => {
                     tracing::warn!("result.json was corrupted. Synthesizing crash report.");
-                    return Err(UfoError::Crash(format!("UFO payload corrupted ({e}). Stderr snapshot: {}", stderr_str)));
+                    return Err(UfoError::Crash(format!(
+                        "UFO payload corrupted ({e}). Stderr snapshot: {}",
+                        stderr_str
+                    )));
                 }
             }
         }
-        
+
         // Fallback if result.json wasn't written
         let log_path = ufo_dir.join("logs").join(&task_id).join("output.md");
         let ufo_result = if log_path.exists() {
@@ -243,12 +290,14 @@ impl UfoClient {
         };
 
         if !status.success() {
-            return Err(UfoError::Crash(format!("Exit {status}. Stderr: {stderr_str}")));
+            return Err(UfoError::Crash(format!(
+                "Exit {status}. Stderr: {stderr_str}"
+            )));
         }
 
         Ok(UfoTaskResult {
             status: "success".into(),
-            task_id: task_id,
+            task_id,
             output: Some(ufo_result),
             error_type: None,
             error_message: None,
@@ -290,7 +339,10 @@ mod tests {
         let result = UfoClient::dispatch_task("noop", None::<fn(String)>);
         std::env::remove_var("BANKFIDELITY_UFO_DIR");
         let err = result.expect_err("missing UFO must be Err");
-        let err = match err { UfoError::Unknown(s) => s, _ => String::new() };
+        let err = match err {
+            UfoError::Unknown(s) => s,
+            _ => String::new(),
+        };
         assert!(
             err.contains("UFO framework not found"),
             "unexpected error: {err}"
