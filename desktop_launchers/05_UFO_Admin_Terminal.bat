@@ -6,7 +6,7 @@ title UFO Interactive Desktop Shell (Elevated)
 net session >nul 2>&1
 if %errorlevel% neq 0 (
     echo Requesting administrative privileges...
-    powershell -Command "Start-Process cmd -ArgumentList '/c cd /d C:\ufo\ufo & \""%~f0\""' -Verb RunAs"
+    powershell -NoProfile -Command "Start-Process -FilePath \"%~f0\" -Verb RunAs"
     exit /b
 )
 
