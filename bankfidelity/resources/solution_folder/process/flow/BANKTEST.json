@@ -1,0 +1,37 @@
+{
+  "docVersion": "1.0.0",
+  "resource": {
+    "name": "BANKTEST",
+    "kind": "process",
+    "type": "flow",
+    "apiVersion": "orchestrator.uipath.com/v1",
+    "projectKey": "8656dd48-c0dc-40bc-b2ab-9e603eb1cf5b",
+    "dependencies": [
+      {
+        "kind": "package",
+        "name": "BANKTEST"
+      }
+    ],
+    "runtimeDependencies": [],
+    "folders": [
+      {
+        "fullyQualifiedName": "solution_folder"
+      }
+    ],
+    "spec": {
+      "type": "Flow",
+      "name": "BANKTEST",
+      "package": {
+        "key": "5fa765a7-3917-4552-9263-3f775909fd20"
+      },
+      "targetFrameworkValue": "Portable",
+      "retentionAction": "Delete",
+      "retentionPeriod": 30,
+      "staleRetentionAction": "Delete",
+      "staleRetentionPeriod": 180
+    },
+    "locks": [],
+    "key": "c35948ce-a981-4cf2-a463-d30c3807d460",
+    "files": []
+  }
+}
