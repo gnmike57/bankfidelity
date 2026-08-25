@@ -11,4 +11,4 @@ if (-Not (Test-Path $modelPath)) {
 }
 
 Write-Host "Starting llama-server.exe with Vulkan offloading (-ngl 99) and 16k context..."
-& $llamaPath -m $modelPath -c 16384 -ngl 99 --port 8080
+& $llamaPath -m $modelPath -c 16384 -ngl 99 --port 11434
