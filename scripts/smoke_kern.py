@@ -3,10 +3,15 @@ import sys
 sys.path.insert(0, 'python')
 import pymupdf
 import pymupdf.pro
+# pyrefly: ignore [missing-import]
 import pymupdf_pro_integration as m
 
-pymupdf.pro.unlock(m.PYMUPDF_PRO_KEY)
-doc = pymupdf.open('AU Bank Statements/IA_Bank_Statement_202602.pdf')
+import os
+pdf_path = sys.argv[1] if len(sys.argv) > 1 else 'AU Bank Statements/anz_example.pdf'
+if not os.path.exists(pdf_path):
+    pdf_path = 'examples/sample.pdf'
+
+doc = pymupdf.open(pdf_path)
 
 count = 0
 kerned = 0

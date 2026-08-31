@@ -192,31 +192,47 @@ Same workspace, same constitution (repeated below — it binds you fully).
 
 ## PHASED OPERATION PLAN
 
-### Phase A — Balance engine exactness campaign
-- Property tests: randomized ledgers over `rust_decimal` → running-balance recomputation ([src/engine/balance.rs](../src/engine/balance.rs)) exact to the cent across thousands of cases; opening/closing continuity invariant.
-- Date semantics: [src/engine/date_adjust.rs](../src/engine/date_adjust.rs) edge cases — month-end rollover, AU DD/MM vs MM/DD ambiguity resolution, year-boundary inline dates (bankwest quirk).
-- Number formats: [src/engine/number_format.rs](../src/engine/number_format.rs) — `$`, thousands commas, parenthesised negatives, CR/DR suffixes, trailing-minus; property-test round-trips.
-- Ground-truth reconciliation: [tests/stress_pdfs/Unbalanced_Ledger_Test.pdf](../tests/stress_pdfs) and `test1..test4_ground_truth.json` must either balance exactly or emit precise per-line diagnostics (row id, expected vs actual delta). Vague "imbalance detected" output is a bug — fix diagnostics granularity.
-- Forensic imbalance explainer: force an imbalance → Qwen explanation streams into the GUI ([src/engine/financial_nlp.rs](../src/engine/financial_nlp.rs), [src/app/nlp_router.rs](../src/app/nlp_router.rs)); with LLM down → graceful manual-only notice that never blocks the edit session.
+### Phase A — Balance Engine Exactness Campaign
+- **Target Files**: `src/engine/balance.rs`, `src/engine/date_adjust.rs`, `src/engine/number_format.rs`, `src/engine/financial_nlp.rs`, `src/app/nlp_router.rs`.
+- **Implementation Details**:
+  - Implement property tests for randomized ledgers over `rust_decimal` to ensure opening/closing continuity invariants.
+  - Implement strict date semantics (month-end rollover, AU DD/MM ambiguity, bankwest year-boundary quirks).
+  - Ensure number format parsing handles `$`, commas, parentheses (negatives), CR/DR suffixes, and trailing minus.
+  - Fix diagnostics granularity on `test1..test4_ground_truth.json` mismatches to emit precise per-line expected vs actual deltas (no vague "imbalance detected").
+  - Wire forensic explainer to `qwen2.5-coder-7b-instruct-q4_k_m` (local LLM via `127.0.0.1:11434`), streaming into `egui`.
+- **Verification Steps**: `cargo test --test stress_pdfs_balance_test`.
+- **Failure Recovery**: If local Qwen LLM is down, gracefully fallback to a manual-only notice without blocking the edit session or crashing the GUI.
 
-### Phase B — Verification gates & evidence ledger
-- Map every gate — [src/engine/verification.rs](../src/engine/verification.rs), [verification_v2.rs](../src/engine/verification_v2.rs), [verification_content.rs](../src/engine/verification_content.rs), [verification_structural.rs](../src/engine/verification_structural.rs), [src/app/api_verification.rs](../src/app/api_verification.rs) — to the 8-gate evidence ledger ([src/app/audit.rs](../src/app/audit.rs)).
-- Tamper matrix: craft violations per class — altered amount, altered date, inserted row, removed row, font swap, geometry shift, metadata touch, rebalance cheat — and prove the corresponding gate trips loudly for EACH. Any silent pass = P0 bug of this phase.
-- Evidence integrity: atomic writes + CRC32 proven by induced mid-write fault injection (crash between temp write and rename); repeatability ([tests/verification_repeatability.rs](../tests/verification_repeatability.rs)): same input → byte-identical evidence JSON.
-- Calibration consumed correctly: [assets/verification-calibration-v2.json](../assets/verification-calibration-v2.json) thresholds drive gate decisions (no magic constants duplicated in code).
+### Phase B — Verification Gates & Evidence Ledger
+- **Target Files**: `src/engine/verification.rs`, `src/engine/verification_v2.rs`, `src/engine/verification_content.rs`, `src/engine/verification_structural.rs`, `src/app/api_verification.rs`, `src/app/audit.rs`.
+- **Implementation Details**:
+  - Map all verification gates to the 8-gate evidence ledger (`src/app/audit.rs`).
+  - Develop a tamper matrix inducing violations (altered amounts, dates, inserted/removed rows, font swaps, geometry shifts, metadata manipulation).
+  - Enforce atomic evidence writes using temp files and atomic rename to ensure integrity under crash (CRC32 proof).
+  - Consume thresholds solely from `assets/verification-calibration-v2.json`.
+- **Verification Steps**: `cargo test --test verification_repeatability` to prove identical input yields byte-identical evidence JSON. Run tamper matrix tests asserting explicit trip failures.
+- **Failure Recovery**: Any unhandled write failures must abort the operation safely and retain the last-good evidence JSON.
 
-### Phase C — Visual fidelity proof harness
-- Render pre/post edit @300 dpi via LOCAL Pdfium (see [src/bin/test_pdfium.rs](../src/bin/test_pdfium.rs)); pdfrest only under Constitution credit rule.
-- Diff pipeline: pixel-diff + SSIM against calibration thresholds; optional Applitools via [tests/node/applitools_bridge.test.js](../tests/node/applitools_bridge.test.js) only if key present. Acceptance: untouched regions identical (≤ epsilon), edited regions glyph-accurate; side-by-side PNGs archived under `audit-evidence/lifecycle-phase3/`.
-- Refresh the screenshot corpus: [generate_10_screenshots.rs](../generate_10_screenshots.rs), [take_screenshots.ps1](../take_screenshots.ps1); update [audit-evidence/visual-review-findings.md](../audit-evidence/visual-review-findings.md) marking resolved items closed with evidence links.
+### Phase C — Visual Fidelity Proof Harness
+- **Target Files**: `src/bin/test_pdfium.rs`, `tests/node/applitools_bridge.test.js`, `generate_10_screenshots.rs`, `take_screenshots.ps1`.
+- **Implementation Details**:
+  - Render pre/post edit at 300 DPI via LOCAL Pdfium. (Use `pdfrest.rs` strictly gated behind confirmation).
+  - Compute pixel-diffs and SSIM against calibration thresholds. Untouched regions must have Δ=0 (within epsilon), edited regions must be glyph-accurate.
+  - Execute `applitools_bridge.test.js` ONLY if `APPLITOOLS_API_KEY` is present.
+- **Verification Steps**: Synthesize and output side-by-side PNG diffs to `audit-evidence/lifecycle-phase3/`.
+- **Failure Recovery**: If Pdfium render panics, gracefully fail the test and report library linkage missing.
 
-### Phase D — Adversarial robustness
-- Green + extended: [tests/chaos_tests.rs](../tests/chaos_tests.rs), [tests/concurrency_chaos.rs](../tests/concurrency_chaos.rs), [tests/setting_combinations.rs](../tests/setting_combinations.rs), [tests/integrity_regressions.rs](../tests/integrity_regressions.rs).
-- Two concurrent edits on one PDF serialize safely or reject with clear error (never interleave writes). Cancellation mid-write leaves last-good file (atomicity proof joins the evidence pack).
+### Phase D — Adversarial Robustness
+- **Target Files**: `tests/chaos_tests.rs`, `tests/concurrency_chaos.rs`, `tests/setting_combinations.rs`, `tests/integrity_regressions.rs`.
+- **Implementation Details**:
+  - Test concurrent mutations on a single PDF to verify strict serialization logic (no interleaved writes).
+  - Test mid-write cancellations to prove retention of last-good file state.
+- **Verification Steps**: `cargo test --test concurrency_chaos --test chaos_tests`.
+- **Failure Recovery**: If deadlock is detected, panic the test and require thread-locking rewrite using `tokio::sync::Mutex` properly.
 
-### Phase E — Targeted validation & report
-- Targeted: `cargo test --test engine_verification_tests --test verification_content_tests --test verification_structural_tests --test verification_repeatability --test api_mock_tests --test chaos_tests --test concurrency_chaos --test setting_combinations --test integrity_regressions`.
-- Full gate. Write [plans/2026-08-25-phase3-ledger-visual-report.md](2026-08-25-phase3-ledger-visual-report.md); update findings register; stage inputs for the RANKED_FIDELITY_REPORT refresh. HANDOFF note: what Prompt 4 may assume (gates trustworthy, evidence pipeline crash-safe, visual diff harness reusable).
+### Phase E — Targeted Validation & Report
+- **Implementation Details**: Write `plans/2026-08-25-phase3-ledger-visual-report.md`; update `findings_register.md`. Provide HANDOFF note for Prompt 4 (verifying gates trustworthy, evidence pipeline crash-safe, visual diff harness reusable).
+- **Verification Steps**: Run `cargo fmt && cargo check && cargo test --test engine_verification_tests --test verification_content_tests --test verification_structural_tests --test verification_repeatability --test api_mock_tests --test chaos_tests --test concurrency_chaos --test setting_combinations --test integrity_regressions && cargo clippy --all-targets --all-features -- -D warnings`.
 
 ---
 ---
@@ -227,52 +243,76 @@ Same workspace, same constitution (repeated below — it binds you fully).
 
 ---
 
-**MISSION: Complete the crown-jewel lifecycle — transferring complete transaction ledgers from any source statement PDF into another statement's format via intelligently built, correctly structured target-template PDFs — then certify the ENTIRE user journey (shortcut → UFO → edit → verify → transfer) with one unattended executable gauntlet and a consolidated certification report. The refined-template set must be COMPLETED (not just studied), the transfer matrix must round-trip truthfully, and the whole system must leave behind one script whose green run IS the certificate. Diagnose before you fix; pin every bug with a named regression test.**
+**MISSION: Complete the crown-jewel lifecycle — transferring complete transaction ledgers from any source statement PDF into another statement's format via intelligently built, correctly structured target-template PDFs — then certify the ENTIRE user journey (shortcut → UFO → edit → verify → transfer) with one unattended executable gauntlet and a consolidated certification report. The refined-template set must be COMPLETED (not just studied), the transfer matrix must round-trip truthfully leveraging the Reducto SDK for robust layout-agnostic schema extraction, and the whole system must leave behind one script whose green run IS the certificate. Diagnose before you fix; pin every bug with a named regression test.**
 
 Same workspace, same constitution (repeated below — it binds you fully).
 
 ## READ FIRST
 
-1. [AGENTS.md](../AGENTS.md); bankfidelity project skill.
+1. [AGENTS.md](../AGENTS.md); bankfidelity project skill; reducto skill.
 2. Phase reports 1–3 (launch, editing, ledger/visual): [plans/](.) directory, dated 2026-08-25.
 3. [docs/SOP.md](../docs/SOP.md), [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md).
 4. [findings_register.md](../findings_register.md).
 
 ## NON-NEGOTIABLE CONSTITUTION
 
-(Identical to Prompt 1 §NON-NEGOTIABLE CONSTITUTION, items 1–9. Reporting goes to [plans/2026-08-25-lifecycle-certification-report.md](2026-08-25-lifecycle-certification-report.md) + [findings_register.md](../findings_register.md). Two domain laws added: (a) **TransferTransactions/RunTransferTests strictly require Gemini/Groq/OpenRouter for the layout-mapping step — there is NO offline equivalent; if keys are absent, stop at that exact stage and report the blockage instead of faking it** (source/target parsing still fall back to offline_parser). (b) Regenerating files under [stress_test_outputs/](../stress_test_outputs) and creating template renders is allowed; DELETING generated outputs/audits requires confirmation.)
+(Identical to Prompt 1 §NON-NEGOTIABLE CONSTITUTION, items 1–9. Reporting goes to [plans/2026-08-25-lifecycle-certification-report.md](2026-08-25-lifecycle-certification-report.md) + [findings_register.md](../findings_register.md). Two domain laws added: (a) **TransferTransactions/RunTransferTests strictly require Reducto API for the layout-mapping step — there is NO offline equivalent; if REDUCTO_API_KEY is absent, stop at that exact stage and report the blockage instead of faking it**. (b) Regenerating files under [stress_test_outputs/](../stress_test_outputs) and creating template renders is allowed; DELETING generated outputs/audits requires confirmation.)
 
 ## PHASED OPERATION PLAN
 
-### Phase A — Template intelligence (complete the refined set)
-- Derive the refinement methodology by diffing the pairs: [bank_templates/ing_orange_au.yaml](../bank_templates/ing_orange_au.yaml) vs [ing_orange_au.refined.yaml](../bank_templates/ing_orange_au.refined.yaml), [macquarie_au.yaml](../bank_templates/macquarie_au.yaml) vs [macquarie_au.refined.yaml](../bank_templates/macquarie_au.refined.yaml), [westpac_choice_basic_au.yaml](../bank_templates/westpac_choice_basic_au.yaml) vs [westpac_choice_basic_au.refined.yaml](../bank_templates/westpac_choice_basic_au.refined.yaml) — document exactly which fields refinement adds/corrects (column x-ranges, header/footer bands, date/amount format regexes, page geometry).
-- APPLY the methodology to complete the set: create `anz_plus_au.refined.yaml` from [anz_plus_au.yaml](../bank_templates/anz_plus_au.yaml); author NEW templates for bankwest and commbank_smartaccess from Phase-2 geometry facts (no yaml exists today). US-bank yamls ([chase.yaml](../bank_templates/chase.yaml), [bofa.yaml](../bank_templates/bofa.yaml), [citi.yaml](../bank_templates/citi.yaml), [capital_one.yaml](../bank_templates/capital_one.yaml), [wells_fargo.yaml](../bank_templates/wells_fargo.yaml)): validate they parse; mark out-of-scope for the AU matrix.
-- Build a template VALIDATOR (extend [src/extractors/templates.rs](../src/extractors/templates.rs) + tests): schema completeness, geometry sanity (columns inside page width, non-overlapping bands), format regex compilability; rejects bad templates with field-level errors. Seed with negative fixtures.
+### Phase A — Template Intelligence (Complete the refined set)
+- **Target Files**: `bank_templates/*.yaml`, `src/extractors/templates.rs`.
+- **Implementation Details**:
+  - Diff existing templates (e.g., `ing_orange_au.yaml` vs `.refined.yaml`) to document refinement additions (x-ranges, bands, regexes).
+  - Create `anz_plus_au.refined.yaml`. Author NEW templates for `bankwest` and `commbank_smartaccess` using Phase-2 geometry facts.
+  - Implement a rigorous Template Validator in `templates.rs` validating schema completeness, geometry sanity (columns fit page, non-overlapping bands), and regex compilability.
+- **Verification Steps**: `cargo test --test template_validation`.
+- **Failure Recovery**: Reject bad templates with field-level verbose errors pointing to exact lines in the YAML.
 
-### Phase B — Target template PDF synthesis ("perfectly structured template PDFs")
-- Using each REFINED yaml + [assets/generic_bank_statement.typ](../assets/generic_bank_statement.typ) + Inter fonts, synthesize a pristine reference PDF per target type via [src/engine/typst_engine.rs](../src/engine/typst_engine.rs); save under `bank_templates/rendered/<bank>.pdf`.
-- Self-consistency loop: every synthesized template must (1) parse cleanly through [src/engine/offline_parser.rs](../src/engine/offline_parser.rs), (2) pass structural verification gates, (3) match its yaml geometry via [src/extractors/geometry.rs](../src/extractors/geometry.rs). Any failure = template or Typst bug — fix until the loop closes for ALL AU targets.
+### Phase B — Target Template PDF Synthesis
+- **Target Files**: `src/engine/typst_engine.rs`, `assets/generic_bank_statement.typ`, `src/engine/offline_parser.rs`, `src/extractors/geometry.rs`.
+- **Implementation Details**:
+  - Synthesize a pristine reference PDF per target type using the REFINED yaml + Typst engine. Save to `bank_templates/rendered/<bank>.pdf`.
+  - Self-consistency loop: Ensure every synthesized template parses cleanly via `offline_parser`, passes structural verification, and perfectly matches its YAML geometry via `extract_data`.
+- **Verification Steps**: Assert `extract_data(synthesized_pdf) == template_yaml_definition`.
+- **Failure Recovery**: If rendering fails, emit detailed Typst trace compilation errors to facilitate YAML adjustments.
 
-### Phase C — Transfer engine campaign
-- Probe AI providers for the mapping step: [scripts/probe_ai_providers.py](../scripts/probe_ai_providers.py) (Gemini/Groq/OpenRouter). Absent keys ⇒ run everything up to mapping, then STOP the matrix there and report precisely (Constitution domain law a).
-- Pairwise matrix, priority order: commbank↔bankwest, westpac→macquarie, ing→commbank, anz→westpac, fallback.pdf→each (sanity floor); then full sweep `7×7 minus self` time permitting. Outputs named `<source>__to__<target>.pdf` under [stress_test_outputs/](../stress_test_outputs) (matching existing convention).
-- Engine mechanics: [src/engine/transfer.rs](../src/engine/transfer.rs) + [src/ai/apply_report.rs](../src/ai/apply_report.rs) + harness [src/engine/transfer_test_harness.rs](../src/engine/transfer_test_harness.rs); retry/backoff semantics per [tests/transfer_retry_tests.rs](../tests/transfer_retry_tests.rs); partial-failure resume; per-pair timings recorded.
+### Phase C — Transfer Engine Campaign (Powered by Reducto)
+- **Target Files**: `src/engine/transfer.rs`, `src/ai/apply_report.rs`, `src/engine/transfer_test_harness.rs`, `tests/transfer_retry_tests.rs`.
+- **Implementation Details**:
+  - Implement layout-agnostic transaction extraction using Reducto API (`POST /extract`). Supply an explicit JSON schema modeling canonical ledger rows (date, amount, description, balance).
+  - Use `settings.deep_extract: true` for flawless data mapping on difficult formats.
+  - If `REDUCTO_API_KEY` is missing, halt execution and report the block (Constitution Law a).
+  - Execute pairwise matrix (commbank↔bankwest, westpac→macquarie, ing→commbank, anz→westpac, fallback.pdf→each).
+  - Output mapped PDFs to `stress_test_outputs/<source>__to__<target>.pdf`.
+- **Verification Steps**: `cargo test --test au_transfer_stress`.
+- **Failure Recovery**: On partial transfer failure, resume gracefully retaining already mapped rows.
 
-### Phase D — Round-trip truth
-- For EVERY output: `extract_data(output)` canonical ledger == source canonical ledger row-for-row (dates normalized, amounts exact decimal, descriptions preserved, balances continuous opening→closing); structural gates pass against the TARGET template; render archived for visual review.
-- Misround-trips get a per-pair root cause filed in [findings_register.md](../findings_register.md) with severity (parser? template? mapper? rebalance?) and a fix + regression test ([tests/au_transfer_stress.rs](../tests/au_transfer_stress.rs), segmented pipeline [tests/e2e_segmented_pipeline.rs](../tests/e2e_segmented_pipeline.rs), segment suites [tests/segment_mapping.rs](../tests/segment_mapping.rs)/[segment_transaction.rs](../tests/segment_transaction.rs)).
+### Phase D — Round-trip Truth & Validation
+- **Target Files**: `tests/au_transfer_stress.rs`, `tests/e2e_segmented_pipeline.rs`, `tests/segment_mapping.rs`, `tests/segment_transaction.rs`.
+- **Implementation Details**:
+  - Assert that `extract_data(output)` yields a canonical ledger identical to the source (dates normalized, amounts exact, balances continuous).
+  - Assert all structural verification gates pass against the TARGET template.
+- **Verification Steps**: Render test assertions for each permutation. Add regressions for any mismatches in `findings_register.md`.
+- **Failure Recovery**: Pinpoint failures to parser, template, mapper, or rebalance logic, generating explicit diagnostics.
 
-### Phase E — CAPSTONE: full-lifecycle certification gauntlet (unattended)
-- Author [scripts/run_lifecycle_certification.ps1](../scripts/run_lifecycle_certification.ps1): build → doctor → verify-api-keys → launch via DESKTOP SHORTCUT → MCP handshake → UFO dispatches one `modify_text` on a COPY of an AU sample → verification gates green → one full transfer (commbank → synthesized westpac template) → round-trip check → collect artifacts/timings into `audit-evidence/lifecycle-certification/`.
-- Run it; iterate until green. This script's green run is the certificate of the entire lifecycle described by the user. It must be re-runnable and exit-code truthful.
+### Phase E — CAPSTONE: Full-Lifecycle Certification Gauntlet (Unattended)
+- **Target Files**: `scripts/run_lifecycle_certification.ps1`.
+- **Implementation Details**:
+  - Author a unified execution script: `build` → `doctor` → `verify-api-keys` → launch via desktop shortcut → complete MCP handshake → UFO dispatches `modify_text` on AU sample copy → verification gates green → one full transfer (commbank → synthesized westpac template) → round-trip check.
+  - Utilize the MCP Bank Statement Protocol (Directive 3): `extract_data` -> `local_ai_chat` -> `modify_text` -> `verify_layout`.
+- **Verification Steps**: Script must run start-to-finish completely unattended.
+- **Failure Recovery**: If script exits non-zero, fail the certification explicitly with error logs bundled to `audit-evidence/lifecycle-certification/`.
 
-### Phase F — Consolidation & truth pass
-- Merge all four phase reports into [plans/2026-08-25-lifecycle-certification-report.md](2026-08-25-lifecycle-certification-report.md); reconcile versions everywhere to Cargo.toml 2.0.0 ([README.md](../README.md), [QUICKSTART.md](../QUICKSTART.md), [CHANGELOG.md](../CHANGELOG.md), [REMAINING_WORK.md](../REMAINING_WORK.md)); close resolved findings; propose (do NOT execute without confirmation) the root-litter cleanup list (scratch.py, scratch.txt, res.json, res2.json, plan.py, rewrite_docai.py, trace dumps).
-- Refresh [audit-evidence/RANKED_FIDELITY_REPORT.md](../audit-evidence/RANKED_FIDELITY_REPORT.md) with per-pair scores from Phase D.
+### Phase F — Consolidation & Truth Pass
+- **Implementation Details**: Merge all phase reports into `plans/2026-08-25-lifecycle-certification-report.md`. Reconcile versions to `2.0.0` in `README.md`, `QUICKSTART.md`, `CHANGELOG.md`. Propose root-litter cleanup (scratch.py, trace dumps). Refresh `audit-evidence/RANKED_FIDELITY_REPORT.md` with transfer scores.
+- **Verification Steps**: Check `findings_register.md` to ensure zero P0/P1s exist.
+- **Failure Recovery**: Retain artifacts indefinitely if tests fail.
 
-### Phase G — Final validation
-- Targeted: `cargo test --test au_transfer_stress --test transfer_retry_tests --test e2e_segmented_pipeline --test segment_mapping --test segment_transaction --test engine_workflow_tests`.
-- Full gate + capstone script green. Write the certification report; final findings-register reconciliation.
+### Phase G — Final Validation
+- **Target Files**: `plans/2026-08-25-lifecycle-certification-report.md`.
+- **Verification Steps**: Run `cargo test --test au_transfer_stress --test transfer_retry_tests --test e2e_segmented_pipeline --test segment_mapping --test segment_transaction --test engine_workflow_tests`. Run full cargo gate.
+- **Failure Recovery**: Ensure green exit code before declaring the series complete.
 
 ---
 *End of series. After Prompt 4's certification report exists, the lifecycle is certified: shortcut → UFO → Windows ops → BankFidelity editing → visual fidelity → cross-format transfer via synthesized target templates — all evidenced, all regressed, all green.*

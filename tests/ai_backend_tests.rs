@@ -33,7 +33,7 @@ async fn test_ai_backend_cascade_success_on_primary() {
     let mock_gemini = server
         .mock(
             "POST",
-            "/v1beta/models/gemini-pro-preview:generateContent?key=gemini-key",
+            "/v1beta/models/gemini-3.7-flash:generateContent?key=gemini-key",
         )
         .with_status(500)
         .expect(0)
@@ -81,7 +81,7 @@ async fn test_ai_backend_cascade_fallback() {
     let mock_gemini = server
         .mock(
             "POST",
-            "/v1beta/models/gemini-pro-preview:generateContent?key=gemini-key",
+            "/v1beta/models/gemini-3.7-flash:generateContent?key=gemini-key",
         )
         .with_status(200)
         .with_header("content-type", "application/json")
@@ -141,7 +141,7 @@ async fn test_ai_backend_cascade_all_failed() {
     let mock_gemini = server
         .mock(
             "POST",
-            "/v1beta/models/gemini-pro-preview:generateContent?key=gemini-key",
+            "/v1beta/models/gemini-3.7-flash:generateContent?key=gemini-key",
         )
         .with_status(500)
         .expect_at_least(1)

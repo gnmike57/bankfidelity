@@ -28,7 +28,7 @@ async fn test_verify_and_repair_extraction_loop() {
     }"#;
 
     Mock::given(method("POST"))
-        .and(path("/v1beta/models/gemini-pro-preview:generateContent"))
+        .and(path("/v1beta/models/gemini-3.7-flash:generateContent"))
         .respond_with(ResponseTemplate::new(200).set_body_string(mock_response))
         .mount(&server)
         .await;

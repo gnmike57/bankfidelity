@@ -27,7 +27,7 @@ async fn test_chaos_malformed_json_repair() {
     }"#;
 
     Mock::given(method("POST"))
-        .and(path("/v1beta/models/gemini-pro-preview:generateContent"))
+        .and(path("/v1beta/models/gemini-3.7-flash:generateContent"))
         .respond_with(ResponseTemplate::new(200).set_body_string(mock_response))
         .mount(&server)
         .await;

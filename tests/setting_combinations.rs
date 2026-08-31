@@ -33,6 +33,7 @@ const ENGINES: &[PdfEngineMode] = &[
 ];
 
 const PARSERS: &[DocumentParserMode] = &[
+    DocumentParserMode::Reducto,
     DocumentParserMode::LlamaParse,
     DocumentParserMode::OfflineHeuristic,
     DocumentParserMode::LocalOcrs,
@@ -78,7 +79,7 @@ fn all_150_setting_combinations_roundtrip_json() {
             }
         }
     }
-    assert_eq!(count, 200, "Expected 200 combinations, got {count}");
+    assert_eq!(count, 250, "Expected 250 combinations, got {count}");
 }
 
 /// Verify every enum variant has a non-empty human-readable label.
@@ -111,10 +112,7 @@ fn all_enum_variants_have_labels() {
 #[test]
 fn default_settings_are_expected() {
     assert_eq!(PdfEngineMode::default(), PdfEngineMode::PyMuPdfProPrimary);
-    assert_eq!(
-        DocumentParserMode::default(),
-        DocumentParserMode::LlamaParse
-    );
+    assert_eq!(DocumentParserMode::default(), DocumentParserMode::Reducto);
     assert_eq!(AiProviderMode::default(), AiProviderMode::LocalLlama);
     assert_eq!(VerificationMode::default(), VerificationMode::LocalPdfium);
 }

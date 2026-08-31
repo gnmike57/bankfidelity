@@ -25,6 +25,10 @@ pub enum NegativeStyle {
     Paren,
     /// `50.00-`
     TrailingMinus,
+    /// `50.00 DR`
+    Dr,
+    /// `50.00 CR`
+    Cr,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -69,10 +73,19 @@ pub fn detect_format(old_text: &str) -> NumberFormat {
 
     let mut working = trimmed.to_string();
 
-    // Negative style.
+    // Negative style / CR-DR suffixes.
+    let upper_working = working.to_uppercase();
     if working.starts_with('(') && working.ends_with(')') {
         fmt.negative_style = NegativeStyle::Paren;
         working = working[1..working.len() - 1].to_string();
+    } else if upper_working.ends_with(" DR") || upper_working.ends_with("DR") {
+        fmt.negative_style = NegativeStyle::Dr;
+        let len = if upper_working.ends_with(" DR") { 3 } else { 2 };
+        working.truncate(working.len() - len);
+    } else if upper_working.ends_with(" CR") || upper_working.ends_with("CR") {
+        fmt.negative_style = NegativeStyle::Cr;
+        let len = if upper_working.ends_with(" CR") { 3 } else { 2 };
+        working.truncate(working.len() - len);
     } else if working.ends_with('-') && !working.starts_with('-') {
         fmt.negative_style = NegativeStyle::TrailingMinus;
         working.pop();
@@ -224,12 +237,17 @@ pub fn format_decimal(value: Decimal, fmt: &NumberFormat) -> String {
     }
 
     if !is_negative {
+        if fmt.negative_style == NegativeStyle::Cr {
+            return format!("{body} CR");
+        }
         return body;
     }
     match fmt.negative_style {
         NegativeStyle::Minus => format!("-{body}"),
         NegativeStyle::Paren => format!("({body})"),
         NegativeStyle::TrailingMinus => format!("{body}-"),
+        NegativeStyle::Dr => format!("{body} DR"),
+        NegativeStyle::Cr => body,
     }
 }
 
@@ -444,5 +462,36 @@ mod tests {
         assert_eq!(fmt.decimals, 0);
         let out = format_decimal(dec!(123.456), &fmt);
         assert_eq!(out, "123"); // rounded
+    }
+
+    #[test]
+    fn test_detect_and_format_dr_cr() {
+        let fmt_dr = detect_format("1,234.56 DR");
+        assert_eq!(fmt_dr.negative_style, NegativeStyle::Dr);
+        assert_eq!(fmt_dr.thousand_sep, ",");
+        assert_eq!(format_decimal(dec!(-1234.56), &fmt_dr), "1,234.56 DR");
+
+        let fmt_cr = detect_format("$500.00 CR");
+        assert_eq!(fmt_cr.negative_style, NegativeStyle::Cr);
+        assert_eq!(fmt_cr.currency, "$");
+        assert_eq!(format_decimal(dec!(500.00), &fmt_cr), "$500.00 CR");
+    }
+
+    #[test]
+    fn test_round_trip_all_styles() {
+        let cases = [
+            ("$1,234.56", dec!(1234.56)),
+            ("-$50.00", dec!(-50.00)),
+            ("($100.00)", dec!(-100.00)),
+            ("50.00-", dec!(-50.00)),
+            ("250.00 DR", dec!(-250.00)),
+            ("750.00 CR", dec!(750.00)),
+            ("€1.234,56", dec!(1234.56)),
+        ];
+
+        for (orig, val) in cases {
+            let formatted = format_like(val, orig);
+            assert_eq!(formatted, orig, "Failed round-trip for original: {}", orig);
+        }
     }
 }

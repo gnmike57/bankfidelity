@@ -1,0 +1,15 @@
+# Auto-generated from AU Bank Statements/. Review the column x-ranges before relying on them.
+id: bankwest_example
+header_signatures:
+  - "bankwest"
+  - "Bankwest"
+  - "business"
+  - "SAVER"
+date_format: "%d/%m/%Y"
+amount_regex: "^-?\\$?[0-9,]+\\.\\d{2}$"
+column_x_ranges:
+  date: [381.5, 462.6]
+  description: [60.9, 200.9]
+  debit: [355.4, 440.4]
+  credit: [433.1, 522.0]
+  balance: [508.2, 606.5]

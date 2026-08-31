@@ -1,13 +1,15 @@
+# Auto-generated from AU Bank Statements/. Review the column x-ranges before relying on them.
 id: westpac_choice_basic_au
 header_signatures:
   - "Westpac"
   - "Choice"
   - "Basic"
-date_format: "%d/%m/%y"
+  - "Credits"
+date_format: "%d/%m/%Y"
 amount_regex: "^-?\\$?[0-9,]+\\.\\d{2}$"
-# Layout learned from Westpac ChoiceBasic.pdf.
 column_x_ranges:
-  date: [60.0, 110.0]
-  description: [115.0, 380.0]
-  amount: [385.0, 400.0]
-  balance: [535.0, 545.0]
+  date: [67.1, 148.3]
+  description: [481.2, 580.2]
+  debit: [369.2, 453.2]
+  credit: [445.0, 534.7]
+  balance: [352.0, 447.9]
