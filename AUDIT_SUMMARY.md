@@ -1,7 +1,7 @@
 # Bank Statement Fidelity Editor - E2E Audit & Refactor Summary
 
 ## Overview
-This document summarizes the comprehensive audit and refactoring work completed on the Bank Statement Fidelity Editor v1.0.0 codebase.
+This document summarizes the comprehensive audit and refactoring work completed on the Bank Statement Fidelity Editor v2.0.0 codebase.
 
 ## Changes Made
 

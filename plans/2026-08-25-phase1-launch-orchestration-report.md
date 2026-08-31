@@ -107,7 +107,11 @@ Both functional — memory check (512MB min), stall detection (30s), headless fa
 
 ## Phase H — Validation
 
-Build in progress. Test execution pending.
+- `cargo fmt --check`: ✅ Passed
+- `cargo check`: ✅ Passed
+- `cargo clippy --all-targets --all-features -- -D warnings`: ✅ Passed (0 warnings)
+- `cargo test --lib`: ✅ Passed (388 unit tests passed)
+- Targeted integration suites (`static_analysis`, `runtime_smoke`, `cli_startup_contract`, `launch_fallback_test`, `gui_app_state_tests`): ✅ Passed (17 integration tests passed)
 
 ---
 
@@ -121,7 +125,7 @@ Build in progress. Test execution pending.
 | P1-5 | P1 | LLM endpoint drift | ✅ FIXED |
 | P1-7 | P1 | License key leak | ✅ FIXED |
 | P1-9 | P1 | Async brittleness | ✅ FIXED |
-| NEW-1 | P2 | UFO agents.yaml model drift | 🟡 OPEN |
+| NEW-1 | P2 | UFO agents.yaml model drift | ✅ FIXED |
 | NEW-2 | P2 | Config dashboard silent close | 🟡 OPEN |
 
 ---

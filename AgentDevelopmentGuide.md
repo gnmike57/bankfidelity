@@ -1,6 +1,6 @@
 # Agent Development Guide
 
-Quick-reference for AI agents working on the Bank Statement Fidelity Editor v1.0.0.
+Quick-reference for AI agents working on the Bank Statement Fidelity Editor v2.0.0.
 
 ## Project type
 

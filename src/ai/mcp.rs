@@ -5,7 +5,7 @@ use std::io::{self, BufRead, Write};
 /// The MCP protocol revision this server speaks. Must be a real, published
 /// protocol date from the Model Context Protocol specification — clients
 /// negotiate on this value during the `initialize` handshake.
-const MCP_PROTOCOL_VERSION: &str = "2025-06-18";
+const MCP_PROTOCOL_VERSION: &str = "2024-11-05";
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]

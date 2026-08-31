@@ -6,4 +6,3 @@ if exist "C:\ufo\ufo\config\ufo\agents.yaml" (start notepad.exe "C:\ufo\ufo\conf
 if exist "C:\ufo\ufo\config\ufo\system.yaml" (start notepad.exe "C:\ufo\ufo\config\ufo\system.yaml") else (echo [WARN] system.yaml not found)
 echo Done!
 pause
-exit /b 0

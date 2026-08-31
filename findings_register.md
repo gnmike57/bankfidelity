@@ -64,3 +64,4 @@
 ### [FND-008] [P2] [Hygiene] Legacy Python MCP Server Not Marked Deprecated
 **Status:** 🟡 OPEN (requires confirmation before modification)
 **Description:** `scripts/mcp_server.py` is a legacy Python MCP server surface that duplicates the canonical Rust stdio MCP server in `src/ai/mcp.rs`. It should be marked deprecated in docs to avoid confusion.
+| NEW-3 | P1 | Local LLM model qwen2.5-coder-7b-instruct-q4_k_m.gguf missing from C:\UFO\models | ?? OPEN |

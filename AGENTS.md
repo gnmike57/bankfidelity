@@ -14,9 +14,9 @@ if one appears.
 
 ## Project type
 
-Rust desktop/CLI project using Cargo (v1.0.0).
+Rust desktop/CLI project using Cargo (v2.0.0).
 Includes GUI (egui), CLI, Python bridge (PyO3), Node.js bridge (Applitools), PDF processing,
-multi-backend AI integrations (Gemini, Document AI, Mindee, LlamaParse), tests, scripts, and CI.
+multi-backend AI integrations (Reducto, Document AI, LlamaParse, Gemini, Offline Heuristic), tests, scripts, and CI.
 
 ## Autonomy level
 

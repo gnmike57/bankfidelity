@@ -13,15 +13,17 @@ if (Test-Path "C:\ufo\ufo\python_env\python.exe") {
 
 cargo build --release
 
+$HostTriple = (rustc -vV | Select-String "host: (.*)").Matches.Groups[1].Value
+$TargetDir = (cargo metadata --format-version 1 --no-deps | ConvertFrom-Json).target_directory
+
 $CandidatePaths = @(
-    (Join-Path $RepoRoot "target\release\dual-core-pdf-pipeline.exe"),
-    (Join-Path $RepoRoot "target\x86_64-pc-windows-msvc\release\dual-core-pdf-pipeline.exe"),
-    (Join-Path $RepoRoot "target\x86_64-pc-windows-gnu\release\dual-core-pdf-pipeline.exe")
+    (Join-Path $TargetDir "release\dual-core-pdf-pipeline.exe"),
+    (Join-Path $TargetDir "$HostTriple\release\dual-core-pdf-pipeline.exe")
 )
 
 $ExePath = $CandidatePaths | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $ExePath) {
-    $ExePath = Join-Path $RepoRoot "target\release\dual-core-pdf-pipeline.exe"
+    $ExePath = Join-Path $TargetDir "release\dual-core-pdf-pipeline.exe"
 }
 
 $WshShell = New-Object -comObject WScript.Shell
