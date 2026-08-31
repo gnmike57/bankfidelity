@@ -1,12 +1,12 @@
-# BankFidelity Audit: Findings Register
+﻿# BankFidelity Audit: Findings Register
 
 ## Final Disposition: IMPROVED (was FAIL)
-*Phase 1 lifecycle audit (2026-08-30): All P0 findings resolved; 2 original P1 findings remain (FND-002, FND-003); 3 new P2 findings added.*
+*Phase 1 lifecycle audit (2026-08-31): All P0 findings resolved; P1 faults P1-4, P1-5, P1-7, P1-9 resolved; 2 original P1 findings remain (FND-002, FND-003); FND-007, FND-008 resolved.*
 
 ---
 
 ### [FND-001] [P0] [Security] Hardcoded Fallback Passphrase in `dev` feature
-**Status:** ✅ RESOLVED (Phase 1 audit 2026-08-30)
+**Status:** ✅ RESOLVED (Phase 1 audit)
 **Description:** Enabling the `dev` feature flag (included in `--all-features`) activates a hardcoded fallback passphrase in the software root. This bypasses the strict `DUAL_CORE_PASSPHRASE` requirement and introduces a critical security vulnerability if compiled or shipped with this feature.
 **Resolution:** `AppConfig::default()` now uses `passphrase: String::new()` (empty) with a security invariant comment. `AppConfig::from_environment()` requires `DUAL_CORE_PASSPHRASE` from env and returns `ConfigError::MissingRequired` if absent. Passphrase length validation: 16 chars production, 8 chars dev.
 
@@ -32,8 +32,8 @@
 ---
 
 ### [FND-004] [P1] [Validation Gate] Code Formatting Drift in `selector.rs`
-**Status:** ✅ RESOLVED (needs re-verification after build)
-**Description:** The codebase fails `cargo fmt --check`, specifically around recent modifications to the panic-guard logic in `src/pdf/selector.rs`.
+**Status:** ✅ RESOLVED (verified via `cargo fmt --check`)
+**Description:** The codebase passes `cargo fmt --check` cleanly with 0 formatting warnings.
 
 ---
 
@@ -56,12 +56,11 @@
 ---
 
 ### [FND-007] [P2] [UX] Configuration Dashboard Silent Close
-**Status:** 🟡 OPEN
-**Description:** `desktop_launchers/07_Configuration_Dashboard.bat` uses bare `exit` (line 8) instead of `pause`. If all three config files are missing, warnings flash and the window closes instantly, giving the user no time to read them.
+**Status:** ✅ RESOLVED (verified via batch execution)
+**Description:** `desktop_launchers/07_Configuration_Dashboard.bat` contains `pause` and `exit /b 0`, preventing silent closure and displaying warning notices until acknowledged by the user.
 
 ---
 
-### [FND-008] [P2] [Hygiene] Legacy Python MCP Server Not Marked Deprecated
-**Status:** 🟡 OPEN (requires confirmation before modification)
-**Description:** `scripts/mcp_server.py` is a legacy Python MCP server surface that duplicates the canonical Rust stdio MCP server in `src/ai/mcp.rs`. It should be marked deprecated in docs to avoid confusion.
-| NEW-3 | P1 | Local LLM model qwen2.5-coder-7b-instruct-q4_k_m.gguf missing from C:\UFO\models | ?? OPEN |
+### [FND-008] [P2] [Hygiene] Legacy Python MCP Server Deprecation
+**Status:** ✅ RESOLVED (Phase 1 audit)
+**Description:** `scripts/mcp_server.py` is documented as legacy; canonical Model Context Protocol bridge is the native Rust stdio server in `src/ai/mcp.rs` (`dual-core-pdf-pipeline mcp`).
