@@ -79,6 +79,33 @@ except Exception as _e:  # ImportError or any loader-level failure
 
 PYMUPDF_PRO_KEY = os.environ.get("PYMUPDF_PRO_KEY", "")
 
+_STANDARD_14_FONTS = {
+    "helv", "hebo", "heit", "hebi", "times", "tibo", "tiit", "tibi",
+    "couri", "cobo", "coit", "cobi", "symb", "zapt",
+    "helvetica", "helvetica-bold", "helvetica-oblique", "helvetica-boldoblique",
+    "times-roman", "times-bold", "times-italic", "times-bolditalic",
+    "courier", "courier-bold", "courier-oblique", "courier-boldoblique",
+    "symbol", "zapfdingbats"
+}
+
+def _safe_pymupdf_font(fontname: str | None = None) -> Any:
+    if not fontname:
+        try:
+            return pymupdf.Font(fontname="helv")
+        except Exception:
+            return None
+    name_clean = str(fontname).strip().lower()
+    if name_clean in _STANDARD_14_FONTS:
+        try:
+            return pymupdf.Font(fontname=fontname)
+        except Exception:
+            pass
+    try:
+        return pymupdf.Font(fontname="helv")
+    except Exception:
+        return None
+
+
 # ---------------------------------------------------------------------------
 # PyMuPDF Pro 3-page licensing limit (Requirement 5).
 #
@@ -2723,18 +2750,13 @@ def _measure_text_width(text: str, fontname: str, fontsize: float, supplied_font
             return float(supplied_font.text_length(text, fontsize=fontsize))
         except Exception:
             pass
-    # Built-in fallback. Try a Font instance for this name; if that fails,
-    # default to Helvetica metrics (good enough for measurement).
-    try:
-        f = pymupdf.Font(fontname=fontname)
-        return float(f.text_length(text, fontsize=fontsize))
-    except Exception:
-        pass
-    try:
-        f = pymupdf.Font(fontname="helv")
-        return float(f.text_length(text, fontsize=fontsize))
-    except Exception:
-        return float(len(text)) * fontsize * 0.5
+    f = _safe_pymupdf_font(fontname)
+    if f is not None:
+        try:
+            return float(f.text_length(text, fontsize=fontsize))
+        except Exception:
+            pass
+    return float(len(text)) * fontsize * 0.5
 
 
 def _detect_number_format(old_text: str) -> dict:
@@ -3149,16 +3171,11 @@ def _extract_kern_map(page, span: dict, font_obj=None) -> dict:
         return {}
     fontsize = float(span.get("size", 0.0)) or 10.0
 
-    # Resolve a Font object we can measure with.
     f = font_obj
     if f is None:
-        try:
-            f = pymupdf.Font(fontname=span.get("font", "helv"))
-        except Exception:
-            try:
-                f = pymupdf.Font(fontname="helv")
-            except Exception:
-                return {}
+        f = _safe_pymupdf_font(span.get("font", "helv"))
+    if f is None:
+        return {}
 
     # Pull per-character bboxes from the rawdict of the same line.
     # We need flag bit 16 (TEXTFLAGS_RAWDICT) to get char-level data.
@@ -3309,15 +3326,7 @@ def _insert_kerned_text(
     reuse exact glyph origins. Otherwise emit the full string (preferred)
     or walk advances with kern_map / extra_spacing / h_scale.
     """
-    f = measure_font
-    if f is None:
-        try:
-            f = pymupdf.Font(fontname=fontname)
-        except Exception:
-            try:
-                f = pymupdf.Font(fontname="helv")
-            except Exception:
-                f = None
+    f = measure_font or _safe_pymupdf_font(fontname)
     if f is None:
         page.insert_text(
             point=pymupdf.Point(origin[0], origin[1]),
@@ -4075,10 +4084,7 @@ def apply_many_edits(pdf_path: str, output_path: str, edits: list, font_path: st
             measure_font = supplied_measure_font
         elif method == "verified-standard14" or is_std14:
             emit_fontname = _fallback_standard14(original_font_name)
-            try:
-                measure_font = pymupdf.Font(fontname=emit_fontname)
-            except Exception:
-                measure_font = None
+            measure_font = _safe_pymupdf_font(emit_fontname)
         else:  # embedded, non-standard
             if not embedded or not embedded.get("refname"):
                 doc.close()

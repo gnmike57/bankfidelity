@@ -16,11 +16,11 @@
   },
   "schema_version": 1,
   "source_files": {
-    "bridge_protocol.py": "e486d4dd5c213e99e4c14f01091a86f8fe0cc8b6b6fae04da13be55bd50ffa4a",
+    "bridge_protocol.py": "377caafa8413ff543d5b96c26297e6d97fb37b97023af602737b04ec14e4057e",
     "font-resource-profiles.json": "51a17ed96607808f2ca988f3d07391f6b6f398d6bafe251f6a10331deabbdf3c",
-    "pymupdf_pro_integration.py": "b487d4c97bf314919b86ee503fd6816a0cc8c3996b895bedc1834d5125aefba0",
-    "verify_runtime_manifest.py": "54a8579410ea39c115a47f0d9567b947aff105296d33cd2771ac2653d4d7b0a1",
+    "pymupdf_pro_integration.py": "b2c3bb518a3548fc1173037da17641623cd7d4b7a5702105bbd24540d3d0ad43",
+    "verify_runtime_manifest.py": "24d1fb61a520cf16538c6d65c852df28cf8976c8365464683508043e41b8cd1b",
     "verify_runtime_versions.py": "bbd3c8b67408e50f97086e236b0cf3ac14e87376f93f1f90cd2883561dadfe02",
-    "worker.py": "eae76ccb2f22b02dbcd869e50e9ac34272cbace834076e29c76ec8c3abfbf722"
+    "worker.py": "99ca77da6bcc391d0bba020522a07515b597d065da7a25955bde9c5193480e67"
   }
 }
