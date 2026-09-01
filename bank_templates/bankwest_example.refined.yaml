@@ -1,0 +1,14 @@
+id: bankwest_example
+header_signatures:
+  - "bankwest"
+  - "Bankwest"
+  - "business"
+  - "SAVER"
+date_format: "%d/%m/%Y"
+amount_regex: "^-?\\$?[0-9,]+\\.\\d{2}$"
+column_x_ranges:
+  date: [50.0, 110.0]
+  description: [110.0, 350.0]
+  debit: [350.0, 440.0]
+  credit: [430.0, 520.0]
+  balance: [500.0, 610.0]

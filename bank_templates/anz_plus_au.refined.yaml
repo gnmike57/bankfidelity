@@ -1,0 +1,14 @@
+id: anz_plus_au
+header_signatures:
+  - "ANZ"
+  - "Plus"
+  - "Account"
+  - "Statement"
+date_format: "%d/%m/%Y"
+amount_regex: "^-?\\$?[0-9,]+\\.\\d{2}$"
+column_x_ranges:
+  date: [36.0, 108.0]
+  description: [108.0, 324.0]
+  debit: [320.0, 408.0]
+  credit: [405.0, 495.0]
+  balance: [490.0, 585.0]
