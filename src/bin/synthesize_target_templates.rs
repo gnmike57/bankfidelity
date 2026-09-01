@@ -48,10 +48,42 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             dec!(5420.50),
             dec!(6120.50),
             vec![
-                make_tx(1, 1, "01/08/2026", "Direct Credit - Payroll", Some(dec!(1500.00)), None, dec!(6920.50)),
-                make_tx(1, 2, "03/08/2026", "Coles Supermarkets", None, Some(dec!(125.40)), dec!(6795.10)),
-                make_tx(1, 3, "05/08/2026", "Woolworths Petrol", None, Some(dec!(85.00)), dec!(6710.10)),
-                make_tx(1, 4, "10/08/2026", "Transfer to Savings", None, Some(dec!(589.60)), dec!(6120.50)),
+                make_tx(
+                    1,
+                    1,
+                    "01/08/2026",
+                    "Direct Credit - Payroll",
+                    Some(dec!(1500.00)),
+                    None,
+                    dec!(6920.50),
+                ),
+                make_tx(
+                    1,
+                    2,
+                    "03/08/2026",
+                    "Coles Supermarkets",
+                    None,
+                    Some(dec!(125.40)),
+                    dec!(6795.10),
+                ),
+                make_tx(
+                    1,
+                    3,
+                    "05/08/2026",
+                    "Woolworths Petrol",
+                    None,
+                    Some(dec!(85.00)),
+                    dec!(6710.10),
+                ),
+                make_tx(
+                    1,
+                    4,
+                    "10/08/2026",
+                    "Transfer to Savings",
+                    None,
+                    Some(dec!(589.60)),
+                    dec!(6120.50),
+                ),
             ],
         ),
         (
@@ -61,9 +93,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             dec!(12000.00),
             dec!(11450.25),
             vec![
-                make_tx(1, 1, "02/08/2026", "Office Supplies Express", None, Some(dec!(245.50)), dec!(11754.50)),
-                make_tx(1, 2, "04/08/2026", "Client Payment - Invoice 104", Some(dec!(850.00)), None, dec!(12604.50)),
-                make_tx(1, 3, "08/08/2026", "ATO Business Activity Statement", None, Some(dec!(1154.25)), dec!(11450.25)),
+                make_tx(
+                    1,
+                    1,
+                    "02/08/2026",
+                    "Office Supplies Express",
+                    None,
+                    Some(dec!(245.50)),
+                    dec!(11754.50),
+                ),
+                make_tx(
+                    1,
+                    2,
+                    "04/08/2026",
+                    "Client Payment - Invoice 104",
+                    Some(dec!(850.00)),
+                    None,
+                    dec!(12604.50),
+                ),
+                make_tx(
+                    1,
+                    3,
+                    "08/08/2026",
+                    "ATO Business Activity Statement",
+                    None,
+                    Some(dec!(1154.25)),
+                    dec!(11450.25),
+                ),
             ],
         ),
         (
@@ -73,10 +129,42 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             dec!(3250.00),
             dec!(3980.50),
             vec![
-                make_tx(1, 1, "01 Aug 2026", "SALARY PAYMENT ACME CORP", Some(dec!(2100.00)), None, dec!(5350.00)),
-                make_tx(1, 2, "04 Aug 2026", "NETFLIX AUSTRALIA SYDNEY", None, Some(dec!(22.99)), dec!(5327.01)),
-                make_tx(1, 3, "09 Aug 2026", "SYDNEY WATER UTILITIES", None, Some(dec!(346.51)), dec!(4980.50)),
-                make_tx(1, 4, "12 Aug 2026", "TRANSFER TO NETBANK SAVER", None, Some(dec!(1000.00)), dec!(3980.50)),
+                make_tx(
+                    1,
+                    1,
+                    "01 Aug 2026",
+                    "SALARY PAYMENT ACME CORP",
+                    Some(dec!(2100.00)),
+                    None,
+                    dec!(5350.00),
+                ),
+                make_tx(
+                    1,
+                    2,
+                    "04 Aug 2026",
+                    "NETFLIX AUSTRALIA SYDNEY",
+                    None,
+                    Some(dec!(22.99)),
+                    dec!(5327.01),
+                ),
+                make_tx(
+                    1,
+                    3,
+                    "09 Aug 2026",
+                    "SYDNEY WATER UTILITIES",
+                    None,
+                    Some(dec!(346.51)),
+                    dec!(4980.50),
+                ),
+                make_tx(
+                    1,
+                    4,
+                    "12 Aug 2026",
+                    "TRANSFER TO NETBANK SAVER",
+                    None,
+                    Some(dec!(1000.00)),
+                    dec!(3980.50),
+                ),
             ],
         ),
         (
@@ -86,9 +174,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             dec!(450.00),
             dec!(1820.00),
             vec![
-                make_tx(1, 1, "01/08/2026", "Pay Anyone Transfer Received", Some(dec!(2000.00)), None, dec!(2450.00)),
-                make_tx(1, 2, "03/08/2026", "Bunnings Warehouse", None, Some(dec!(340.00)), dec!(2110.00)),
-                make_tx(1, 3, "06/08/2026", "JB Hi-Fi Electrical", None, Some(dec!(290.00)), dec!(1820.00)),
+                make_tx(
+                    1,
+                    1,
+                    "01/08/2026",
+                    "Pay Anyone Transfer Received",
+                    Some(dec!(2000.00)),
+                    None,
+                    dec!(2450.00),
+                ),
+                make_tx(
+                    1,
+                    2,
+                    "03/08/2026",
+                    "Bunnings Warehouse",
+                    None,
+                    Some(dec!(340.00)),
+                    dec!(2110.00),
+                ),
+                make_tx(
+                    1,
+                    3,
+                    "06/08/2026",
+                    "JB Hi-Fi Electrical",
+                    None,
+                    Some(dec!(290.00)),
+                    dec!(1820.00),
+                ),
             ],
         ),
         (
@@ -98,8 +210,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             dec!(15400.00),
             dec!(16250.00),
             vec![
-                make_tx(1, 1, "02/08/2026", "Dividend Reinvestment Macquarie", Some(dec!(1250.00)), None, dec!(16650.00)),
-                make_tx(1, 2, "05/08/2026", "Management Fee - Monthly", None, Some(dec!(400.00)), dec!(16250.00)),
+                make_tx(
+                    1,
+                    1,
+                    "02/08/2026",
+                    "Dividend Reinvestment Macquarie",
+                    Some(dec!(1250.00)),
+                    None,
+                    dec!(16650.00),
+                ),
+                make_tx(
+                    1,
+                    2,
+                    "05/08/2026",
+                    "Management Fee - Monthly",
+                    None,
+                    Some(dec!(400.00)),
+                    dec!(16250.00),
+                ),
             ],
         ),
         (
@@ -109,9 +237,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             dec!(2890.00),
             dec!(3450.00),
             vec![
-                make_tx(1, 1, "01/08/2026", "DIRECT CREDIT SALARY", Some(dec!(1800.00)), None, dec!(4690.00)),
-                make_tx(1, 2, "04/08/2026", "TELSTRA TELECOM BILL", None, Some(dec!(140.00)), dec!(4550.00)),
-                make_tx(1, 3, "08/08/2026", "MORTGAGE OFFSET TRANSFER", None, Some(dec!(1100.00)), dec!(3450.00)),
+                make_tx(
+                    1,
+                    1,
+                    "01/08/2026",
+                    "DIRECT CREDIT SALARY",
+                    Some(dec!(1800.00)),
+                    None,
+                    dec!(4690.00),
+                ),
+                make_tx(
+                    1,
+                    2,
+                    "04/08/2026",
+                    "TELSTRA TELECOM BILL",
+                    None,
+                    Some(dec!(140.00)),
+                    dec!(4550.00),
+                ),
+                make_tx(
+                    1,
+                    3,
+                    "08/08/2026",
+                    "MORTGAGE OFFSET TRANSFER",
+                    None,
+                    Some(dec!(1100.00)),
+                    dec!(3450.00),
+                ),
             ],
         ),
     ];
@@ -127,11 +279,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         let out_pdf = out_dir.join(format!("{}.pdf", bank_id));
-        println!("[synthesis] Synthesizing pristine template: {}", out_pdf.display());
+        println!(
+            "[synthesis] Synthesizing pristine template: {}",
+            out_pdf.display()
+        );
         engine.reconstruct_pdf(&stmt, &out_pdf).await?;
         println!("[synthesis] Successfully created {}", out_pdf.display());
     }
 
-    println!("[synthesis] All pristine target templates synthesized successfully in {}", out_dir.display());
+    println!(
+        "[synthesis] All pristine target templates synthesized successfully in {}",
+        out_dir.display()
+    );
     Ok(())
 }

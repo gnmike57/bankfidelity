@@ -65,8 +65,9 @@ impl OxidizePdfEngine {
             })?
             .operations;
         let rotation = inherited_page_rotation(&document, page_id);
-        let targets =
-            collect_native_text_targets(&operations, page_box, rotation).map_err(|error| {
+        let cmaps = load_page_cmaps(&document, page_id);
+        let targets = collect_native_text_targets(&operations, page_box, rotation, &cmaps)
+            .map_err(|error| {
                 EngineError::ExtractFailed(format!("Failed to map positioned text: {error}"))
             })?;
         Ok(targets
@@ -247,11 +248,229 @@ fn object_as_page_box(doc: &lopdf::Document, object: &lopdf::Object) -> Option<C
     })
 }
 
-/// Helper: extract a String from the first string operand.
-fn extract_string_operand(operands: &[lopdf::Object]) -> Option<String> {
+#[derive(Debug, Clone, Default)]
+struct FontCMap {
+    char_map: std::collections::HashMap<u32, String>,
+    code_length: usize,
+}
+
+fn parse_hex_utf16(hex: &str) -> String {
+    let chars = hex
+        .chars()
+        .filter(|c| c.is_ascii_hexdigit())
+        .collect::<Vec<_>>();
+    let mut u16_buf = Vec::new();
+    for chunk in chars.chunks(4) {
+        let chunk_str: String = chunk.iter().collect();
+        if let Ok(val) = u16::from_str_radix(&chunk_str, 16) {
+            u16_buf.push(val);
+        }
+    }
+    if !u16_buf.is_empty() {
+        String::from_utf16_lossy(&u16_buf)
+    } else if let Ok(val) = u32::from_str_radix(hex, 16) {
+        char::from_u32(val)
+            .map(|c| c.to_string())
+            .unwrap_or_default()
+    } else {
+        String::new()
+    }
+}
+
+impl FontCMap {
+    fn from_stream_bytes(bytes: &[u8]) -> Self {
+        let mut cmap = FontCMap::default();
+        let text = String::from_utf8_lossy(bytes);
+        let mut in_bfchar = false;
+        let mut in_bfrange = false;
+
+        for line in text.lines() {
+            let trimmed = line.trim();
+            if trimmed.contains("beginbfchar") {
+                in_bfchar = true;
+                in_bfrange = false;
+                continue;
+            }
+            if trimmed.contains("endbfchar") {
+                in_bfchar = false;
+                continue;
+            }
+            if trimmed.contains("beginbfrange") {
+                in_bfrange = true;
+                in_bfchar = false;
+                continue;
+            }
+            if trimmed.contains("endbfrange") {
+                in_bfrange = false;
+                continue;
+            }
+            if trimmed.contains("begincodespacerange") || trimmed.contains("endcodespacerange") {
+                continue;
+            }
+
+            if in_bfchar {
+                let tokens: Vec<&str> = trimmed
+                    .split(|c: char| c.is_whitespace() || c == '<' || c == '>')
+                    .filter(|s| !s.is_empty())
+                    .collect();
+                if tokens.len() >= 2 {
+                    if let Ok(src) = u32::from_str_radix(tokens[0], 16) {
+                        let code_len = tokens[0].len().div_ceil(2);
+                        if cmap.code_length == 0 || code_len > cmap.code_length {
+                            cmap.code_length = code_len;
+                        }
+                        let dst_str = parse_hex_utf16(tokens[1]);
+                        cmap.char_map.insert(src, dst_str);
+                    }
+                }
+            } else if in_bfrange {
+                if trimmed.contains('[') {
+                    let parts: Vec<&str> = trimmed.splitn(2, '[').collect();
+                    let header_tokens: Vec<&str> = parts[0]
+                        .split(|c: char| c.is_whitespace() || c == '<' || c == '>')
+                        .filter(|s| !s.is_empty())
+                        .collect();
+                    if header_tokens.len() >= 2 {
+                        let start = u32::from_str_radix(header_tokens[0], 16).unwrap_or(0);
+                        let end = u32::from_str_radix(header_tokens[1], 16).unwrap_or(0);
+                        let code_len = header_tokens[0].len().div_ceil(2);
+                        if cmap.code_length == 0 || code_len > cmap.code_length {
+                            cmap.code_length = code_len;
+                        }
+                        if parts.len() > 1 {
+                            let list_tokens: Vec<&str> = parts[1]
+                                .split(|c: char| {
+                                    c.is_whitespace() || c == '<' || c == '>' || c == ']'
+                                })
+                                .filter(|s| !s.is_empty())
+                                .collect();
+                            for (idx, dst_tok) in list_tokens.iter().enumerate() {
+                                let src = start + idx as u32;
+                                if src <= end {
+                                    cmap.char_map.insert(src, parse_hex_utf16(dst_tok));
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    let tokens: Vec<&str> = trimmed
+                        .split(|c: char| c.is_whitespace() || c == '<' || c == '>')
+                        .filter(|s| !s.is_empty())
+                        .collect();
+                    if tokens.len() >= 3 {
+                        if let (Ok(start), Ok(end), Ok(dst_start)) = (
+                            u32::from_str_radix(tokens[0], 16),
+                            u32::from_str_radix(tokens[1], 16),
+                            u32::from_str_radix(tokens[2], 16),
+                        ) {
+                            let code_len = tokens[0].len().div_ceil(2);
+                            if cmap.code_length == 0 || code_len > cmap.code_length {
+                                cmap.code_length = code_len;
+                            }
+                            for offset in 0..=(end.saturating_sub(start)) {
+                                let src = start + offset;
+                                let dst = dst_start + offset;
+                                let dst_str = if let Some(c) = char::from_u32(dst) {
+                                    c.to_string()
+                                } else {
+                                    String::new()
+                                };
+                                cmap.char_map.insert(src, dst_str);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if cmap.code_length == 0 {
+            cmap.code_length = 2;
+        }
+        cmap
+    }
+
+    fn decode_bytes(&self, bytes: &[u8]) -> String {
+        if self.char_map.is_empty() {
+            return String::from_utf8_lossy(bytes).to_string();
+        }
+        let mut out = String::new();
+        let step = if self.code_length == 0 {
+            2
+        } else {
+            self.code_length
+        };
+
+        let mut i = 0;
+        while i < bytes.len() {
+            if step == 2 && i + 1 < bytes.len() {
+                let code = ((bytes[i] as u32) << 8) | (bytes[i + 1] as u32);
+                if let Some(s) = self.char_map.get(&code) {
+                    out.push_str(s);
+                } else if let Some(c) = char::from_u32(code) {
+                    if !c.is_control() {
+                        out.push(c);
+                    }
+                }
+                i += 2;
+            } else if step == 1 || i + 1 >= bytes.len() {
+                let code = bytes[i] as u32;
+                if let Some(s) = self.char_map.get(&code) {
+                    out.push_str(s);
+                } else if let Some(c) = char::from_u32(code) {
+                    if !c.is_control() {
+                        out.push(c);
+                    }
+                }
+                i += 1;
+            } else {
+                i += 1;
+            }
+        }
+        out
+    }
+}
+
+fn load_page_cmaps(
+    document: &lopdf::Document,
+    page_id: lopdf::ObjectId,
+) -> std::collections::HashMap<String, FontCMap> {
+    let mut cmaps = std::collections::HashMap::new();
+    let Ok(fonts) = document.get_page_fonts(page_id) else {
+        return cmaps;
+    };
+    for (name_bytes, font_dict) in fonts {
+        let name = String::from_utf8_lossy(&name_bytes).to_string();
+        if let Ok(to_unicode_obj) = font_dict.get(b"ToUnicode") {
+            let stream_obj = match to_unicode_obj {
+                lopdf::Object::Reference(id) => document.get_object(*id).ok(),
+                other => Some(other),
+            };
+            if let Some(lopdf::Object::Stream(stream)) = stream_obj {
+                let decompressed = stream
+                    .decompressed_content()
+                    .unwrap_or_else(|_| stream.content.clone());
+                let cmap = FontCMap::from_stream_bytes(&decompressed);
+                cmaps.insert(name.clone(), cmap.clone());
+                if let Some(stripped) = name.strip_prefix('/') {
+                    cmaps.insert(stripped.to_string(), cmap);
+                } else {
+                    cmaps.insert(format!("/{name}"), cmap);
+                }
+            }
+        }
+    }
+    cmaps
+}
+
+/// Helper: extract a String from the first string operand with optional CMap decoding.
+fn extract_string_operand(operands: &[lopdf::Object], cmap: Option<&FontCMap>) -> Option<String> {
     for op in operands {
         if let lopdf::Object::String(bytes, _) = op {
-            return Some(String::from_utf8_lossy(bytes).to_string());
+            return Some(if let Some(cmap) = cmap {
+                cmap.decode_bytes(bytes)
+            } else {
+                String::from_utf8_lossy(bytes).to_string()
+            });
         }
     }
     None
@@ -298,10 +517,11 @@ fn transform_point(matrix: PdfMatrix, x: f32, y: f32) -> (f32, f32) {
 fn operation_text_and_advance(
     operation: &lopdf::content::Operation,
     font_size: f32,
+    cmap: Option<&FontCMap>,
 ) -> Option<(String, f32)> {
     match operation.operator.as_str() {
         "Tj" => {
-            let text = extract_string_operand(&operation.operands)?;
+            let text = extract_string_operand(&operation.operands, cmap)?;
             let advance = text.chars().count() as f32 * font_size * 0.5;
             Some((text, advance))
         }
@@ -314,7 +534,11 @@ fn operation_text_and_advance(
             for item in items {
                 match item {
                     lopdf::Object::String(bytes, _) => {
-                        let part = String::from_utf8_lossy(bytes);
+                        let part = if let Some(cmap) = cmap {
+                            cmap.decode_bytes(bytes)
+                        } else {
+                            String::from_utf8_lossy(bytes).to_string()
+                        };
                         advance += part.chars().count() as f32 * font_size * 0.5;
                         text.push_str(&part);
                     }
@@ -371,6 +595,7 @@ fn collect_native_text_targets(
     operations: &[lopdf::content::Operation],
     page_box: CanonicalPageBox,
     rotation: i32,
+    cmaps: &std::collections::HashMap<String, FontCMap>,
 ) -> Result<Vec<NativeTextTarget>, EngineError> {
     let identity = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
     let mut ctm = identity;
@@ -470,7 +695,12 @@ fn collect_native_text_targets(
                 tm = tlm;
             }
             "Tj" | "TJ" => {
-                if let Some((text, advance)) = operation_text_and_advance(operation, font_size) {
+                let current_cmap = cmaps
+                    .get(&current_font)
+                    .or_else(|| cmaps.get(current_font.trim_start_matches('/')));
+                if let Some((text, advance)) =
+                    operation_text_and_advance(operation, font_size, current_cmap)
+                {
                     if !text.trim().is_empty() {
                         targets.push(NativeTextTarget {
                             operation_index,
@@ -1432,7 +1662,9 @@ impl PdfEngine for OxidizePdfEngine {
             let mut content = lopdf::content::Content::decode(&content_bytes).map_err(|error| {
                 EngineError::ApplyFailed(format!("Failed to decode page {page_index}: {error}"))
             })?;
-            let targets = collect_native_text_targets(&content.operations, page_box, rotation)?;
+            let cmaps = load_page_cmaps(&document, page_id);
+            let targets =
+                collect_native_text_targets(&content.operations, page_box, rotation, &cmaps)?;
             let mut selected_operations = std::collections::HashSet::new();
             let mut replacements = Vec::new();
 
