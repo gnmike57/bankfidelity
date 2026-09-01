@@ -6,7 +6,6 @@ chcp 65001 >nul
 color 0a
 
 :: Set ESC character for ANSI colors
-for /f %%a in ('echo prompt $E^| cmd') do set "ESC=%%a"
 
 pushd "%~dp0.."
 set "BF_DIR=%CD%"
@@ -23,43 +22,43 @@ if not exist "%PYTHON_EXE%" (
 cd /d "%BF_DIR%"
 cls
 echo.
-echo !ESC![90m===============================================================!ESC![0m
-echo !ESC![92;1m              BANKFIDELITY SYSTEM TERMINAL!ESC![0m
-echo !ESC![97m                 ORCHESTRATOR  //  MASTER!ESC![0m
-echo !ESC![90m===============================================================!ESC![0m
+echo ===============================================================
+echo               BANKFIDELITY SYSTEM TERMINAL
+echo                  ORCHESTRATOR  //  MASTER
+echo ===============================================================
 echo.
-echo  !ESC![97m[1]!ESC![0m !ESC![92mLaunch BankFidelity GUI (Release)!ESC![0m
-echo  !ESC![97m[2]!ESC![0m !ESC![92mLaunch BankFidelity GUI (Debug)!ESC![0m
-echo  !ESC![97m[3]!ESC![0m !ESC![96mBoot Headless HTTP Server!ESC![0m
-echo  !ESC![97m[4]!ESC![0m !ESC![96mBoot MCP Server (stdio)!ESC![0m
-echo  !ESC![97m[5]!ESC![0m !ESC![93mLocal AI Chat (CLI NLU)!ESC![0m
-echo  !ESC![97m[6]!ESC![0m !ESC![95mSubsystem Diagnostics & Doctor!ESC![0m
-echo  !ESC![97m[7]!ESC![0m !ESC![95mAPI Key Status Verification!ESC![0m
-echo  !ESC![97m[8]!ESC![0m !ESC![96mRun Full Lifecycle Certification Gauntlet!ESC![0m
-echo  !ESC![97m[0]!ESC![0m !ESC![91mExit!ESC![0m
+echo  [1] Launch BankFidelity GUI (Release)
+echo  [2] Launch BankFidelity GUI (Debug)
+echo  [3] Boot Headless HTTP Server
+echo  [4] Boot MCP Server (stdio)
+echo  [5] Local AI Chat (CLI NLU)
+echo  [6] Subsystem Diagnostics and Doctor
+echo  [7] API Key Status Verification
+echo  [8] Run Full Lifecycle Certification Gauntlet
+echo  [0] Exit
 echo.
-set /p CHOICE="!ESC![92mSYS_REQ_>!ESC![0m "
+set /p CHOICE="SYS_REQ_> "
 
 if "%CHOICE%"=="1" (
-    echo !ESC![96m[launch] Starting BankFidelity GUI (Release)...!ESC![0m
+    echo aunch] Starting BankFidelity GUI (Release)...
     cargo run --release -- gui
     pause
     goto MAIN_MENU
 )
 if "%CHOICE%"=="2" (
-    echo !ESC![96m[launch] Starting BankFidelity GUI (Debug)...!ESC![0m
+    echo aunch] Starting BankFidelity GUI (Debug)...
     cargo run -- gui
     pause
     goto MAIN_MENU
 )
 if "%CHOICE%"=="3" (
-    echo !ESC![96m[launch] Booting HTTP Server on port 8080...!ESC![0m
+    echo aunch] Booting HTTP Server on port 8080...
     cargo run -- serve
     pause
     goto MAIN_MENU
 )
 if "%CHOICE%"=="4" (
-    echo !ESC![96m[launch] Starting MCP Server stdio loop...!ESC![0m
+    echo aunch] Starting MCP Server stdio loop...
     cargo run -- mcp
     pause
     goto MAIN_MENU

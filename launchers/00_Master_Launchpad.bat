@@ -5,9 +5,8 @@ color 0B
 chcp 65001 >nul
 
 :: Set ESC character for ANSI colors
-for /f %%a in ('echo prompt $E^| cmd') do set "ESC=%%a"
 
-echo !ESC![96mInitializing BankFidelity + UFO Dual-Core Orchestrator...!ESC![0m
+echo Initializing BankFidelity + UFO Dual-Core Orchestrator...
 if exist "%~dp0BankFidelity_Matrix.ps1" (
     powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0BankFidelity_Matrix.ps1"
 )
@@ -15,24 +14,24 @@ if exist "%~dp0BankFidelity_Matrix.ps1" (
 :menu
 cls
 echo.
-echo !ESC![90m==============================================================================================================!ESC![0m
-echo !ESC![92;1m                                 BANKFIDELITY // MASTER SYSTEM ORCHESTRATOR!ESC![0m
-echo !ESC![97m                                100%% Visual Fidelity • Dual-Core AI Architecture!ESC![0m
-echo !ESC![90m==============================================================================================================!ESC![0m
+echo ==============================================================================================================
+echo                                  BANKFIDELITY // MASTER SYSTEM ORCHESTRATOR
+echo                                 100%% Visual Fidelity • Dual-Core AI Architecture
+echo ==============================================================================================================
 echo.
-echo   !ESC![97m[1]!ESC![0m !ESC![92mBANKFIDELITY CORE GUI & TERMINAL!ESC![0m      (Native Rust egui UI, Smart Balance Engine, REPL, Direct Edit)
-echo   !ESC![97m[2]!ESC![0m !ESC![93mCROSS-BANK TRANSFER STRESS TEST!ESC![0m       (Real API Pairwise Matrix: CBA, Westpac, Bankwest, ING, Macquarie)
-echo   !ESC![97m[3]!ESC![0m !ESC![95mVISION AI SUB-PIXEL CALIBRATION!ESC![0m       (300 DPI Rasterization, SSIM / PSNR Diffing, Iterative Correction)
-echo   !ESC![97m[4]!ESC![0m !ESC![96mUFO DUAL-CORE AGENT SURGERY!ESC![0m           (Autonomous Desktop UI Agent, MCP Stdio Bridge, Task Dispatch)
-echo   !ESC![97m[5]!ESC![0m !ESC![94mDREAM TEAM LOCAL VISION STACK!ESC![0m         (Offline Qwen-VL + Gemma-4 + LiteLLM :4000 Port Proxy)
-echo   !ESC![97m[6]!ESC![0m !ESC![92mFULL-LIFECYCLE CERTIFICATION!ESC![0m          (Unattended 6-Gate End-to-End Test & Certification Gauntlet)
-echo   !ESC![97m[7]!ESC![0m !ESC![95mSUBSYSTEM HEALTH & DOCTOR!ESC![0m             (Hardware, Memory, API Keys, Fallbacks, Template Validations)
-echo   !ESC![97m[8]!ESC![0m !ESC![91mSUPER E2E ARCHITECTURE AUDIT!ESC![0m          (Full-Stack PyTest + Cargo Test + Notepad Live Automation)
-echo   !ESC![97m[9]!ESC![0m !ESC![97mCONFIGURATION & MASTER API KEYS!ESC![0m       (Manage Reducto, Gemini, PyMuPDF Pro, Passphrases & Env)
+echo   [1] BANKFIDELITY CORE GUI and TERMINAL      (Native Rust egui UI, Smart Balance Engine, REPL, Direct Edit)
+echo   [2] CROSS-BANK TRANSFER STRESS TEST       (Real API Pairwise Matrix: CBA, Westpac, Bankwest, ING, Macquarie)
+echo   [3] VISION AI SUB-PIXEL CALIBRATION       (300 DPI Rasterization, SSIM / PSNR Diffing, Iterative Correction)
+echo   [4] UFO DUAL-CORE AGENT SURGERY           (Autonomous Desktop UI Agent, MCP Stdio Bridge, Task Dispatch)
+echo   [5] DREAM TEAM LOCAL VISION STACK         (Offline Qwen-VL + Gemma-4 + LiteLLM :4000 Port Proxy)
+echo   [6] FULL-LIFECYCLE CERTIFICATION          (Unattended 6-Gate End-to-End Test and Certification Gauntlet)
+echo   [7] SUBSYSTEM HEALTH and DOCTOR             (Hardware, Memory, API Keys, Fallbacks, Template Validations)
+echo   [8] SUPER E2E ARCHITECTURE AUDIT          (Full-Stack PyTest + Cargo Test + Notepad Live Automation)
+echo   [9] CONFIGURATION and MASTER API KEYS       (Manage Reducto, Gemini, PyMuPDF Pro, Passphrases and Env)
 echo.
-echo   !ESC![97m[X]!ESC![0m !ESC![90mEXIT ORCHESTRATOR!ESC![0m
-echo !ESC![90m==============================================================================================================!ESC![0m
-set /p choice="!ESC![92mSYS_COMMAND_>!ESC![0m "
+echo   [X] EXIT ORCHESTRATOR
+echo ==============================================================================================================
+set /p choice="SYS_COMMAND_> "
 
 if /i "!choice!"=="1" start "" "%~dp001_BankFidelity_Terminal.bat"
 if /i "!choice!"=="2" start "" "%~dp011_Matrix_Stress_Test.bat"

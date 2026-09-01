@@ -5,7 +5,6 @@ color 0D
 chcp 65001 >nul
 
 :: Set ESC character for ANSI colors
-for /f %%a in ('echo prompt $E^| cmd') do set "ESC=%%a"
 
 pushd "%~dp0.."
 set "BF_DIR=%CD%"
@@ -18,17 +17,17 @@ if not exist "%PYTHON_EXE%" (
 )
 
 cls
-echo !ESC![95m==============================================================================!ESC![0m
-echo !ESC![95;1m              VISION AI SUB-PIXEL CALIBRATION & CORRECTION LOOP!ESC![0m
-echo !ESC![95m==============================================================================!ESC![0m
-echo !ESC![97mExecutes closed-loop visual verification across real bank statements:!ESC![0m
-echo !ESC![90m  1. 300+ DPI High-Resolution Dual-Page Rasterization!ESC![0m
-echo !ESC![90m  2. Structural & Perceptual Diffing (SSIM, PSNR, Pixel MSE)!ESC![0m
-echo !ESC![90m  3. Optical Kerning & Bounding Box Sub-Pixel Calibration!ESC![0m
-echo !ESC![90m  4. Closed-Loop Iterative Layout Correction until SSIM >= 0.998!ESC![0m
-echo !ESC![90m  5. Heatmap Visual Artifact Generation in audit-evidence/vision-calibration/!ESC![0m
+echo ==============================================================================
+echo               VISION AI SUB-PIXEL CALIBRATION and CORRECTION LOOP
+echo ==============================================================================
+echo Executes closed-loop visual verification across real bank statements:
+echo   1. 300+ DPI High-Resolution Dual-Page Rasterization
+echo   2. Structural and Perceptual Diffing (SSIM, PSNR, Pixel MSE)
+echo   3. Optical Kerning and Bounding Box Sub-Pixel Calibration
+echo   4. Closed-Loop Iterative Layout Correction until SSIM >= 0.998
+echo   5. Heatmap Visual Artifact Generation in audit-evidence/vision-calibration/
 echo.
-echo !ESC![95m==============================================================================!ESC![0m
+echo ==============================================================================
 echo.
 pause
 
@@ -36,7 +35,7 @@ cd /d "%BF_DIR%"
 "%PYTHON_EXE%" "%BF_DIR%\scripts\vision_ai_calibration.py"
 
 echo.
-echo !ESC![92m==============================================================================!ESC![0m
-echo !ESC![92mCalibration & Verification Loop Complete. Evidence saved to audit-evidence/!ESC![0m
-echo !ESC![92m==============================================================================!ESC![0m
+echo ==============================================================================
+echo Calibration and Verification Loop Complete. Evidence saved to audit-evidence/
+echo ==============================================================================
 pause
