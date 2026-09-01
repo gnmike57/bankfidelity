@@ -371,6 +371,42 @@ pub fn learn_template(
     Ok(out_path)
 }
 
+/// Learns or refines a bank template from Reducto bounding-box annotations.
+pub fn learn_template_from_reducto(
+    template_dir: &Path,
+    template: &BankTemplate,
+    reducto_data: &serde_json::Value,
+) -> Result<std::path::PathBuf, String> {
+    let mut observed_bboxes = Vec::new();
+    if let Some(arr) = reducto_data.get("transactions").and_then(|v| v.as_array()) {
+        for tx in arr {
+            for (field, key) in [
+                ("date", "date_bbox"),
+                ("amount", "amount_bbox"),
+                ("debit", "debit_bbox"),
+                ("credit", "credit_bbox"),
+                ("balance", "balance_bbox"),
+            ] {
+                if let Some(bbox_arr) = tx.get(key).and_then(|v| v.as_array()) {
+                    if bbox_arr.len() == 4 {
+                        let b: Vec<f32> = bbox_arr
+                            .iter()
+                            .filter_map(|v| v.as_f64().map(|f| f as f32))
+                            .collect();
+                        if b.len() == 4 {
+                            observed_bboxes.push((field.to_string(), [b[0], b[1], b[2], b[3]]));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if observed_bboxes.is_empty() {
+        return Err("No bounding-box observations found in Reducto data".into());
+    }
+    learn_template(template_dir, template, &observed_bboxes)
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
@@ -478,6 +514,42 @@ mod tests {
         // min x0 = 40, max x1 = 100 -> padded -> [36, 104]
         assert!((date[0] - 36.0).abs() < 0.1);
         assert!((date[1] - 104.0).abs() < 0.1);
+        Ok(())
+    }
+
+    #[test]
+    fn test_learn_template_from_reducto() -> anyhow::Result<()> {
+        let dir = tempdir()?;
+        let tmpl = sample_template();
+        let reducto_json = serde_json::json!({
+            "transactions": [
+                {
+                    "date": "01/08/2026",
+                    "date_bbox": [50.0, 100.0, 90.0, 120.0],
+                    "description": "Coffee Shop",
+                    "amount": "10.00",
+                    "amount_bbox": [300.0, 100.0, 350.0, 120.0]
+                },
+                {
+                    "date": "02/08/2026",
+                    "date_bbox": [45.0, 130.0, 95.0, 150.0],
+                    "description": "Book Store",
+                    "amount": "25.00",
+                    "amount_bbox": [295.0, 130.0, 355.0, 150.0]
+                }
+            ]
+        });
+
+        let out = learn_template_from_reducto(dir.path(), &tmpl, &reducto_json)
+            .map_err(|e| anyhow::anyhow!(e))?;
+        let refined: BankTemplate = serde_yaml::from_str(&std::fs::read_to_string(&out)?)
+            .map_err(|e| anyhow::anyhow!(e))?;
+        let date = refined
+            .column_x_ranges
+            .get("date")
+            .ok_or_else(|| anyhow::anyhow!("No date field"))?;
+        assert!((date[0] - 41.0).abs() < 0.1);
+        assert!((date[1] - 99.0).abs() < 0.1);
         Ok(())
     }
 }

@@ -301,10 +301,130 @@ impl ReductoClient {
         Ok(classify_res.result.classification.unwrap_or_default())
     }
 
+    fn parse_amount_clean(val: Option<&serde_json::Value>) -> Option<rust_decimal::Decimal> {
+        let s = val?.as_str()?.trim();
+        if s.is_empty() {
+            return None;
+        }
+        let cleaned: String = s
+            .chars()
+            .filter(|c| c.is_ascii_digit() || *c == '.' || *c == '-')
+            .collect();
+        cleaned.parse::<rust_decimal::Decimal>().ok()
+    }
+
+    /// Pull structured bank transactions directly into a canonical BankStatement using Reducto's POST /extract
+    pub async fn extract_statement_transactions(
+        &self,
+        pdf_path: &Path,
+    ) -> Result<crate::ai::document_ai::BankStatement, ReductoError> {
+        let schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "bank_name": { "type": "string" },
+                "account_number": { "type": "string" },
+                "opening_balance": { "type": "string" },
+                "closing_balance": { "type": "string" },
+                "transactions": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "date": { "type": "string" },
+                            "description": { "type": "string" },
+                            "debit": { "type": ["string", "null"] },
+                            "credit": { "type": ["string", "null"] },
+                            "amount": { "type": ["string", "null"] },
+                            "running_balance": { "type": ["string", "null"] }
+                        },
+                        "required": ["date", "description"]
+                    }
+                }
+            },
+            "required": ["transactions"]
+        });
+
+        let json_val = self.extract_fields(pdf_path, schema).await?;
+        let bank_name = json_val
+            .get("bank_name")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let account_number = json_val
+            .get("account_number")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let opening_balance = Self::parse_amount_clean(json_val.get("opening_balance"))
+            .unwrap_or(rust_decimal::Decimal::ZERO);
+        let closing_balance = Self::parse_amount_clean(json_val.get("closing_balance"))
+            .unwrap_or(rust_decimal::Decimal::ZERO);
+
+        let mut transactions = Vec::new();
+        if let Some(arr) = json_val.get("transactions").and_then(|v| v.as_array()) {
+            for (idx, item) in arr.iter().enumerate() {
+                let date = item
+                    .get("date")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default()
+                    .to_string();
+                let description = item
+                    .get("description")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default()
+                    .to_string();
+                let mut debit = Self::parse_amount_clean(item.get("debit"));
+                let mut credit = Self::parse_amount_clean(item.get("credit"));
+                let running_balance = Self::parse_amount_clean(item.get("running_balance"));
+
+                if debit.is_none() && credit.is_none() {
+                    if let Some(amt) = Self::parse_amount_clean(item.get("amount")) {
+                        if amt < rust_decimal::Decimal::ZERO {
+                            credit = Some(-amt);
+                        } else {
+                            debit = Some(amt);
+                        }
+                    }
+                }
+
+                let raw_text = format!("{date} {description}");
+                transactions.push(crate::engine::model::Transaction {
+                    page: 0,
+                    line_on_page: idx,
+                    date,
+                    raw_text,
+                    debit,
+                    credit,
+                    running_balance,
+                    bbox: None,
+                    field_bboxes: crate::engine::model::FieldBboxes::default(),
+                    provenance: crate::engine::model::Provenance::DocumentAI { confidence: 1.0 },
+                    category: None,
+                    canonical: Default::default(),
+                });
+            }
+        }
+
+        let mut stmt = crate::ai::document_ai::BankStatement {
+            total_pages: 1,
+            transactions,
+            opening_balance,
+            closing_balance,
+            account_number,
+            bank_name,
+        };
+        stmt.ensure_canonical_metadata();
+        Ok(stmt)
+    }
+
     pub async fn parse_statement(
         &self,
         pdf_path: &Path,
     ) -> Result<crate::ai::document_ai::BankStatement, ReductoError> {
+        if let Ok(stmt) = self.extract_statement_transactions(pdf_path).await {
+            if !stmt.transactions.is_empty() {
+                return Ok(stmt);
+            }
+        }
+
         let chunks = self.parse_document(pdf_path).await?;
         let markdown = chunks.to_string();
 
