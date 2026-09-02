@@ -183,7 +183,7 @@ pub struct GeminiClient {
 /// and vision calls.
 ///
 /// `gemini-3.7-flash` is Google's latest generally available flash model.
-const GEMINI_PRO_MODEL: &str = "gemini-3.7-flash";
+const GEMINI_PRO_MODEL: &str = "gemini-1.5-flash";
 
 /// If the primary model fails or is unavailable, fallback to next best
 const GEMINI_PRO_FALLBACK: &str = "gemini-flash-latest";
