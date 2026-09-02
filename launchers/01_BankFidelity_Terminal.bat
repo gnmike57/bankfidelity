@@ -1,22 +1,14 @@
 @echo off
 setlocal EnableDelayedExpansion
-set "PYTHONIOENCODING=utf-8"
 title BankFidelity // Terminal
 chcp 65001 >nul
 color 0a
 
-:: Set ESC character for ANSI colors
-
-pushd "%~dp0.."
-set "BF_DIR=%CD%"
-popd
-
-:: Validate Python Environment
+set "BF_DIR=C:\bankfidelity\bankfidelity"
 set "UFO_ROOT=C:\ufo\ufo"
 set "PYTHON_EXE=%UFO_ROOT%\python_env\python.exe"
-if not exist "%PYTHON_EXE%" (
-    for /f "delims=" %%P in ('where python.exe 2^>nul') do set "PYTHON_EXE=%%P"
-)
+set "PYTHONIOENCODING=utf-8"
+set "PYTHONPATH=%UFO_ROOT%;%BF_DIR%"
 
 :MAIN_MENU
 cd /d "%BF_DIR%"
@@ -40,25 +32,25 @@ echo.
 set /p CHOICE="SYS_REQ_> "
 
 if "%CHOICE%"=="1" (
-    echo aunch] Starting BankFidelity GUI (Release)...
+    echo [Launch] Starting BankFidelity GUI (Release)...
     cargo run --release -- gui
     pause
     goto MAIN_MENU
 )
 if "%CHOICE%"=="2" (
-    echo aunch] Starting BankFidelity GUI (Debug)...
+    echo [Launch] Starting BankFidelity GUI (Debug)...
     cargo run -- gui
     pause
     goto MAIN_MENU
 )
 if "%CHOICE%"=="3" (
-    echo aunch] Booting HTTP Server on port 8080...
+    echo [Launch] Booting HTTP Server on port 8080...
     cargo run -- serve
     pause
     goto MAIN_MENU
 )
 if "%CHOICE%"=="4" (
-    echo aunch] Starting MCP Server stdio loop...
+    echo [Launch] Starting MCP Server stdio loop...
     cargo run -- mcp
     pause
     goto MAIN_MENU

@@ -4,8 +4,6 @@ title Booting UFO AI Dream Team (Local LLMs)
 color 0A
 chcp 65001 >nul
 
-:: Set ESC character for ANSI colors
-
 set "UFO_ROOT=C:\ufo\ufo"
 set "PYTHON_EXE=%UFO_ROOT%\python_env\python.exe"
 
@@ -33,7 +31,7 @@ echo Starting Local LLM Stack...
 if exist "%UFO_ROOT%\scripts\setup_dream_team.bat" (
     call "%UFO_ROOT%\scripts\setup_dream_team.bat"
 ) else (
-    echo RROR] setup_dream_team.bat not found at %UFO_ROOT%\scripts\
+    echo [ERROR] setup_dream_team.bat not found at %UFO_ROOT%\scripts\
     pause
 )
 goto MENU
@@ -44,7 +42,7 @@ echo Stopping Local LLM Stack...
 if exist "%UFO_ROOT%\scripts\stop_local_llm.bat" (
     call "%UFO_ROOT%\scripts\stop_local_llm.bat"
 ) else (
-    echo RROR] stop_local_llm.bat not found at %UFO_ROOT%\scripts\
+    echo [ERROR] stop_local_llm.bat not found at %UFO_ROOT%\scripts\
     pause
 )
 goto MENU

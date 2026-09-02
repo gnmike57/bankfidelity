@@ -5,4 +5,5 @@ start notepad.exe "C:\bankfidelity\bankfidelity\.env"
 start notepad.exe "C:\ufo\ufo\config\ufo\agents.yaml"
 start notepad.exe "C:\ufo\ufo\config\ufo\system.yaml"
 echo Done!
-exit
+pause
+exit /b 0
