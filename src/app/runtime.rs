@@ -398,6 +398,7 @@ pub enum PythonJob {
         output_path: String,
         edits_json: String,
         font_path: Option<String>,
+        strict_fidelity: bool,
     },
     /// Stage 3 / Item #16: split a PDF into chunks <= 30 pages so Document AI
     /// can parse documents above its single-request page cap.
@@ -607,6 +608,7 @@ impl PythonJob {
                 output_path,
                 edits_json,
                 font_path,
+                strict_fidelity,
             } => {
                 let edits: serde_json::Value = serde_json::from_str(edits_json)
                     .map_err(|error| format!("invalid edit payload: {error}"))?;
@@ -618,6 +620,7 @@ impl PythonJob {
                         "output_path": output_path,
                         "edits": edits,
                         "font_path": font_path,
+                        "strict_fidelity": strict_fidelity,
                     }),
                 )
             }

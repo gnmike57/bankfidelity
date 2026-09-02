@@ -345,6 +345,7 @@ class WorkerRuntime:
                 payload["output_path"],
                 payload["edits"],
                 payload.get("font_path"),
+                payload.get("strict_fidelity", False),
             ),
             "chunk_pdf_for_docai": lambda: self.bridge.chunk_pdf_for_docai(
                 payload["pdf_path"],

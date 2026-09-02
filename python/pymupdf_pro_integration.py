@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 PyMuPDF Pro Smart Targeted Editor v2.1
 - Get all text blocks with accurate bounding boxes
@@ -3650,7 +3650,7 @@ def _build_apply_report(
     }
 
 
-def apply_many_edits(pdf_path: str, output_path: str, edits: list, font_path: str = None):
+def apply_many_edits(pdf_path: str, output_path: str, edits: list, font_path: str = None, strict_fidelity: bool = False):
     """Apply many targeted edits in a single open/save pass.
 
     Stage 3 / Item #14: each `replace_text_in_rect` call opens, modifies and
@@ -4024,6 +4024,7 @@ def apply_many_edits(pdf_path: str, output_path: str, edits: list, font_path: st
 
         if (
             not coverage_ok
+            and not strict_fidelity
             and all(_winansi_covers(character) for character in new_text)
             and (
                 bool(span.get("_ocr_identity_verified"))
