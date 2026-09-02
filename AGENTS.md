@@ -1,4 +1,4 @@
-# AGENTS.md
+﻿# AGENTS.md
 
 ## Single source of truth: the runtime
 
@@ -8,7 +8,7 @@ cancellation, parser chain, interactive fallback). Its only submodule is
 A historical dead fork of that directory name (core.rs, client.rs, jobs.rs,
 python_job.rs, tracking.rs) was deleted. Never treat any other file as a
 reference for current runtime behavior, and never place undeclared `.rs`
-files in that directory — `tests/static_analysis.rs`
+files in that directory â€” `tests/static_analysis.rs`
 (`test_zombie_runtime_fork_files_are_declared_or_absent`) fails the suite
 if one appears.
 
@@ -222,11 +222,11 @@ and temporary duct-tape fixes.
 ## Fallback chain rules
 
 Every pipeline stage must have at least one offline fallback:
-- Cloud parsers → offline_parser
-- AI balance → local balance engine
-- Cloud rendering → local Pdfium
-- Visual AI → SSIM-only metrics
-- PyMuPDF edit → Pdfium → Typst reconstruct (ultimate)
+- Cloud parsers â†’ offline_parser
+- AI balance â†’ local balance engine
+- Cloud rendering â†’ local Pdfium
+- Visual AI â†’ SSIM-only metrics
+- PyMuPDF edit â†’ Pdfium â†’ Typst reconstruct (ultimate)
 
 **Exception**: `TransferTransactions` and `RunTransferTests` strictly require an AI provider (Gemini/Groq/OpenRouter) for layout-agnostic format mapping. Their source and target parsing stages fall back to `offline_parser`, but the actual translation mapping has no offline equivalent.
 
@@ -241,3 +241,13 @@ At the end of each session, summarize:
 - commands run
 - validation result
 - remaining manual steps, if any
+
+## Anti-Fragile Orchestration Principles (Learned)
+
+1. **Zero-Brittle Boundaries**: Never use bare except Exception: in Python, especially in JSON parsing or API calls. Always use typed exceptions (json.JSONDecodeError) or exc_info=True. In Rust, never use .unwrap() or .expect() at I/O boundaries (Network, FS, IPC); always propagate Result or use unwrap_or_default().
+2. **Explicit IPC Handoffs**: When BankFidelity (Rust) orchestrates Microsoft UFO (Python), do not rely on UFO's internal status flags alone. Always parse esult.json's output field using strict Regex (e.g., (?i)[a-z]:\\[^<>\x22\|\?\*]+\.pdf) to programmatically intercept artifacts and inject them into the next Pipeline Job (e.g., Job::ExtractTransactions).
+3. **Smart Retries**: Always wrap agentic subprocess calls (UfoClient::dispatch_task) in a localized retry loop (max 1-2 attempts) to recover from LLM hallucinations before crashing back to the user terminal.
+4. **Absolute Repository Roots in Launchers**: All .bat and .ps1 launchers must define explicit absolute paths (set "BF_DIR=C:\bankfidelity\bankfidelity", set "UFO_ROOT=C:\ufo\ufo") rather than assuming %~dp0.. when placed on Desktop or OneDrive folders.
+5. **Deterministic Python Runtime**: Never invoke bare python in Windows batch scripts or PowerShell tasks. Always invoke %PYTHON_EXE% (C:\ufo\ufo\python_env\python.exe), setting PYTHONIOENCODING=utf-8 and PYTHONPATH=%UFO_ROOT%;%BF_DIR%.
+6. **Explicit UTF-8 Encoding in Subprocesses**: Always pass encoding="utf-8", errors="replace" to subprocess.Popen / subprocess.run on Windows to prevent cp1252 UnicodeDecodeError / UnicodeEncodeError.
+7. **Win32 Foreground Focus Switching**: To reliably activate target windows on Windows 10/11, use AllowSetForegroundWindow(-1) and AttachThreadInput with an Alt-key tap before SetForegroundWindow.
