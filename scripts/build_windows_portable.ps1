@@ -9,7 +9,13 @@ $Revision = if ($env:GITHUB_SHA) { $env:GITHUB_SHA } else { (git rev-parse HEAD)
 $Output = if ($args.Count -gt 0) { $args[0] } else { "target/release/portable/windows-x86_64" }
 
 cargo build --locked --release --bin dual-core-pdf-pipeline
-python scripts/build_portable_bundle.py `
+$UFO_ROOT = "C:\ufo\ufo"
+$BF_DIR = "C:\bankfidelity\bankfidelity"
+$PYTHON_EXE = "$UFO_ROOT\python_env\python.exe"
+$env:PYTHONIOENCODING = "utf-8"
+$env:PYTHONPATH = "$UFO_ROOT;$BF_DIR"
+
+& $PYTHON_EXE scripts/build_portable_bundle.py `
   --platform windows-x86_64 `
   --binary target/release/dual-core-pdf-pipeline.exe `
   --output $Output `

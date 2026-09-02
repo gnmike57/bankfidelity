@@ -4,7 +4,12 @@ Set-StrictMode -Version Latest
 $Root = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $Root
 
-if (-not $env:PYO3_PYTHON) { $env:PYO3_PYTHON = "python" }
+$UFO_ROOT = "C:\ufo\ufo"
+$BF_DIR = "C:\bankfidelity\bankfidelity"
+$PYTHON_EXE = "$UFO_ROOT\python_env\python.exe"
+$env:PYTHONIOENCODING = "utf-8"
+$env:PYTHONPATH = "$UFO_ROOT;$BF_DIR"
+if (-not $env:PYO3_PYTHON) { $env:PYO3_PYTHON = $PYTHON_EXE }
 if (-not $env:DUAL_CORE_PASSPHRASE) { $env:DUAL_CORE_PASSPHRASE = "base-state-verification-only" }
 if (-not $env:CARGO_BUILD_JOBS) { $env:CARGO_BUILD_JOBS = "2" }
 
@@ -13,7 +18,7 @@ cargo fmt --all -- --check
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "[2/8] Python production bridge"
-python python/smoke_test.py
+& $PYTHON_EXE python/smoke_test.py
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "[3/8] all host targets"

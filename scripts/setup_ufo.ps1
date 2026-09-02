@@ -25,7 +25,10 @@ if (Test-Path $systemYamlPath) {
 $patcherScript = Join-Path $PWD "scripts\patch_ufo_parser.py"
 if (Test-Path $patcherScript) {
     Write-Host "Patching UFO JSON parsers for Local LLM PascalCase issues..."
-    python $patcherScript $ufoPath
+    $PYTHON_EXE = Join-Path $ufoPath "python_env\python.exe"
+    $env:PYTHONIOENCODING = "utf-8"
+    $env:PYTHONPATH = "$ufoPath;$PWD"
+    & $PYTHON_EXE $patcherScript $ufoPath
 }
 
 Write-Host "UFO Setup Complete."
