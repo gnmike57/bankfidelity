@@ -185,7 +185,10 @@ impl UfoClient {
         let work_dir = if ufo_dir.join("ufo").join("__main__.py").exists() {
             ufo_dir.clone()
         } else if ufo_dir.join("__main__.py").exists() {
-            ufo_dir.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| ufo_dir.clone())
+            ufo_dir
+                .parent()
+                .map(|p| p.to_path_buf())
+                .unwrap_or_else(|| ufo_dir.clone())
         } else {
             ufo_dir.clone()
         };
@@ -439,4 +442,3 @@ mod tests {
         );
     }
 }
-
