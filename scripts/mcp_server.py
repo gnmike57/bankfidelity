@@ -631,7 +631,9 @@ async def tool_update_api_key(provider: str, api_key: str) -> dict:
     try:
         await _api_post("/job", {"job": "reload_config"})
         return {"status": "updated", "provider": provider, "env_var": env_var, "reloaded": True}
-    except Exception:
+    except Exception as e:
+
+        import traceback; traceback.print_exc()
         return {"status": "updated", "provider": provider, "env_var": env_var, "reloaded": False,
                 "note": "Backend not running; key saved to .env for next startup"}
 
@@ -792,7 +794,9 @@ async def tool_list_available_pdfs(directory: str | None = None) -> dict:
                         info["bank"] = bank
                         break
                 doc.close()
-            except Exception:
+            except Exception as e:
+
+                import traceback; traceback.print_exc()
                 pass
         results.append(info)
     return {"directory": str(d), "count": len(results), "pdfs": results}

@@ -43,7 +43,13 @@ impl Default for PythonWorkerConfig {
             bundled_executable.unwrap_or_else(resolve_system_python_executable);
         let python_executable = std::env::var_os("PYTHON_EXECUTABLE")
             .or_else(|| std::env::var_os("PYO3_PYTHON"))
+            .or_else(|| std::env::var_os("PYTHON_EXE"))
             .map(PathBuf::from)
+            .or_else(|| {
+                std::env::var_os("UFO_ROOT").map(|root| {
+                    PathBuf::from(root).join("python_env").join("python.exe")
+                })
+            })
             .unwrap_or(default_executable);
         let worker_script = std::env::var_os("PYTHON_WORKER_SCRIPT")
             .map(PathBuf::from)

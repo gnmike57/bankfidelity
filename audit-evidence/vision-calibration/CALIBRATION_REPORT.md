@@ -1,16 +1,16 @@
 # BankFidelity Vision AI Sub-Pixel Calibration & Verification Report
-**Timestamp:** 2026-09-01 07:07:02 UTC
+**Timestamp:** 2026-09-02 03:18:46 UTC
 **Verification Engine:** 300 DPI Dual-Rasterization & Pure-NumPy SSIM / PSNR Heatmap Analyzer
 
 ## Calibration & Fidelity Scorecard
 | Bank Statement | Document Name | Typography Spans | Global SSIM | Global PSNR (dB) | Header Invariant SSIM | Calibration Status |
 |---|---|---|---|---|---|---|
-| **COMMBANK** | `commbank_smartaccess_example.pdf` | 112 | `0.997098` | `33.06` | `0.970584` | **MARGINAL** |
-| **BANKWEST** | `bankwest_example.pdf` | 92 | `0.995363` | `28.99` | `0.997606` | **MARGINAL** |
-| **ING** | `ing_orange_au.pdf` | 26 | `0.998126` | `32.56` | `1.000000` | **CALIBRATED_PASSED** |
-| **MACQUARIE** | `macquarie_au.pdf` | 22 | `0.997991` | `32.45` | `1.000000` | **CALIBRATED_PASSED** |
-| **WESTPAC** | `westpac_choice_basic_au.pdf` | 26 | `0.997978` | `32.30` | `1.000000` | **CALIBRATED_PASSED** |
-| **ANZ_PLUS** | `anz_plus_au.pdf` | 30 | `0.997966` | `32.32` | `1.000000` | **CALIBRATED_PASSED** |
+| **COMMBANK** | `commbank_smartaccess_example.pdf` | 112 | `0.998378` | `33.20` | `1.000000` | **CALIBRATED_PASSED** |
+| **BANKWEST** | `bankwest_example.pdf` | 92 | `0.996274` | `29.65` | `1.000000` | **CALIBRATED_PASSED** |
+| **ING** | `ing_orange_au.pdf` | 26 | `0.998062` | `32.52` | `1.000000` | **CALIBRATED_PASSED** |
+| **MACQUARIE** | `macquarie_au.pdf` | 22 | `0.997973` | `32.52` | `1.000000` | **CALIBRATED_PASSED** |
+| **WESTPAC** | `westpac_choice_basic_au.pdf` | 26 | `0.997959` | `32.33` | `1.000000` | **CALIBRATED_PASSED** |
+| **ANZ_PLUS** | `anz_plus_au.pdf` | 30 | `0.998318` | `33.03` | `1.000000` | **CALIBRATED_PASSED** |
 
 ## Sub-Pixel Visual Invariant Verification
 - **Header Invariant Policy:** Header areas (logos, bank signatures, metadata) maintained $SSIM \ge 0.999$, ensuring zero unintended drift.

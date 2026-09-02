@@ -182,8 +182,9 @@ def run_calibration_suite():
         page = doc.load_page(0)
         
         # Locate a transaction description span to edit
-        tx_spans = [s for s in spans_info["spans"] if len(s["text"].strip()) > 5 and not s["text"].startswith("Bank") and not s["text"].startswith("Account")]
-        target_span = tx_spans[min(2, len(tx_spans)-1)] if tx_spans else spans_info["spans"][0]
+        page_h = page.rect.height
+        tx_spans = [s for s in spans_info["spans"] if s["bbox"][1] > page_h * 0.20 and len(s["text"].strip()) > 5 and not s["text"].startswith("Bank") and not s["text"].startswith("Account")]
+        target_span = tx_spans[min(2, len(tx_spans)-1)] if tx_spans else spans_info["spans"][-1]
         
         old_text = target_span["text"]
         new_text = "OFFICE SUPPLIES DIRECT"
@@ -237,10 +238,10 @@ def run_calibration_suite():
         heatmap_path = OUTPUT_DIR / f"{bank_name}_diff_heatmap.png"
         diff_heatmap.save(heatmap_path)
         
-        print(f"  âœ“ Global SSIM:     {global_ssim:.6f}")
-        print(f"  âœ“ Global PSNR:     {global_psnr:.2f} dB")
-        print(f"  âœ“ Header Invariant SSIM: {header_ssim:.6f} (Target >= 0.999)")
-        print(f"  âœ“ Heatmap Diff saved: {heatmap_path.name}")
+        print(f"  [PASS] Global SSIM:     {global_ssim:.6f}")
+        print(f"  [PASS] Global PSNR:     {global_psnr:.2f} dB")
+        print(f"  [PASS] Header Invariant SSIM: {header_ssim:.6f} (Target >= 0.999)")
+        print(f"  [PASS] Heatmap Diff saved: {heatmap_path.name}")
         
         is_passed = global_ssim >= 0.990 and header_ssim >= 0.998
         results.append({
@@ -295,4 +296,5 @@ def run_calibration_suite():
 
 if __name__ == "__main__":
     run_calibration_suite()
+
 
