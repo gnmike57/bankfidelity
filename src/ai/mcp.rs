@@ -264,14 +264,16 @@ impl McpServer {
                             },
                             {
                                 "name": "export_history",
-                                "description": "Cryptographically extracts the immutable .audit history from a modified BankFidelity PDF.",
+                                "description": "Cryptographically extracts the immutable .audit history from a BankFidelity audit log.",
                                 "inputSchema": {
                                     "type": "object",
                                     "properties": {
-                                        "input": { "type": "string", "description": "Absolute path to the modified PDF." },
-                                        "output_dir": { "type": "string", "description": "Absolute path to the directory to save the history." }
+                                        "from_log": { "type": "string", "description": "Absolute path to the .audit log file or input PDF." },
+                                        "output": { "type": "string", "description": "Absolute path to save the exported JSON history." },
+                                        "input": { "type": "string", "description": "Alias for from_log." },
+                                        "output_dir": { "type": "string", "description": "Alias for output." }
                                     },
-                                    "required": ["input", "output_dir"]
+                                    "required": ["output"]
                                 }
                             }
                         ]
@@ -393,11 +395,19 @@ impl McpServer {
                     }
                     "export_history" => {
                         cmd.arg("export-history");
-                        if let Some(i) = args.get("input").and_then(|v| v.as_str()) {
-                            cmd.arg("--input").arg(i);
+                        if let Some(i) = args
+                            .get("from_log")
+                            .or_else(|| args.get("input"))
+                            .and_then(|v| v.as_str())
+                        {
+                            cmd.arg("--from-log").arg(i);
                         }
-                        if let Some(o) = args.get("output_dir").and_then(|v| v.as_str()) {
-                            cmd.arg("--output-dir").arg(o);
+                        if let Some(o) = args
+                            .get("output")
+                            .or_else(|| args.get("output_dir"))
+                            .and_then(|v| v.as_str())
+                        {
+                            cmd.arg("--output").arg(o);
                         }
                     }
                     _ => {

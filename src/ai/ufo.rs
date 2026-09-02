@@ -1,4 +1,4 @@
-﻿use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
@@ -137,9 +137,13 @@ impl UfoClient {
                 }
             }
         }
-        let bundled = ufo_dir.join("ufo").join("python_env").join("python.exe");
-        if bundled.exists() {
-            return bundled.to_string_lossy().to_string();
+        let candidate1 = ufo_dir.join("ufo").join("python_env").join("python.exe");
+        if candidate1.exists() {
+            return candidate1.to_string_lossy().to_string();
+        }
+        let candidate2 = ufo_dir.join("python_env").join("python.exe");
+        if candidate2.exists() {
+            return candidate2.to_string_lossy().to_string();
         }
         "python".to_string()
     }
@@ -178,6 +182,14 @@ impl UfoClient {
         );
 
         let python_cmd = Self::resolve_python_command(&ufo_dir);
+        let work_dir = if ufo_dir.join("ufo").join("__main__.py").exists() {
+            ufo_dir.clone()
+        } else if ufo_dir.join("__main__.py").exists() {
+            ufo_dir.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| ufo_dir.clone())
+        } else {
+            ufo_dir.clone()
+        };
+
         let mut child = Command::new(&python_cmd)
             .arg("-m")
             .arg("ufo")
@@ -185,7 +197,7 @@ impl UfoClient {
             .arg(&task_id)
             .arg("--request")
             .arg(&context_prompt)
-            .current_dir(&ufo_dir)
+            .current_dir(&work_dir)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
@@ -255,8 +267,26 @@ impl UfoClient {
 
         let stderr_str = stderr_buf.lock().map(|s| s.clone()).unwrap_or_default();
 
-        let result_json_path = ufo_dir.join("logs").join(&task_id).join("result.json");
-        if result_json_path.exists() {
+        let candidate_log_dirs = [
+            ufo_dir.join("logs").join(&task_id),
+            ufo_dir.join("ufo").join("logs").join(&task_id),
+            work_dir.join("logs").join(&task_id),
+        ];
+
+        let mut found_result_json = None;
+        let mut found_output_md = None;
+        for dir in &candidate_log_dirs {
+            let r = dir.join("result.json");
+            if r.exists() && found_result_json.is_none() {
+                found_result_json = Some(r);
+            }
+            let o = dir.join("output.md");
+            if o.exists() && found_output_md.is_none() {
+                found_output_md = Some(o);
+            }
+        }
+
+        if let Some(result_json_path) = found_result_json {
             let json_str = std::fs::read_to_string(&result_json_path).unwrap_or_default();
             match serde_json::from_str::<UfoTaskResult>(&json_str) {
                 Ok(res) => {
@@ -286,8 +316,7 @@ impl UfoClient {
         }
 
         // Fallback if result.json wasn't written
-        let log_path = ufo_dir.join("logs").join(&task_id).join("output.md");
-        let ufo_result = if log_path.exists() {
+        let ufo_result = if let Some(log_path) = found_output_md {
             std::fs::read_to_string(&log_path).unwrap_or_default()
         } else {
             "".into()

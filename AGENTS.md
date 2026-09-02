@@ -1,4 +1,4 @@
-﻿# AGENTS.md
+# AGENTS.md
 
 ## Single source of truth: the runtime
 
@@ -251,3 +251,7 @@ At the end of each session, summarize:
 5. **Deterministic Python Runtime**: Never invoke bare python in Windows batch scripts or PowerShell tasks. Always invoke %PYTHON_EXE% (C:\ufo\ufo\python_env\python.exe), setting PYTHONIOENCODING=utf-8 and PYTHONPATH=%UFO_ROOT%;%BF_DIR%.
 6. **Explicit UTF-8 Encoding in Subprocesses**: Always pass encoding="utf-8", errors="replace" to subprocess.Popen / subprocess.run on Windows to prevent cp1252 UnicodeDecodeError / UnicodeEncodeError.
 7. **Win32 Foreground Focus Switching**: To reliably activate target windows on Windows 10/11, use AllowSetForegroundWindow(-1) and AttachThreadInput with an Alt-key tap before SetForegroundWindow.
+8. **Strict Subsystem Independence**: BankFidelity and Microsoft UFO must always be independently bootable and testable. Never introduce hard compile-time or runtime dependencies that break standalone execution of either component.
+9. **MCP Signature Parity**: Every tool exposed in `src/ai/mcp.rs` must have 100% argument alignment with `src/app/cli.rs`. Always support canonical CLI parameter names alongside common aliases (`from_log` / `input`, `output` / `output_dir`).
+10. **Cloud Primary + Local Offline Fallback**: In UFO agent configs (`agents.yaml`), configure Gemini / Cloud endpoints as primary for multimodal reasoning, while maintaining local Qwen (port 11434) and offline heuristic parsers as zero-cost resilience layers.
+
