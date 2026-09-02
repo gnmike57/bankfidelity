@@ -2855,7 +2855,7 @@ Additional Context:\n{context}",
                 let mut best_result = None;
                 let mut correction_hint: Option<String> = None;
                 let synthesized_fonts_used = false;
-                let font_override_path: Option<String> = None;
+                let mut font_override_path: Option<String> = None;
                 let mut total_corrections = 0;
                 let requested_output_pdf = output_pdf.clone();
                 let requested_output_parent = requested_output_pdf
@@ -3901,6 +3901,7 @@ Additional Context:\n{context}",
                                                     .to_string(),
                                                 edits_json,
                                                 font_path: font_override_path.clone(),
+                                                strict_fidelity: false,
                                             },
                                             reply_tx,
                                         ));
@@ -4001,51 +4002,10 @@ Additional Context:\n{context}",
                         } else {
                             let edits_json =
                                 serde_json::to_string(&batch_edits).unwrap_or_default();
-                            let eng = engine_for_tokio.clone();
-                            let p_in = output_pdf.clone();
-                            let p_out = output_pdf.with_extension("temp.pdf");
-                            let f_path = font_override_path.clone();
-                            let edits_json_clone = edits_json.clone();
-
-                            let native_res = tokio::task::spawn_blocking(move || {
-                                let fp = f_path.map(std::path::PathBuf::from);
-                                eng.apply_many_edits(
-                                    &p_in,
-                                    &p_out,
-                                    &edits_json_clone,
-                                    fp.as_deref(),
-                                )
-                            })
-                            .await
-                            .unwrap_or(Ok(0));
-
-                            let native_temp = output_pdf.with_extension("temp.pdf");
-                            if let Ok(c) = native_res {
-                                if c == total_edits && native_temp.is_file() {
-                                    match publish_surgery_output(&native_temp, &output_pdf) {
-                                        Ok(()) => {
-                                            edits_applied = c;
-                                            tracing::info!(
-                                                "[TRANSFER] (Native) Exact batch edit succeeded"
-                                            );
-                                        }
-                                        Err(error) => {
-                                            let _ = std::fs::remove_file(&native_temp);
-                                            tracing::warn!(
-                                                "[TRANSFER] Native exact batch could not be published: {error}"
-                                            );
-                                        }
-                                    }
-                                } else {
-                                    let _ = std::fs::remove_file(&native_temp);
-                                    tracing::warn!(
-                                        "[TRANSFER] Native batch rejected: applied {c}/{total_edits} edits"
-                                    );
-                                }
-                            }
-
-                            if edits_applied == 0 {
-                                tracing::warn!("[TRANSFER] Native ApplyManyEdits failed or returned 0. Falling back to Python.");
+                            let mut retry_count = 0;
+                            let max_retries = 1;
+                            
+                            while edits_applied == 0 && retry_count <= max_retries {
                                 let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
                                 let _ = py_tx.send((
                                     PythonJob::ApplyManyEdits {
@@ -4054,8 +4014,9 @@ Additional Context:\n{context}",
                                             .with_extension("temp.pdf")
                                             .to_string_lossy()
                                             .to_string(),
-                                        edits_json,
+                                        edits_json: edits_json.clone(),
                                         font_path: font_override_path.clone(),
+                                        strict_fidelity: true,
                                     },
                                     reply_tx,
                                 ));
@@ -4074,30 +4035,57 @@ Additional Context:\n{context}",
                                         match publish_surgery_output(&temp_output, &output_pdf) {
                                             Ok(()) => {
                                                 edits_applied = report.placed;
-                                                tracing::info!(
-                                                    "[TRANSFER] (Python) Exact batch edit succeeded"
-                                                );
+                                                tracing::info!("[TRANSFER] (Python) Exact batch edit succeeded");
                                             }
                                             Err(error) => {
-                                                tracing::error!(
-                                                    "[TRANSFER] Python output commit failed: {}",
-                                                    error
-                                                );
+                                                tracing::error!("[TRANSFER] Python output commit failed: {}", error);
                                                 let _ = std::fs::remove_file(temp_output);
                                             }
                                         }
                                     }
+                                    Ok(PythonJobResult::Error(error)) => {
+                                        tracing::error!("[TRANSFER] (Python) Batch edit failed: {}", error);
+                                        if error.contains("FONT_COVERAGE_INSUFFICIENT") && font_override_path.is_none() && retry_count < max_retries {
+                                            if let Ok(err_json) = serde_json::from_str::<serde_json::Value>(&error) {
+                                                if let Some(missing) = err_json.get("missing_chars").and_then(|v| v.as_array()) {
+                                                    let missing_csv = missing.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join(",");
+                                                    tracing::warn!("[TRANSFER] PyMuPDF lacks coverage for: {}. Synthesizing font...", missing_csv);
+                                                    let _ = res_tx.send(JobResult::Progress {
+                                                        label: format!("Synthesizing precise missing font characters ({}/{})...", retry_count + 1, max_retries),
+                                                        fraction: 0.50,
+                                                    });
+                                                    let (f_tx, f_rx) = tokio::sync::oneshot::channel();
+                                                    let _ = py_tx.send((
+                                                        PythonJob::ReplicateFontForMissingChars {
+                                                            pdf_path: output_pdf.to_string_lossy().to_string(),
+                                                            font_name: err_json.get("original_font").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                                                            missing_chars_csv: missing_csv,
+                                                            output_dir: output_pdf.parent().unwrap_or(std::path::Path::new("")).to_string_lossy().to_string(),
+                                                        },
+                                                        f_tx,
+                                                    ));
+                                                    if let Ok(PythonJobResult::Json(resp)) = f_rx.await {
+                                                        if let Ok(resp_json) = serde_json::from_str::<serde_json::Value>(&resp) {
+                                                            if resp_json.get("success").and_then(|v| v.as_bool()).unwrap_or(false) {
+                                                                if let Some(path) = resp_json.get("output_path").and_then(|v| v.as_str()) {
+                                                                    font_override_path = Some(path.to_string());
+                                                                    retry_count += 1;
+                                                                    continue;
+                                                                }
+                                                            } else if let Some(err_msg) = resp_json.get("error").and_then(|v| v.as_str()) {
+                                                                tracing::error!("[TRANSFER] Font synthesis failed: {}", err_msg);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        break; // stop on other errors or if out of retries
+                                    }
                                     Ok(PythonJobResult::ApplyReport(report)) => {
-                                        let _ = std::fs::remove_file(
-                                            output_pdf.with_extension("temp.pdf"),
-                                        );
-                                        if let Some(failed_edit) =
-                                            report.edits.iter().find(|edit| !edit.placed)
-                                        {
-                                            let request = batch_metadata
-                                                .get(failed_edit.index)
-                                                .cloned()
-                                                .unwrap_or_default();
+                                        let _ = std::fs::remove_file(output_pdf.with_extension("temp.pdf"));
+                                        if let Some(failed_edit) = report.edits.iter().find(|edit| !edit.placed) {
+                                            let request = batch_metadata.get(failed_edit.index).cloned().unwrap_or_default();
                                             tracing::error!(
                                                 edit_index = failed_edit.index,
                                                 page = failed_edit.page,
@@ -4111,23 +4099,13 @@ Additional Context:\n{context}",
                                                 "[TRANSFER] First exact Python edit failure"
                                             );
                                         }
-                                        tracing::error!(
-                                            requested = report.requested,
-                                            matched = report.matched,
-                                            placed = report.placed,
-                                            failed = report.failed,
-                                            warnings = ?report.warnings,
-                                            "[TRANSFER] (Python) Exact batch edit failed"
-                                        );
+                                        tracing::error!("[TRANSFER] (Python) Exact batch edit failed (partial)");
+                                        break;
                                     }
-                                    Ok(PythonJobResult::Error(error)) => tracing::error!(
-                                        "[TRANSFER] (Python) Batch edit failed: {}",
-                                        error
-                                    ),
-                                    other => tracing::error!(
-                                        result = ?other,
-                                        "[TRANSFER] (Python) Batch edit returned unexpected result"
-                                    ),
+                                    other => {
+                                        tracing::error!("[TRANSFER] (Python) Batch edit returned unexpected result: {:?}", other);
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -6716,7 +6694,6 @@ Additional Context:\n{context}",
                             .collect();
                         let json_str =
                             serde_json::to_string(&edits_json).unwrap_or_else(|_| "[]".into());
-                        let json_str_for_fallback = json_str.clone();
                         let edited_out = tmp.path().join(format!("segment_{si:03}_edited.pdf"));
                         let expected = edits.len();
 
@@ -6725,8 +6702,9 @@ Additional Context:\n{context}",
                             PythonJob::ApplyManyEdits {
                                 pdf_path: seg_paths[si].to_string_lossy().to_string(),
                                 output_path: edited_out.to_string_lossy().to_string(),
-                                edits_json: json_str,
+                                edits_json: json_str.clone(),
                                 font_path: None,
+                                strict_fidelity: false,
                             },
                             rtx,
                         ));
@@ -6779,7 +6757,7 @@ Additional Context:\n{context}",
                                 let native_path =
                                     tmp.path().join(format!("segment_{si:03}_native.pdf"));
                                 let native_out = native_path.clone();
-                                let native_json = json_str_for_fallback;
+                                let native_json = json_str.clone();
                                 let native_result = tokio::task::spawn_blocking(move || {
                                     let native_engine =
                                         crate::pdf::native_engine::OxidizePdfEngine::new();
@@ -6986,6 +6964,7 @@ Additional Context:\n{context}",
                             output_path: scratch.to_string_lossy().to_string(),
                             edits_json: edits_json.clone(),
                             font_path: None,
+                            strict_fidelity: false,
                         },
                         reply_tx,
                     ))
@@ -7217,6 +7196,7 @@ Additional Context:\n{context}",
                         output_path: py_out.to_string_lossy().to_string(),
                         edits_json: json_str.clone(),
                         font_path: None,
+                        strict_fidelity: false,
                     },
                     rtx,
                 ));
@@ -7381,7 +7361,7 @@ Additional Context:\n{context}",
             // edit-in-place visual fidelity. Keep the job for API stability
             // but fail closed with a clear reason (same gate as workflow finalize).
             let tx = result_tx_clone.clone();
-            tokio::task::spawn(async move {
+            tokio::spawn(async move {
                 let _ = tx.send(JobResult::Error {
                     job_label: "typst_reconstruct_disabled".into(),
                     message: "Automatic Typst reconstruction is disabled in this build: cannot preserve edit-in-place fidelity".into(),
@@ -9084,6 +9064,7 @@ Additional Context:\n{context}",
                                         font_path: font_path
                                             .as_ref()
                                             .map(|p| p.to_string_lossy().to_string()),
+                                        strict_fidelity: false,
                                     },
                                     tx,
                                 ));
@@ -9187,6 +9168,7 @@ Additional Context:\n{context}",
                                 font_path: font_path
                                     .as_ref()
                                     .map(|p| p.to_string_lossy().to_string()),
+                                strict_fidelity: false,
                             },
                             tx,
                         ));
