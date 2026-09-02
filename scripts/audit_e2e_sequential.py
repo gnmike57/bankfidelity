@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """BankFidelity <-> UFO Sequential E2E Architecture Audit.
 
 Verifies every stage of the Rust -> UFO -> MCP -> Rust loop in order,
@@ -73,6 +73,8 @@ def _rpc(exe, payload, timeout=20.0):
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     try:
         out, _ = proc.communicate(json.dumps(payload) + "\n", timeout=timeout)
@@ -212,4 +214,5 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+
 

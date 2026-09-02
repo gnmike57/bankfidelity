@@ -8,7 +8,7 @@
     "global_ssim": 0.9747286438941956,
     "global_psnr": 23.182367440869356,
     "header_ssim": 0.9187173247337341,
-    "latency_ms": 12673.811399989063,
+    "latency_ms": 14139.488200002233,
     "pdf_out": "commbank_to_commbank_transferred.pdf",
     "heatmap": "commbank_to_commbank_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -22,7 +22,7 @@
     "global_ssim": 0.9842043519020081,
     "global_psnr": 23.668238328058315,
     "header_ssim": 0.9911788702011108,
-    "latency_ms": 11915.233200008515,
+    "latency_ms": 9840.340299997479,
     "pdf_out": "commbank_to_bankwest_transferred.pdf",
     "heatmap": "commbank_to_bankwest_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -36,7 +36,7 @@
     "global_ssim": 0.9703847765922546,
     "global_psnr": 21.87263329621455,
     "header_ssim": 1.0,
-    "latency_ms": 11700.448899995536,
+    "latency_ms": 14136.669400002575,
     "pdf_out": "commbank_to_ing_transferred.pdf",
     "heatmap": "commbank_to_ing_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -50,7 +50,7 @@
     "global_ssim": 0.9725068807601929,
     "global_psnr": 22.20497801769649,
     "header_ssim": 1.0,
-    "latency_ms": 11556.727499992121,
+    "latency_ms": 12900.36770000006,
     "pdf_out": "commbank_to_macquarie_transferred.pdf",
     "heatmap": "commbank_to_macquarie_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -64,7 +64,7 @@
     "global_ssim": 0.9689782857894897,
     "global_psnr": 21.57172344062642,
     "header_ssim": 1.0,
-    "latency_ms": 11726.87539999606,
+    "latency_ms": 13875.752299994929,
     "pdf_out": "commbank_to_westpac_transferred.pdf",
     "heatmap": "commbank_to_westpac_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -78,7 +78,7 @@
     "global_ssim": 0.9708273410797119,
     "global_psnr": 21.960630978415114,
     "header_ssim": 1.0,
-    "latency_ms": 11731.764299998758,
+    "latency_ms": 14332.627800002228,
     "pdf_out": "commbank_to_anz_plus_transferred.pdf",
     "heatmap": "commbank_to_anz_plus_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -92,7 +92,7 @@
     "global_ssim": 0.9748064279556274,
     "global_psnr": 23.19488155394343,
     "header_ssim": 0.9191247820854187,
-    "latency_ms": 12894.183299998986,
+    "latency_ms": 16843.831899997895,
     "pdf_out": "bankwest_to_commbank_transferred.pdf",
     "heatmap": "bankwest_to_commbank_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -106,7 +106,7 @@
     "global_ssim": 0.9842739701271057,
     "global_psnr": 23.682333440882807,
     "header_ssim": 0.9911788702011108,
-    "latency_ms": 12447.384400002193,
+    "latency_ms": 14233.721099997638,
     "pdf_out": "bankwest_to_bankwest_transferred.pdf",
     "heatmap": "bankwest_to_bankwest_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -120,7 +120,7 @@
     "global_ssim": 0.9704556465148926,
     "global_psnr": 21.886636534893572,
     "header_ssim": 1.0,
-    "latency_ms": 12044.297300002654,
+    "latency_ms": 11011.009800000465,
     "pdf_out": "bankwest_to_ing_transferred.pdf",
     "heatmap": "bankwest_to_ing_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -134,7 +134,7 @@
     "global_ssim": 0.9726055264472961,
     "global_psnr": 22.22094192592764,
     "header_ssim": 1.0,
-    "latency_ms": 12271.101499994984,
+    "latency_ms": 16402.65869999712,
     "pdf_out": "bankwest_to_macquarie_transferred.pdf",
     "heatmap": "bankwest_to_macquarie_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -148,7 +148,7 @@
     "global_ssim": 0.969089925289154,
     "global_psnr": 21.580696522862006,
     "header_ssim": 1.0,
-    "latency_ms": 12556.154400008381,
+    "latency_ms": 13323.767299996689,
     "pdf_out": "bankwest_to_westpac_transferred.pdf",
     "heatmap": "bankwest_to_westpac_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -162,7 +162,7 @@
     "global_ssim": 0.9709258675575256,
     "global_psnr": 21.97257778666448,
     "header_ssim": 1.0,
-    "latency_ms": 12825.829099994735,
+    "latency_ms": 13849.037399995723,
     "pdf_out": "bankwest_to_anz_plus_transferred.pdf",
     "heatmap": "bankwest_to_anz_plus_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -176,7 +176,7 @@
     "global_ssim": 0.9752098917961121,
     "global_psnr": 23.310151630387036,
     "header_ssim": 0.9222894906997681,
-    "latency_ms": 15575.489399998332,
+    "latency_ms": 18083.687300008023,
     "pdf_out": "ing_to_commbank_transferred.pdf",
     "heatmap": "ing_to_commbank_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -190,7 +190,7 @@
     "global_ssim": 0.9847173690795898,
     "global_psnr": 23.811831266002507,
     "header_ssim": 0.9911788702011108,
-    "latency_ms": 12353.200800003833,
+    "latency_ms": 14994.909100001678,
     "pdf_out": "ing_to_bankwest_transferred.pdf",
     "heatmap": "ing_to_bankwest_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -204,7 +204,7 @@
     "global_ssim": 0.9708433747291565,
     "global_psnr": 21.960344488224408,
     "header_ssim": 1.0,
-    "latency_ms": 9916.092100000242,
+    "latency_ms": 18510.222600001725,
     "pdf_out": "ing_to_ing_transferred.pdf",
     "heatmap": "ing_to_ing_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -218,7 +218,7 @@
     "global_ssim": 0.973030149936676,
     "global_psnr": 22.305524428043512,
     "header_ssim": 1.0,
-    "latency_ms": 8764.600299997255,
+    "latency_ms": 14845.101800005068,
     "pdf_out": "ing_to_macquarie_transferred.pdf",
     "heatmap": "ing_to_macquarie_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -232,7 +232,7 @@
     "global_ssim": 0.9695244431495667,
     "global_psnr": 21.653981618055496,
     "header_ssim": 1.0,
-    "latency_ms": 8324.17420001002,
+    "latency_ms": 13113.893100002315,
     "pdf_out": "ing_to_westpac_transferred.pdf",
     "heatmap": "ing_to_westpac_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -246,7 +246,7 @@
     "global_ssim": 0.9713333249092102,
     "global_psnr": 22.053784320528905,
     "header_ssim": 1.0,
-    "latency_ms": 7842.108500000904,
+    "latency_ms": 12671.751000001677,
     "pdf_out": "ing_to_anz_plus_transferred.pdf",
     "heatmap": "ing_to_anz_plus_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -260,7 +260,7 @@
     "global_ssim": 0.9747008085250854,
     "global_psnr": 23.18584434318646,
     "header_ssim": 0.9184836745262146,
-    "latency_ms": 7755.810699993162,
+    "latency_ms": 13521.382599996286,
     "pdf_out": "macquarie_to_commbank_transferred.pdf",
     "heatmap": "macquarie_to_commbank_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -274,7 +274,7 @@
     "global_ssim": 0.9841989278793335,
     "global_psnr": 23.671100221824986,
     "header_ssim": 0.9911788702011108,
-    "latency_ms": 8601.253899993026,
+    "latency_ms": 12991.61159999494,
     "pdf_out": "macquarie_to_bankwest_transferred.pdf",
     "heatmap": "macquarie_to_bankwest_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -288,7 +288,7 @@
     "global_ssim": 0.9703469276428223,
     "global_psnr": 21.874712361558398,
     "header_ssim": 1.0,
-    "latency_ms": 7570.664500002749,
+    "latency_ms": 13435.746500006644,
     "pdf_out": "macquarie_to_ing_transferred.pdf",
     "heatmap": "macquarie_to_ing_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -302,7 +302,7 @@
     "global_ssim": 0.9724724888801575,
     "global_psnr": 22.204656803982434,
     "header_ssim": 1.0,
-    "latency_ms": 7358.442099997774,
+    "latency_ms": 13241.342599998461,
     "pdf_out": "macquarie_to_macquarie_transferred.pdf",
     "heatmap": "macquarie_to_macquarie_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -316,7 +316,7 @@
     "global_ssim": 0.968993604183197,
     "global_psnr": 21.57333005177515,
     "header_ssim": 1.0,
-    "latency_ms": 8148.1033000018215,
+    "latency_ms": 15011.32299999881,
     "pdf_out": "macquarie_to_westpac_transferred.pdf",
     "heatmap": "macquarie_to_westpac_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -330,7 +330,7 @@
     "global_ssim": 0.9708081483840942,
     "global_psnr": 21.95725496203059,
     "header_ssim": 1.0,
-    "latency_ms": 8014.8721000005025,
+    "latency_ms": 13470.491400003084,
     "pdf_out": "macquarie_to_anz_plus_transferred.pdf",
     "heatmap": "macquarie_to_anz_plus_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -344,7 +344,7 @@
     "global_ssim": 0.9748731851577759,
     "global_psnr": 23.223790765452954,
     "header_ssim": 0.9197739362716675,
-    "latency_ms": 8542.830599995796,
+    "latency_ms": 14417.342300002929,
     "pdf_out": "westpac_to_commbank_transferred.pdf",
     "heatmap": "westpac_to_commbank_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -358,7 +358,7 @@
     "global_ssim": 0.9843600392341614,
     "global_psnr": 23.714681260348982,
     "header_ssim": 0.9911788702011108,
-    "latency_ms": 7482.319600007031,
+    "latency_ms": 15298.877599998377,
     "pdf_out": "westpac_to_bankwest_transferred.pdf",
     "heatmap": "westpac_to_bankwest_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -372,7 +372,7 @@
     "global_ssim": 0.9705523252487183,
     "global_psnr": 21.909138820245815,
     "header_ssim": 1.0,
-    "latency_ms": 7624.811499990756,
+    "latency_ms": 12213.793600007193,
     "pdf_out": "westpac_to_ing_transferred.pdf",
     "heatmap": "westpac_to_ing_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -386,7 +386,7 @@
     "global_ssim": 0.9726876616477966,
     "global_psnr": 22.24421929657712,
     "header_ssim": 1.0,
-    "latency_ms": 7728.375100006815,
+    "latency_ms": 12991.32849999296,
     "pdf_out": "westpac_to_macquarie_transferred.pdf",
     "heatmap": "westpac_to_macquarie_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -400,7 +400,7 @@
     "global_ssim": 0.9692100882530212,
     "global_psnr": 21.605046272043378,
     "header_ssim": 1.0,
-    "latency_ms": 8404.103699998814,
+    "latency_ms": 13184.886900009587,
     "pdf_out": "westpac_to_westpac_transferred.pdf",
     "heatmap": "westpac_to_westpac_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -414,7 +414,7 @@
     "global_ssim": 0.9709958434104919,
     "global_psnr": 21.9959779966992,
     "header_ssim": 1.0,
-    "latency_ms": 7438.169500004733,
+    "latency_ms": 12928.662699996494,
     "pdf_out": "westpac_to_anz_plus_transferred.pdf",
     "heatmap": "westpac_to_anz_plus_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -428,7 +428,7 @@
     "global_ssim": 0.9748881459236145,
     "global_psnr": 23.23028091640527,
     "header_ssim": 0.9202738404273987,
-    "latency_ms": 8276.439699999173,
+    "latency_ms": 12873.397200004547,
     "pdf_out": "anz_plus_to_commbank_transferred.pdf",
     "heatmap": "anz_plus_to_commbank_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -442,7 +442,7 @@
     "global_ssim": 0.9844059348106384,
     "global_psnr": 23.721644734380185,
     "header_ssim": 0.9911788702011108,
-    "latency_ms": 7715.322100004414,
+    "latency_ms": 16124.342899987823,
     "pdf_out": "anz_plus_to_bankwest_transferred.pdf",
     "heatmap": "anz_plus_to_bankwest_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -456,7 +456,7 @@
     "global_ssim": 0.9705079197883606,
     "global_psnr": 21.904948302241017,
     "header_ssim": 1.0,
-    "latency_ms": 7767.502100003185,
+    "latency_ms": 13332.213000001502,
     "pdf_out": "anz_plus_to_ing_transferred.pdf",
     "heatmap": "anz_plus_to_ing_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -470,7 +470,7 @@
     "global_ssim": 0.972636342048645,
     "global_psnr": 22.237795136324806,
     "header_ssim": 1.0,
-    "latency_ms": 8294.051999997464,
+    "latency_ms": 11763.218399995822,
     "pdf_out": "anz_plus_to_macquarie_transferred.pdf",
     "heatmap": "anz_plus_to_macquarie_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -484,7 +484,7 @@
     "global_ssim": 0.9691528677940369,
     "global_psnr": 21.600587296963486,
     "header_ssim": 1.0,
-    "latency_ms": 8102.610999994795,
+    "latency_ms": 12799.553699995158,
     "pdf_out": "anz_plus_to_westpac_transferred.pdf",
     "heatmap": "anz_plus_to_westpac_diff_heatmap.png",
     "status": "HEALED_PASSED"
@@ -498,7 +498,7 @@
     "global_ssim": 0.970954179763794,
     "global_psnr": 21.991749592450027,
     "header_ssim": 1.0,
-    "latency_ms": 7030.110200008494,
+    "latency_ms": 12725.9769999946,
     "pdf_out": "anz_plus_to_anz_plus_transferred.pdf",
     "heatmap": "anz_plus_to_anz_plus_diff_heatmap.png",
     "status": "HEALED_PASSED"

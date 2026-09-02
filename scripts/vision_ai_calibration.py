@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 BankFidelity Vision AI Sub-Pixel Calibration & Verification Engine
 ===================================================================
@@ -13,6 +13,11 @@ import math
 import json
 import time
 from pathlib import Path
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
@@ -232,10 +237,10 @@ def run_calibration_suite():
         heatmap_path = OUTPUT_DIR / f"{bank_name}_diff_heatmap.png"
         diff_heatmap.save(heatmap_path)
         
-        print(f"  ✓ Global SSIM:     {global_ssim:.6f}")
-        print(f"  ✓ Global PSNR:     {global_psnr:.2f} dB")
-        print(f"  ✓ Header Invariant SSIM: {header_ssim:.6f} (Target >= 0.999)")
-        print(f"  ✓ Heatmap Diff saved: {heatmap_path.name}")
+        print(f"  âœ“ Global SSIM:     {global_ssim:.6f}")
+        print(f"  âœ“ Global PSNR:     {global_psnr:.2f} dB")
+        print(f"  âœ“ Header Invariant SSIM: {header_ssim:.6f} (Target >= 0.999)")
+        print(f"  âœ“ Heatmap Diff saved: {heatmap_path.name}")
         
         is_passed = global_ssim >= 0.990 and header_ssim >= 0.998
         results.append({
@@ -290,3 +295,4 @@ def run_calibration_suite():
 
 if __name__ == "__main__":
     run_calibration_suite()
+
