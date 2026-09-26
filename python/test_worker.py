@@ -12,7 +12,6 @@ import unittest
 from pathlib import Path
 
 import pymupdf
-
 from bridge_protocol import OPERATIONS, PROTOCOL_VERSION, ProtocolError, parse_response
 from worker import classify_error
 
@@ -23,8 +22,9 @@ WORKER = ROOT / "python" / "worker.py"
 def pro_package_available() -> bool:
     try:
         importlib.metadata.version("PyMuPDFPro")
+        import pymupdf.pro  # noqa: F401
         return True
-    except importlib.metadata.PackageNotFoundError:
+    except Exception:
         return False
 
 

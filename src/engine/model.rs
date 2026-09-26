@@ -164,6 +164,7 @@ impl Transaction {
         if self.canonical.confidence.is_none() {
             self.canonical.confidence = Some(match self.provenance {
                 Provenance::DocumentAI { confidence } => confidence.clamp(0.0, 1.0),
+                Provenance::Reducto { confidence } => confidence.clamp(0.0, 1.0),
                 Provenance::Manual => 1.0,
                 Provenance::Computed => 0.8,
             });
@@ -184,7 +185,7 @@ impl Transaction {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Provenance {
     DocumentAI { confidence: f32 },
-
+    Reducto { confidence: f32 },
     Manual,
     Computed,
 }
@@ -203,6 +204,8 @@ pub struct ProposedChange {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct ParserStats {
     pub total_attempts: usize,
+    #[serde(default)]
+    pub reducto_wins: usize,
     pub gemini_wins: usize,
     pub docai_wins: usize,
     pub llamaparse_wins: usize,

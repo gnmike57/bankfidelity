@@ -3,10 +3,11 @@ Stress Test PDF Generator — Creates 4 control PDFs with known ground truth
 for the Bank Statement Fidelity Editor v0.5.1 benchmark suite.
 """
 
-import pymupdf  # PyMuPDF
 import json
 import os
 import random
+
+import pymupdf  # PyMuPDF
 
 OUT_DIR = "tests/stress_pdfs"
 os.makedirs(OUT_DIR, exist_ok=True)

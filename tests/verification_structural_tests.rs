@@ -202,3 +202,50 @@ fn font_and_metadata_policy_negative_controls_fail() {
         VerificationGateStatus::Failed
     );
 }
+
+#[test]
+fn xref_compliance_and_structural_damage_controls_fail() {
+    let directory = tempfile::tempdir().unwrap();
+    let original = directory.path().join("original.pdf");
+    create_pdf(
+        &original,
+        &["Alpha Branch Opening Balance Customer Statement"],
+        "Helvetica",
+        "Monthly Statement",
+    );
+
+    // Negative control 1: Damaged startxref offset
+    let damaged_startxref = directory.path().join("damaged_startxref.pdf");
+    let bytes = std::fs::read(&original).unwrap();
+    let eof_pos = bytes.windows(5).rposition(|w| w == b"%%EOF").unwrap();
+    let startxref_pos = bytes[..eof_pos]
+        .windows(9)
+        .rposition(|w| w == b"startxref")
+        .unwrap();
+    let mut damaged_bytes = bytes.clone();
+    damaged_bytes.splice(startxref_pos + 9..eof_pos, b"\n9999999\n".iter().copied());
+    std::fs::write(&damaged_startxref, &damaged_bytes).unwrap();
+
+    let gates = verify_structural_invariants(&original, &damaged_startxref).unwrap();
+    let xref_gate = gate(&gates, "structure.xref_compliance");
+    assert_eq!(xref_gate.status, VerificationGateStatus::Failed);
+
+    // Negative control 2: Missing %%EOF marker
+    let missing_eof = directory.path().join("missing_eof.pdf");
+    let no_eof_bytes = bytes[..eof_pos].to_vec();
+    std::fs::write(&missing_eof, &no_eof_bytes).unwrap();
+
+    let gates = verify_structural_invariants(&original, &missing_eof).unwrap();
+    let xref_gate = gate(&gates, "structure.xref_compliance");
+    assert_eq!(xref_gate.status, VerificationGateStatus::Failed);
+
+    // Negative control 3: Missing %PDF- header
+    let bad_header = directory.path().join("bad_header.pdf");
+    let mut bad_header_bytes = bytes.clone();
+    bad_header_bytes[0..5].copy_from_slice(b"%XYZ-");
+    std::fs::write(&bad_header, &bad_header_bytes).unwrap();
+
+    let gates = verify_structural_invariants(&original, &bad_header).unwrap();
+    let xref_gate = gate(&gates, "structure.xref_compliance");
+    assert_eq!(xref_gate.status, VerificationGateStatus::Failed);
+}

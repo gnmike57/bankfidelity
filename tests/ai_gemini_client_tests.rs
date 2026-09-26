@@ -9,7 +9,7 @@ use serde_json::json;
 async fn test_propose_balance_adjustments_success() {
     let mut server = Server::new_async().await;
     let mock = server
-        .mock("POST", "/v1beta/models/gemini-pro-preview:generateContent?key=fake-key")
+        .mock("POST", "/v1beta/models/gemini-3.7-flash:generateContent?key=fake-key")
         .with_status(200)
         .with_header("content-type", "application/json")
         .with_body(json!({
@@ -45,7 +45,7 @@ async fn test_propose_balance_adjustments_success() {
 async fn test_propose_balance_adjustments_low_confidence() {
     let mut server = Server::new_async().await;
     let mock = server
-        .mock("POST", "/v1beta/models/gemini-pro-preview:generateContent?key=fake-key")
+        .mock("POST", "/v1beta/models/gemini-3.7-flash:generateContent?key=fake-key")
         .with_status(200)
         .with_header("content-type", "application/json")
         .with_body(json!({
@@ -80,7 +80,7 @@ async fn test_gemini_retry_on_429() {
     let mock = server
         .mock(
             "POST",
-            "/v1beta/models/gemini-pro-preview:generateContent?key=fake-key",
+            "/v1beta/models/gemini-3.7-flash:generateContent?key=fake-key",
         )
         .with_status(429)
         .with_header("content-type", "application/json")

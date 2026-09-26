@@ -619,7 +619,7 @@
       },
       "response": {
         "applied_count": 1,
-        "capability_tier": "pro",
+        "capability_tier": "core",
         "disposition": "succeeded",
         "failure": null,
         "input_sha256": "1111111111111111111111111111111111111111111111111111111111111111",

@@ -49,7 +49,9 @@ def verify(tier: str) -> dict[str, Any]:
         fail(f"Python {actual_python} does not match {expected_python}")
 
     sys.path.insert(0, str(PYTHON_DIR))
-    from bridge_protocol import PROTOCOL_VERSION  # pylint: disable=import-outside-toplevel
+    from bridge_protocol import (
+        PROTOCOL_VERSION,  # pylint: disable=import-outside-toplevel
+    )
 
     if manifest.get("protocol_version") != PROTOCOL_VERSION:
         fail("worker protocol version does not match manifest")

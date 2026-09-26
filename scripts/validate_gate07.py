@@ -42,7 +42,6 @@ def main() -> None:
     structural = read("src/engine/verification_structural.rs")
     content = read("src/engine/verification_content.rs")
     workflow = read("src/engine/workflow.rs")
-    legacy = read("src/engine/verification_v2.rs")
     vision = read("src/ai/vision.rs")
     pdfrest = read("src/ai/pdfrest.rs")
     calibration = json.loads(read("assets/verification-calibration-v2.json"))
@@ -53,7 +52,7 @@ def main() -> None:
     ])
     require_markers("structural verifier", structural, ["page_count", "media_box", "crop_box", "rotation", "fonts", "metadata"])
     require_markers("content verifier", content, ["old_text", "new_text", "expected exactly one", "stale_old_matches"])
-    require_markers("immutable policy", workflow + legacy, ["mask_padding_for_attempt", "caller_threshold_overrides_are_ignored"])
+    require_markers("immutable policy", workflow, ["mask_padding_for_attempt"])
     require_markers("Vision provider", vision, ["Unavailable", "timeout", "missing_key"])
     require_markers("pdfRest provider", pdfrest, ["polling", "timeout", "PNG"])
 

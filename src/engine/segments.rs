@@ -592,7 +592,7 @@ impl SegmentManager {
             ));
         }
         {
-            let f = std::fs::File::open(&staged_path)?;
+            let f = std::fs::OpenOptions::new().write(true).open(&staged_path)?;
             f.sync_all()?;
         }
         if output_path.exists() {

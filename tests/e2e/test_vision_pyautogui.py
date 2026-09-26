@@ -1,10 +1,11 @@
-import pytest
 import os
-import time
+import shutil
 import subprocess
+import time
+
 import pyautogui
 import pytesseract
-import shutil
+import pytest
 
 # OCR Visual Testing Foundation
 #

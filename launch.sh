@@ -28,7 +28,18 @@ if [ -n "$PYTHON_DIR" ]; then
     export PYO3_PYTHON="$PYTHON_EXE"
     export PYTHON_SYS_EXECUTABLE="$PYTHON_EXE"
     export PYTHONHOME="$PYTHON_DIR"
-    export PYTHONPATH="$PYTHON_DIR/Lib/site-packages:$PYTHON_DIR/Lib:$PYTHON_DIR/DLLs"
+    # Python paths: try Linux-style first, then Windows-style
+    PYTHON_LIB=""
+    for pyver in $(ls -d "$PYTHON_DIR/lib"* 2>/dev/null | head -5); do
+        if [ -d "$pyver/site-packages" ]; then
+            PYTHON_LIB="$pyver"
+            break
+        fi
+    done
+    if [ -z "$PYTHON_LIB" ]; then
+        PYTHON_LIB="$PYTHON_DIR/lib"
+    fi
+    export PYTHONPATH="$PYTHON_LIB/site-packages:$PYTHON_LIB:$PYTHON_DIR/lib/python3/site-packages:$PYTHON_DIR/Lib/site-packages:$PYTHON_DIR/Lib:$PYTHON_DIR/DLLs"
 fi
 
 # Export .env
@@ -38,7 +49,7 @@ if [ -f "$SCRIPT_DIR/.env" ]; then
     set +a
 fi
 
-# Locate binary
+# Locate binary (Windows + Linux targets)
 BIN=""
 if [ -f "$SCRIPT_DIR/target/x86_64-pc-windows-gnu/release/dual-core-pdf-pipeline.exe" ]; then
     BIN="$SCRIPT_DIR/target/x86_64-pc-windows-gnu/release/dual-core-pdf-pipeline.exe"
@@ -50,6 +61,15 @@ elif [ -f "$SCRIPT_DIR/target/debug/dual-core-pdf-pipeline.exe" ]; then
     BIN="$SCRIPT_DIR/target/debug/dual-core-pdf-pipeline.exe"
 elif [ -f "$SCRIPT_DIR/BankFidelity_Stable.exe" ]; then
     BIN="$SCRIPT_DIR/BankFidelity_Stable.exe"
+# Linux binary targets (for Linux migration / WSL2 / Docker-less builds)
+elif [ -f "$SCRIPT_DIR/target/release/dual-core-pdf-pipeline" ]; then
+    BIN="$SCRIPT_DIR/target/release/dual-core-pdf-pipeline"
+elif [ -f "$SCRIPT_DIR/target/debug/dual-core-pdf-pipeline" ]; then
+    BIN="$SCRIPT_DIR/target/debug/dual-core-pdf-pipeline"
+elif [ -f "$SCRIPT_DIR/target/x86_64-unknown-linux-gnu/release/dual-core-pdf-pipeline" ]; then
+    BIN="$SCRIPT_DIR/target/x86_64-unknown-linux-gnu/release/dual-core-pdf-pipeline"
+elif [ -f "$SCRIPT_DIR/target/x86_64-unknown-linux-gnu/debug/dual-core-pdf-pipeline" ]; then
+    BIN="$SCRIPT_DIR/target/x86_64-unknown-linux-gnu/debug/dual-core-pdf-pipeline"
 fi
 
 if [ -z "$BIN" ]; then

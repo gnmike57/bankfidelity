@@ -436,6 +436,7 @@ impl GeminiClient {
             status == StatusCode::FORBIDDEN
                 || status == StatusCode::NOT_FOUND
                 || status == StatusCode::TOO_MANY_REQUESTS
+                || status == StatusCode::BAD_REQUEST
         }
 
         // Tier 1: frontier preview Pro (best, finance-tuned).
@@ -881,8 +882,8 @@ impl GeminiClient {
                 "parts": [
                     { "text": prompt },
                     {
-                        "inline_data": {
-                            "mime_type": "image/png",
+                        "inlineData": {
+                            "mimeType": "image/png",
                             "data": b64,
                         }
                     }
@@ -1125,8 +1126,8 @@ If misaligned, reply with JSON specifying the required shift in points: {\"nudge
         for png_bytes in proof_pngs {
             let b64 = base64::engine::general_purpose::STANDARD.encode(png_bytes);
             parts.push(serde_json::json!({
-                "inline_data": {
-                    "mime_type": "image/png",
+                "inlineData": {
+                    "mimeType": "image/png",
                     "data": b64
                 }
             }));
@@ -1141,6 +1142,17 @@ If misaligned, reply with JSON specifying the required shift in points: {\"nudge
         });
 
         let resp = self.post_generate_pro(&payload).await?;
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let err_text = resp.text().await.unwrap_or_default();
+            tracing::warn!(
+                "[gemini] AI visual review HTTP {} error: {}",
+                status,
+                err_text
+            );
+            return Err(GeminiError::Api(status, err_text));
+        }
+
         let resp_json: serde_json::Value = resp
             .json()
             .await
@@ -1673,7 +1685,7 @@ mod tests {
         let server = MockServer::start().await;
 
         Mock::given(method("POST"))
-            .and(path("/v1beta/models/gemini-pro-preview:generateContent"))
+            .and(path(format!("/v1beta/models/{}:generateContent", GEMINI_PRO_MODEL)))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({
                 "candidates": [{
                     "content": {

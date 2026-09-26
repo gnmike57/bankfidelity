@@ -33,6 +33,7 @@ fn test_pdfium_library_loads() {
 }
 
 #[tokio::test]
+#[ignore = "requires live network and DNS access to external AI endpoints; run manually with --ignored"]
 async fn test_ai_provider_dns_resolution() {
     let endpoints = vec![
         "generativelanguage.googleapis.com:443", // Gemini AI Studio

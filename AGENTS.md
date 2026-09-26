@@ -1,10 +1,22 @@
 # AGENTS.md
 
+## Single source of truth: the runtime
+
+`src/app/runtime.rs` is the ONLY live runtime module (job orchestration,
+cancellation, parser chain, interactive fallback). Its only submodule is
+`src/app/runtime/parser_chain.rs`, declared via `mod parser_chain;`.
+A historical dead fork of that directory name (core.rs, client.rs, jobs.rs,
+python_job.rs, tracking.rs) was deleted. Never treat any other file as a
+reference for current runtime behavior, and never place undeclared `.rs`
+files in that directory â€” `tests/static_analysis.rs`
+(`test_zombie_runtime_fork_files_are_declared_or_absent`) fails the suite
+if one appears.
+
 ## Project type
 
-Rust desktop/CLI project using Cargo (v1.0.0).
-Includes GUI (egui), CLI, Python bridge (PyO3), Node.js bridge (Applitools), PDF processing,
-multi-backend AI integrations (Gemini, Document AI, Mindee, LlamaParse), tests, scripts, and CI.
+Rust desktop/CLI project using Cargo (v2.0.0).
+Includes GUI (egui), CLI, Python bridge (supervised JSON-lines subprocess, `python/worker.py`; no `pyo3` dependency), Node.js bridge (Applitools), PDF processing,
+multi-backend AI integrations (Reducto, Document AI, LlamaParse, Gemini, Offline Heuristic), tests, scripts, and CI.
 
 ## Autonomy level
 
@@ -125,13 +137,13 @@ May report whether a variable is set, but never its value.
 
 Allowed:
 
-    GEMINI_API_KEY is set
+    REDUCTO_API_KEY is set
     PDFREST_API_KEY is missing
     MINDEE_API_KEY is set (46 chars)
 
 Forbidden:
 
-    GEMINI_API_KEY=actual-secret-value
+    REDUCTO_API_KEY=actual-secret-value
 
 May read .env.example. Must not read or modify .env unless explicitly instructed.
 If a variable is missing, update .env.example or docs instead of inventing a value.
@@ -143,10 +155,9 @@ The project uses the following API keys (all optional except DUAL_CORE_PASSPHRAS
 | Key | Backend | Fallback |
 |---|---|---|
 | DUAL_CORE_PASSPHRASE | Encryption (required) | None |
-| GEMINI_API_KEY | AI balance, vision, validation | Manual-only mode |
-| MINDEE_API_KEY | Cloud parser (Mindee) | offline_parser |
-| LLAMAPARSE_API_KEY | Default parser (LLM) | offline_parser |
-| DOCUMENT_AI_* | Google ML parser | offline_parser |
+| REDUCTO_API_KEY | Default cloud parser (Reducto) | offline_parser |
+| MINDEE_API_KEY | Optional legacy cloud parser (Mindee) | offline_parser |
+| LLAMAPARSE_API_KEY | Alternative cloud parser (LLM) | offline_parser |
 | PDFREST_API_KEY | Cloud verification render | Local Pdfium |
 | APPLITOOLS_API_KEY | Visual AI testing | SSIM-only |
 | PYMUPDF_PRO_KEY | Enhanced font handling | PyMuPDF free tier |
@@ -209,13 +220,13 @@ and temporary duct-tape fixes.
 ## Fallback chain rules
 
 Every pipeline stage must have at least one offline fallback:
-- Cloud parsers → offline_parser
-- AI balance → local balance engine
-- Cloud rendering → local Pdfium
-- Visual AI → SSIM-only metrics
-- PyMuPDF edit → Pdfium → Typst reconstruct (ultimate)
+- Cloud parsers -> offline_parser
+- AI balance -> local balance engine
+- Cloud rendering -> local Pdfium
+- Visual AI -> SSIM-only metrics
+- PyMuPDF edit -> Pdfium (Typst reconstruct is DISABLED for fidelity: `PdfEngineMode::is_fidelity_selectable` returns false for it, the job emits `typst_reconstruct_disabled`, and `modals.rs` force-migrates the setting away)
 
-**Exception**: `TransferTransactions` and `RunTransferTests` strictly require an AI provider (Gemini/Groq/OpenRouter) for layout-agnostic format mapping. Their source and target parsing stages fall back to `offline_parser`, but the actual translation mapping has no offline equivalent.
+**Exception**: `TransferTransactions` and `RunTransferTests` strictly require an AI provider (Groq/OpenRouter/Local Qwen) for layout-agnostic format mapping. Their source and target parsing stages fall back to `offline_parser`, but the actual translation mapping has no offline equivalent.
 
 New integrations must follow this pattern and register in ApiAvailability.
 
@@ -228,3 +239,19 @@ At the end of each session, summarize:
 - commands run
 - validation result
 - remaining manual steps, if any
+
+## Anti-Fragile Orchestration Principles (Learned)
+
+1. **Zero-Brittle Boundaries**: Never use bare except Exception: in Python, especially in JSON parsing or API calls. Always use typed exceptions (json.JSONDecodeError) or exc_info=True. In Rust, never use .unwrap() or .expect() at I/O boundaries (Network, FS, IPC); always propagate Result or use unwrap_or_default().
+2. **Explicit IPC Handoffs**: When BankFidelity (Rust) orchestrates Microsoft UFO (Python), do not rely on UFO's internal status flags alone. Always parse esult.json's output field using strict Regex (e.g., (?i)[a-z]:\\[^<>\x22\|\?\*]+\.pdf) to programmatically intercept artifacts and inject them into the next Pipeline Job (e.g., Job::ExtractTransactions).
+3. **Smart Retries**: Always wrap agentic subprocess calls (UfoClient::dispatch_task) in a localized retry loop (max 1-2 attempts) to recover from LLM hallucinations before crashing back to the user terminal.
+4. **Absolute Repository Roots in Launchers**: All .bat and .ps1 launchers must define explicit absolute paths (set "BF_DIR=C:\bankfidelity\bankfidelity", set "UFO_ROOT=C:\ufo\ufo") rather than assuming %~dp0.. when placed on Desktop or OneDrive folders.
+5. **Deterministic Python Runtime**: Never invoke bare python in Windows batch scripts or PowerShell tasks. Always invoke %PYTHON_EXE% (C:\ufo\ufo\python_env\python.exe), setting PYTHONIOENCODING=utf-8 and PYTHONPATH=%UFO_ROOT%;%BF_DIR%.
+6. **Explicit UTF-8 Encoding in Subprocesses**: Always pass encoding="utf-8", errors="replace" to subprocess.Popen / subprocess.run on Windows to prevent cp1252 UnicodeDecodeError / UnicodeEncodeError.
+7. **Win32 Foreground Focus Switching**: To reliably activate target windows on Windows 10/11, use AllowSetForegroundWindow(-1) and AttachThreadInput with an Alt-key tap before SetForegroundWindow.
+8. **Strict Subsystem Independence**: BankFidelity and Microsoft UFO must always be independently bootable and testable. Never introduce hard compile-time or runtime dependencies that break standalone execution of either component.
+9. **MCP Signature Parity**: Every tool exposed in `src/ai/mcp.rs` must have 100% argument alignment with `src/app/cli.rs`. Always support canonical CLI parameter names alongside common aliases (`from_log` / `input`, `output` / `output_dir`).
+10. **Cloud Primary + Local Offline Fallback**: In UFO agent configs (`agents.yaml`), configure Cloud / Local Qwen endpoints as primary for multimodal reasoning, while maintaining local Qwen (port 11434) and offline heuristic parsers as zero-cost resilience layers.
+11. **Vector Baseline Anchoring Over Generative Guesswork**: For PDF text surgery, never use `insert_textbox` or generative coordinate hallucinations. Always anchor replacement glyphs to the target donor's true vector baseline `span["origin"]` (or calculate baseline via font ascent metrics) and verify alignment using sub-millimeter differential projection profile analysis.
+12. **Omnipotent Specialist Ensemble Architecture**: Stack best-in-class specialist models (Reducto for ingestion, PyMuPDF Pro for vector baseline geometry, Molmo/Florence-2 for sub-pixel coordinate regression, Surya/DeepFont for typographical classification, and native `rust_decimal` for cryptographic double-entry arithmetic) for maximum visual fidelity.
+

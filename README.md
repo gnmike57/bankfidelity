@@ -1,6 +1,6 @@
 # Bank Statement Fidelity Editor
 
-**Version:** 1.0.0  
+**Version:** 2.0.0 (matches `Cargo.toml`)
 **Status:** Stable  
 **License:** Proprietary (Dual-Core PASSPHRASE required)
 
@@ -13,7 +13,7 @@ Unlike standard PDF editors that reconstruct or flatten documents (destroying fo
 ## 🚀 Key Features
 
 *   **Pixel-Perfect Fidelity:** Surgically edits PDF text streams in-place. Lossy reconstruction, flattening, and automatic font substitution are explicitly disabled.
-*   **Multi-Provider AI Extraction:** Integrates with Mindee (default), LlamaParse, Google Document AI, Gemini, pdfRest, and Mistral.
+*   **Multi-Provider AI Extraction:** Default cloud parser is Reducto, with a fallback chain of Document AI → LlamaParse → the deterministic offline parser. Gemini, pdfRest, and Mistral power balancing, rendering, and validation.
 *   **Exact-Decimal Balance Engine:** Automatically recalculates running and closing balances when a transaction is edited, guaranteeing mathematical consistency across the entire ledger.
 *   **Cryptographic Evidence Ledger:** Every edit produces an immutable JSON manifest containing policy versions, calibration hashes, exact intent sets, structural gates, and visual fidelity scores.
 *   **Offline Fallback:** Works entirely offline with a deterministic geometry extractor if API keys are missing or cloud services fail.
@@ -32,7 +32,7 @@ The application is built on a high-performance Rust core with a supervised Pytho
 | :--- | :--- |
 | **`app/`** | CLI, egui GUI, runtime loop, audit logging, telemetry, and configuration. |
 | **`engine/`** | Exact-decimal balance math, transaction modeling, multi-layer verification, layout, and font analysis. |
-| **`pdf/`** | Engine trait + selector (PyMuPDF primary, Pdfium fallback, OxidizePdf). |
+| **`pdf/`** | Engine trait + selector (Rank 1: PyMuPdfPro, Rank 2: Native, Rank 3: Typst). |
 | **`extractors/`** | Deterministic geometry providers (per-bank templates) and hybrid mergers. |
 | **`ai/`** | Document AI, Gemini, LlamaParse, pdfRest, Vision AI, and the supervised Python bridge. |
 | **`security/`** | Software root-of-trust and ChaCha20-Poly1305 encryption. |

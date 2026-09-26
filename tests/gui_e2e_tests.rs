@@ -365,3 +365,53 @@ fn test_gui_document_loaded_does_not_free_wait_until_parse() {
         app.in_flight
     );
 }
+
+#[test]
+fn test_gui_dropped_pdf_single_open() {
+    let _ = dotenvy::dotenv();
+    let mut cfg = AppConfig::from_env().unwrap_or_default();
+    cfg.interactive_fallbacks = false;
+    let cfg = Arc::new(cfg);
+
+    let (job_tx, job_rx) = std::sync::mpsc::channel();
+    let (_result_tx, result_rx) = std::sync::mpsc::channel();
+    let mut app = dual_core_pdf_pipeline::app::gui::MyApp::new(job_tx, result_rx, cfg);
+    let ctx = egui::Context::default();
+
+    let sample = std::path::PathBuf::from("examples/sample.pdf");
+    if sample.exists() {
+        let mut raw_input = egui::RawInput {
+            time: Some(0.0),
+            ..Default::default()
+        };
+        raw_input.dropped_files.push(egui::DroppedFile {
+            path: Some(sample.clone()),
+            name: "sample.pdf".to_string(),
+            last_modified: None,
+            bytes: None,
+            mime: String::new(),
+        });
+        let _ = ctx.run(raw_input, |ctx| {
+            app.headless_update(ctx);
+        });
+
+        // Exactly one Job::LoadDocument must be sent, and in_flight must be 1 (not 2).
+        assert_eq!(
+            app.in_flight, 1,
+            "in_flight must be incremented exactly once for dropped PDF"
+        );
+        let mut job_count = 0;
+        while let Ok(job) = job_rx.try_recv() {
+            if matches!(
+                job,
+                dual_core_pdf_pipeline::app::runtime::Job::LoadDocument { .. }
+            ) {
+                job_count += 1;
+            }
+        }
+        assert_eq!(
+            job_count, 1,
+            "Exactly one Job::LoadDocument must be queued for a single dropped PDF"
+        );
+    }
+}

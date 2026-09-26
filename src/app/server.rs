@@ -37,7 +37,7 @@
 //! All POST endpoints accept and return `application/json`.
 //! CORS headers are included so the API can be called from browser tooling.
 
-use crate::app::runtime::{Job, JobResult, JobTicket, RuntimeClient};
+use crate::app::runtime::{Job, JobResult, JobTicket, OperationDisposition, RuntimeClient};
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
@@ -560,11 +560,36 @@ fn collect_results(ticket: JobTicket, job_name: &str) -> (&'static str, &'static
                 messages.push(format!("{} change(s) applied", changes_applied));
                 break;
             }
+            // Useful payload of `Job::ValidateCredentials`: report it, but do
+            // NOT end the wait — the shared completion contract closes that
+            // job with exactly one terminal `JobCompleted` right after it.
             Ok(JobResult::ApiKeysVerified(report)) => {
                 messages.push(format!(
                     "api keys verified: {} provider(s) checked",
                     report.results.len()
                 ));
+            }
+            // Shared terminal completion (e.g. `validate_credentials`,
+            // `cleanup_temp_files`, `adjust_dates`): end the wait and mirror
+            // the payload-driven disposition into the HTTP status.
+            Ok(JobResult::JobCompleted {
+                job_label,
+                disposition,
+                artifact,
+                message,
+            }) => {
+                if matches!(
+                    disposition,
+                    OperationDisposition::Failed
+                        | OperationDisposition::Cancelled
+                        | OperationDisposition::TimedOut
+                ) {
+                    ok = false;
+                }
+                messages.push(match artifact {
+                    Some(path) => format!("{job_label}: {message} -> {}", path.display()),
+                    None => format!("{job_label}: {message}"),
+                });
                 break;
             }
 

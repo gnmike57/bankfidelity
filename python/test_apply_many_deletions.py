@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pymupdf
 
-
 MODULE_PATH = Path(__file__).with_name("pymupdf_pro_integration.py")
 SPEC = importlib.util.spec_from_file_location("deletion_bridge", MODULE_PATH)
 BRIDGE = importlib.util.module_from_spec(SPEC)

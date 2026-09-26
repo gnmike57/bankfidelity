@@ -19,6 +19,7 @@ python3 scripts/build_portable_bundle.py \
   --version "$VERSION"
 
 mkdir -p target/release/artifacts
+cp "$OUTPUT/BankStatementFidelityEditor.app/Contents/MacOS/libpdfium.dylib" "$OUTPUT/BankStatementFidelityEditor.app/Contents/Resources/"
 tar -C "$OUTPUT" -czf "target/release/artifacts/BankStatementFidelityEditor-${VERSION}-macos-aarch64.tar.gz" BankStatementFidelityEditor.app
 ARCHIVE="target/release/artifacts/BankStatementFidelityEditor-${VERSION}-macos-aarch64.tar.gz"
 if command -v sha256sum >/dev/null 2>&1; then

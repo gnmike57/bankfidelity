@@ -26,7 +26,7 @@ fn test_force_headless_fallback_routes_to_server() {
         .spawn()
         .expect("Failed to spawn process");
 
-    std::thread::sleep(Duration::from_millis(1500));
+    std::thread::sleep(Duration::from_millis(4000));
 
     // Kill it so we can read the output
     let _ = child.kill();

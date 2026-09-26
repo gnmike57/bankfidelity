@@ -394,7 +394,7 @@ impl LlamaParseClient {
         ))
     }
 
-    fn parse_markdown_to_statement(
+    pub fn parse_markdown_to_statement(
         &self,
         markdown: &str,
     ) -> Result<BankStatement, LlamaParseError> {
@@ -407,7 +407,9 @@ impl LlamaParseClient {
 /// Page markers (`Page N`, `# Page N`) advance a 0-based page counter so
 /// multi-page statements keep correct identities for transfer/geometry merge.
 /// Empty-date description rows append onto the previous transaction (multi-line).
-fn parse_markdown_to_statement_inner(markdown: &str) -> Result<BankStatement, LlamaParseError> {
+pub(crate) fn parse_markdown_to_statement_inner(
+    markdown: &str,
+) -> Result<BankStatement, LlamaParseError> {
     let mut transactions: Vec<crate::engine::model::Transaction> = Vec::new();
     let mut in_table = false;
     let mut line_on_page = 0usize;

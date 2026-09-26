@@ -1,3 +1,5 @@
+> **NOTE - NOT CURRENT-TREE VERIFICATION.** The gate ledger below was recorded for head `c354094b83e31ca7e026e7749c567931a97a43f4` in repo `bank-statement-fidelity-editor-remediated`. Current HEAD is `179aa834` on `main` in `gnmike57/bankfidelity`. Gate evidence here has not been re-run against the current tree.
+
 # Remediation Program Status
 
 **Repository head audited:** `c354094b83e31ca7e026e7749c567931a97a43f4`

@@ -1,0 +1,60 @@
+# syntax=docker/dockerfile:1
+# ---------------------------------------------------------------------------
+# Bank Statement Fidelity Editor - headless image for aarch64 (GX10 / DGX OS).
+#
+# Unlike the slim Dockerfile, this image ships the Python worker (PyMuPDF) so
+# the per-segment edit path works. Large models are NOT in this image: run vLLM
+# separately (see scripts/gx10/docker-compose.yml) and point LOCAL_LLM_URL /
+# LOCAL_VLM_URL at it.
+#
+#   docker build -f Dockerfile.gx10 -t bankfidelity:gx10 .
+# ---------------------------------------------------------------------------
+
+FROM rust:1.89-bookworm AS builder
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        pkg-config libssl-dev libfontconfig1-dev libfreetype6-dev \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /build
+COPY Cargo.toml Cargo.lock ./
+COPY .cargo ./.cargo
+COPY src ./src
+COPY tests ./tests
+COPY assets ./assets
+RUN cargo build --release --locked --bin dual-core-pdf-pipeline
+
+FROM debian:bookworm-slim AS runtime
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libfontconfig1 libfreetype6 ca-certificates \
+        python3 python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+# Isolated Python runtime for the supervised worker.
+COPY requirements-ci.txt /tmp/requirements-ci.txt
+RUN python3 -m venv /opt/bf-python \
+    && /opt/bf-python/bin/pip install --no-cache-dir -r /tmp/requirements-ci.txt fonttools
+
+WORKDIR /app
+COPY --from=builder /build/target/release/dual-core-pdf-pipeline /usr/local/bin/dual-core-pdf-pipeline
+COPY bank_templates ./bank_templates
+COPY python ./python
+COPY assets ./assets
+RUN mkdir -p audit output logs cache/fonts pdfium_lib
+
+# Pdfium: on first use the binary downloads the checksum-pinned linux-aarch64
+# artifact (assets/pdfium-artifacts.json) into /app/pdfium_lib and verifies it.
+# For air-gapped hosts, mount a pre-verified library at /app/pdfium_lib instead
+# and set PDFIUM_AUTO_DOWNLOAD=false.
+ENV PDFIUM_AUTO_DOWNLOAD=true
+
+RUN groupadd --system appgroup && useradd --system --gid appgroup appuser \
+    && chown -R appuser:appgroup /app
+USER appuser
+
+ENV RUST_LOG=info \
+    PORT=8080 \
+    PYTHON_EXECUTABLE=/opt/bf-python/bin/python \
+    PYTHONIOENCODING=utf-8
+EXPOSE 8080
+
+# Required at deploy time: DUAL_CORE_PASSPHRASE (>=16 chars).
+CMD ["dual-core-pdf-pipeline", "serve"]

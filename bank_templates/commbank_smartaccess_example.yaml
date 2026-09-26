@@ -1,0 +1,16 @@
+# Auto-generated from AU Bank Statements/. Review the column x-ranges before relying on them.
+id: commbank_smartaccess_example
+header_signatures:
+  - "Number"
+  - "Dec"
+  - "Mar"
+  - "Enquiries"
+date_format: "%d %b %Y"
+amount_regex: "^-?\\$?[0-9,]+\\.\\d{2}$"
+column_x_ranges:
+  date: [69.3, 147.1]
+  description: [273.6, 359.2]
+  debit: [324.7, 397.6]
+  credit: [152.9, 242.5]
+  amount: [88.5, 169.8]
+  balance: [394.2, 492.0]

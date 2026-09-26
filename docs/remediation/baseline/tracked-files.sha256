@@ -1,3 +1,7 @@
+# FROZEN HISTORICAL BASELINE — DO NOT REGENERATE
+# This file is a historical snapshot from a previous commit lineage.
+# Note: Entries below include files deleted in subsequent remediation stages
+# (e.g. src/engine/font_metrics.rs and src/engine/verification_v2.rs).
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  .ai/mcp/mcp.json
 13b5f401999e66bf1b1d937dc8b8db245fa1b510f675f922dd2f8f2bf2cc53b4  .cargo/config.toml
 0a1a156f4d159dbfe6610d43028cad570777e5baa23eba263ecd95e8fb46a10c  .dockerignore

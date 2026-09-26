@@ -176,7 +176,7 @@ def verify_source_invariants() -> None:
     if pdfium_manifest.get("release_tag") != "chromium/7961":
         fail("Pdfium release tag is not the verified immutable release")
     artifacts = pdfium_manifest.get("artifacts", {})
-    for platform in ["windows-x86_64", "macos-aarch64", "macos-x86_64", "linux-x86_64"]:
+    for platform in ["windows-x86_64", "macos-aarch64", "macos-x86_64", "linux-x86_64", "linux-aarch64"]:
         artifact = artifacts.get(platform)
         if not artifact:
             fail(f"missing Pdfium artifact: {platform}")

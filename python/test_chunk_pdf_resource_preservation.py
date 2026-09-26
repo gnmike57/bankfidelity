@@ -5,13 +5,13 @@ from pathlib import Path
 
 import pymupdf
 
-
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = Path(__file__).with_name("pymupdf_pro_integration.py")
 SPEC = importlib.util.spec_from_file_location("chunk_resource_bridge", MODULE_PATH)
 BRIDGE = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
 SPEC.loader.exec_module(BRIDGE)
+BRIDGE._ensure_pro_unlocked = lambda *_args, **_kwargs: None
 
 
 class ChunkPdfResourcePreservationTests(unittest.TestCase):

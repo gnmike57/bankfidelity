@@ -29,19 +29,32 @@ pub enum DateAdjustMode {
 }
 
 /// Common date format patterns for parsing/formatting.
+/// Ordered with Australian formats (DD/MM/YYYY) first to resolve ambiguous dates like 05/06/2026.
 const DATE_FORMATS: &[&str] = &[
-    "%d/%m/%Y",  // DD/MM/YYYY
-    "%m/%d/%Y",  // MM/DD/YYYY
-    "%Y-%m-%d",  // YYYY-MM-DD
+    "%d/%m/%Y",  // DD/MM/YYYY (Australian default)
     "%d-%m-%Y",  // DD-MM-YYYY
-    "%m-%d-%Y",  // MM-DD-YYYY
     "%d %b %Y",  // 01 Jan 2026
-    "%b %d, %Y", // Jan 01, 2026
+    "%d %B %Y",  // 01 January 2026
     "%d/%m/%y",  // DD/MM/YY
-    "%m/%d/%y",  // MM/DD/YY
+    "%d-%m-%y",  // DD-MM-YY
+    "%Y-%m-%d",  // ISO YYYY-MM-DD
+    "%m/%d/%Y",  // US MM/DD/YYYY
+    "%m-%d-%Y",  // US MM-DD-YYYY
+    "%b %d, %Y", // US Jan 01, 2026
+    "%m/%d/%y",  // US MM/DD/YY
+];
+
+/// Formats without explicit year, requiring a statement year hint.
+const DATE_FORMATS_NO_YEAR: &[&str] = &[
+    "%d %b", // 15 Jan
+    "%d %B", // 15 January
+    "%d/%m", // 15/01
+    "%d-%m", // 15-01
+    "%b %d", // Jan 15
 ];
 
 /// Try to parse a date string using all known formats.
+/// Prioritizes Australian DD/MM ordering.
 /// Returns the parsed date and the format string that worked.
 pub fn parse_date(date_str: &str) -> Option<(NaiveDate, &'static str)> {
     let trimmed = date_str.trim();
@@ -51,6 +64,57 @@ pub fn parse_date(date_str: &str) -> Option<(NaiveDate, &'static str)> {
         }
     }
     None
+}
+
+/// Try to parse a date string that may lack a year, using a supplied year hint.
+/// Correctly handles bankwest-style inline dates where months may span December-January.
+pub fn parse_date_with_year_hint(date_str: &str, year_hint: i32) -> Option<(NaiveDate, String)> {
+    let trimmed = date_str.trim();
+    if let Some((d, fmt)) = parse_date(trimmed) {
+        return Some((d, fmt.to_string()));
+    }
+
+    for &fmt in DATE_FORMATS_NO_YEAR {
+        let with_year = format!("{} {}", trimmed, year_hint);
+        let full_fmt = format!("{} %Y", fmt);
+        if let Ok(d) = NaiveDate::parse_from_str(&with_year, &full_fmt) {
+            return Some((d, fmt.to_string()));
+        }
+    }
+    None
+}
+
+/// Adds `months` to a `NaiveDate`, clamping the day to the last valid day of the target month.
+/// For example, Jan 31 + 1 month -> Feb 28 (or Feb 29 in leap years).
+pub fn add_months_clamped(date: NaiveDate, months: i32) -> NaiveDate {
+    use chrono::Datelike;
+    let total_months = (date.year() as i64) * 12 + (date.month0() as i64) + (months as i64);
+    let target_year = (total_months / 12) as i32;
+    let target_month0 = (total_months % 12) as u32;
+    let target_month = target_month0 + 1;
+
+    // Find the max days in target_month
+    let target_day = date.day();
+    let max_days = days_in_month(target_year, target_month);
+    let clamped_day = target_day.min(max_days);
+
+    NaiveDate::from_ymd_opt(target_year, target_month, clamped_day).unwrap_or(date)
+}
+
+/// Returns the number of days in a given year and month.
+pub fn days_in_month(year: i32, month: u32) -> u32 {
+    match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 => {
+            if (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0) {
+                29
+            } else {
+                28
+            }
+        }
+        _ => 30,
+    }
 }
 
 /// Shift all transaction dates by a fixed number of days.
@@ -218,5 +282,40 @@ mod tests {
         assert!(parse_date("01/15/2026").is_some());
         assert!(parse_date("2026-01-15").is_some());
         assert!(parse_date("garbage").is_none());
+    }
+
+    #[test]
+    fn test_au_date_ambiguity_priority() {
+        // "05/06/2026" should resolve to June 5th in AU format (DD/MM/YYYY), not May 6th
+        let (d, fmt) = parse_date("05/06/2026").unwrap();
+        assert_eq!(d, NaiveDate::from_ymd_opt(2026, 6, 5).unwrap());
+        assert_eq!(fmt, "%d/%m/%Y");
+    }
+
+    #[test]
+    fn test_parse_with_year_hint_for_inline_dates() {
+        let (d1, _) = parse_date_with_year_hint("15 Jan", 2026).unwrap();
+        assert_eq!(d1, NaiveDate::from_ymd_opt(2026, 1, 15).unwrap());
+
+        let (d2, _) = parse_date_with_year_hint("31 Dec", 2025).unwrap();
+        assert_eq!(d2, NaiveDate::from_ymd_opt(2025, 12, 31).unwrap());
+    }
+
+    #[test]
+    fn test_add_months_clamped_rollover() {
+        // Jan 31 + 1 month -> Feb 28 (2026 is not a leap year)
+        let jan31 = NaiveDate::from_ymd_opt(2026, 1, 31).unwrap();
+        let feb28 = add_months_clamped(jan31, 1);
+        assert_eq!(feb28, NaiveDate::from_ymd_opt(2026, 2, 28).unwrap());
+
+        // Jan 31 + 1 month in leap year 2024 -> Feb 29
+        let leap_jan31 = NaiveDate::from_ymd_opt(2024, 1, 31).unwrap();
+        let feb29 = add_months_clamped(leap_jan31, 1);
+        assert_eq!(feb29, NaiveDate::from_ymd_opt(2024, 2, 29).unwrap());
+
+        // March 31 - 1 month -> Feb 28
+        let mar31 = NaiveDate::from_ymd_opt(2026, 3, 31).unwrap();
+        let feb_prev = add_months_clamped(mar31, -1);
+        assert_eq!(feb_prev, NaiveDate::from_ymd_opt(2026, 2, 28).unwrap());
     }
 }

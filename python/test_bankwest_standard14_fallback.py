@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pymupdf
 
-
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = Path(__file__).with_name("pymupdf_pro_integration.py")
 SPEC = importlib.util.spec_from_file_location("bankwest_standard14", MODULE_PATH)

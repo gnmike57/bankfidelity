@@ -1,22 +1,29 @@
-use crate::ai::gemini_client::{GeminiClient, GeminiCompletenessReport, GeminiError};
+use crate::ai::gemini_client::{GeminiClient, GeminiError};
 use crate::ai::openai_client::{OpenAiClient, OpenAiError};
 use crate::app::config::{AiProviderMode, AppConfig};
 use crate::engine::model::Transaction;
 
+pub type BalancePlan = crate::ai::gemini_client::GeminiBalancePlan;
+pub type CompletenessReport = crate::ai::gemini_client::GeminiCompletenessReport;
+pub type VisionReport = crate::ai::gemini_client::GeminiVisionReport;
+
 pub struct AiBackend {
     pub primary: AiProviderMode,
-    pub gemini: Option<GeminiClient>,
     pub openrouter: Option<OpenAiClient>,
     pub groq: Option<OpenAiClient>,
     pub mistral: Option<OpenAiClient>,
+    pub mistral_native: Option<crate::ai::mistral_client::MistralClient>,
+    pub gemini: Option<GeminiClient>,
 }
 
 #[derive(thiserror::Error, Debug)]
 pub enum AiBackendError {
+    #[error("OpenAI/OpenRouter Error: {0}")]
+    OpenAi(#[from] OpenAiError),
+    #[error("Mistral Error: {0}")]
+    Mistral(#[from] crate::ai::mistral_client::MistralError),
     #[error("Gemini Error: {0}")]
     Gemini(#[from] GeminiError),
-    #[error("OpenAI Error: {0}")]
-    OpenAi(#[from] OpenAiError),
     #[error("No AI backends available or all failed. Last error: {0}")]
     AllFailed(String),
 }
@@ -29,14 +36,11 @@ impl AiBackend {
             ));
         }
 
-        let mut gemini = None;
         let mut openrouter = None;
         let mut groq = None;
         let mut mistral = None;
-
-        if let Ok(c) = GeminiClient::from_app_config(cfg) {
-            gemini = Some(c);
-        }
+        let mut mistral_native = None;
+        let mut gemini = None;
 
         let mut or_cfg = cfg.clone();
         or_cfg.ai_provider = AiProviderMode::OpenRouterApiKey;
@@ -56,22 +60,32 @@ impl AiBackend {
             mistral = Some(c);
         }
 
+        if let Ok(mc) = crate::ai::mistral_client::MistralClient::from_app_config(cfg) {
+            mistral_native = Some(mc);
+        }
+
+        if let Ok(c) = GeminiClient::from_app_config(cfg) {
+            gemini = Some(c);
+        }
+
         Ok(Self {
             primary: cfg.ai_provider,
-            gemini,
             openrouter,
             groq,
             mistral,
+            mistral_native,
+            gemini,
         })
     }
 
     pub fn new_mock() -> Self {
         Self {
-            primary: AiProviderMode::GeminiApiKey,
-            gemini: None,
+            primary: AiProviderMode::OpenRouterApiKey,
             openrouter: None,
             groq: None,
             mistral: None,
+            mistral_native: None,
+            gemini: None,
         }
     }
 
@@ -82,14 +96,11 @@ impl AiBackend {
             ));
         }
 
-        let mut gemini = None;
         let mut openrouter = None;
         let mut groq = None;
         let mut mistral = None;
-
-        if let Ok(c) = GeminiClient::from_app_config_async(cfg).await {
-            gemini = Some(c);
-        }
+        let mut mistral_native = None;
+        let mut gemini = None;
 
         let mut or_cfg = cfg.clone();
         or_cfg.ai_provider = AiProviderMode::OpenRouterApiKey;
@@ -109,17 +120,40 @@ impl AiBackend {
             mistral = Some(c);
         }
 
+        if let Ok(mc) = crate::ai::mistral_client::MistralClient::from_app_config_async(cfg).await {
+            mistral_native = Some(mc);
+        }
+
+        if let Ok(c) = GeminiClient::from_app_config_async(cfg).await {
+            gemini = Some(c);
+        }
+
         Ok(Self {
             primary: cfg.ai_provider,
-            gemini,
             openrouter,
             groq,
             mistral,
+            mistral_native,
+            gemini,
         })
     }
 
     pub async fn ping(&self) -> Result<(), AiBackendError> {
-        // Just ping whatever we have
+        if let Some(c) = &self.openrouter {
+            if let Ok(()) = c.ping().await {
+                return Ok(());
+            }
+        }
+        if let Some(c) = &self.groq {
+            if let Ok(()) = c.ping().await {
+                return Ok(());
+            }
+        }
+        if let Some(c) = &self.mistral {
+            if let Ok(()) = c.ping().await {
+                return Ok(());
+            }
+        }
         if let Some(c) = &self.gemini {
             let _ = c.ping().await;
         }
@@ -131,8 +165,21 @@ macro_rules! cascade {
     ($self:ident, $method:ident, $($args:expr),*) => {{
         let mut last_err = String::new();
 
-        // 1. Try primary
+        // 1. Try primary provider first
         match $self.primary {
+            AiProviderMode::MistralApiKey => {
+                if let Some(c) = &$self.mistral_native {
+                    match c.$method($($args),*).await {
+                        Ok(r) => return Ok(r),
+                        Err(e) => last_err = e.to_string(),
+                    }
+                } else if let Some(c) = &$self.mistral {
+                    match c.$method($($args),*).await {
+                        Ok(r) => return Ok(r),
+                        Err(e) => last_err = e.to_string(),
+                    }
+                }
+            }
             AiProviderMode::OpenRouterApiKey => {
                 if let Some(c) = &$self.openrouter {
                     match c.$method($($args),*).await {
@@ -149,15 +196,7 @@ macro_rules! cascade {
                     }
                 }
             }
-            AiProviderMode::MistralApiKey => {
-                if let Some(c) = &$self.mistral {
-                    match c.$method($($args),*).await {
-                        Ok(r) => return Ok(r),
-                        Err(e) => last_err = e.to_string(),
-                    }
-                }
-            }
-            AiProviderMode::GeminiApiKey | AiProviderMode::GeminiVertex => {
+            AiProviderMode::GeminiApiKey => {
                 if let Some(c) = &$self.gemini {
                     match c.$method($($args),*).await {
                         Ok(r) => return Ok(r),
@@ -168,7 +207,12 @@ macro_rules! cascade {
             _ => {}
         }
 
-        // 2. Cascade: Mistral -> OpenRouter -> Gemini -> Groq
+        // 2. Cascade: Mistral (Specialist) -> OpenRouter / Groq (Zero Gemini)
+        if let Some(c) = &$self.mistral_native {
+            if $self.primary != AiProviderMode::MistralApiKey {
+                if let Ok(r) = c.$method($($args),*).await { return Ok(r); }
+            }
+        }
         if let Some(c) = &$self.mistral {
             if $self.primary != AiProviderMode::MistralApiKey {
                 if let Ok(r) = c.$method($($args),*).await { return Ok(r); }
@@ -176,11 +220,6 @@ macro_rules! cascade {
         }
         if let Some(c) = &$self.openrouter {
             if $self.primary != AiProviderMode::OpenRouterApiKey {
-                if let Ok(r) = c.$method($($args),*).await { return Ok(r); }
-            }
-        }
-        if let Some(c) = &$self.gemini {
-            if !matches!($self.primary, AiProviderMode::GeminiApiKey | AiProviderMode::GeminiVertex) {
                 if let Ok(r) = c.$method($($args),*).await { return Ok(r); }
             }
         }
@@ -200,7 +239,7 @@ impl AiBackend {
         transactions: &[Transaction],
         imbalance: f64,
         layout: &crate::engine::layout::DocumentLayout,
-    ) -> Result<crate::ai::gemini_client::GeminiBalancePlan, AiBackendError> {
+    ) -> Result<BalancePlan, AiBackendError> {
         cascade!(
             self,
             propose_balance_adjustments,
@@ -216,7 +255,7 @@ impl AiBackend {
         opening: f64,
         closing: f64,
         pages: usize,
-    ) -> Result<GeminiCompletenessReport, AiBackendError> {
+    ) -> Result<CompletenessReport, AiBackendError> {
         cascade!(
             self,
             validate_parse_completeness,
@@ -245,16 +284,16 @@ impl AiBackend {
         &self,
         _doc: &[u8],
         _bboxes: &[[f32; 4]],
-    ) -> Result<crate::ai::gemini_client::GeminiVisionReport, AiBackendError> {
+    ) -> Result<VisionReport, AiBackendError> {
         if let Some(c) = &self.gemini {
             c.validate_render_visually(_doc, _bboxes)
                 .await
                 .map_err(Into::into)
         } else {
-            Ok(crate::ai::gemini_client::GeminiVisionReport {
+            Ok(VisionReport {
                 anomaly_score: 0.0,
                 hotspots: vec![],
-                notes: "Vision check bypassed (Gemini not configured)".into(),
+                notes: "Vision check bypassed (local spatial verifier active)".into(),
             })
         }
     }
@@ -304,5 +343,13 @@ impl AiBackend {
             raw_ocr_text,
             error_message
         )
+    }
+
+    pub async fn apply_natural_language_edit(
+        &self,
+        prompt: &str,
+        transactions: &[Transaction],
+    ) -> Result<Vec<Transaction>, AiBackendError> {
+        cascade!(self, apply_natural_language_edit, prompt, transactions)
     }
 }

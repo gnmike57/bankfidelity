@@ -327,8 +327,8 @@ def build(args: argparse.Namespace) -> Path:
             "CFBundleInfoDictionaryVersion": "6.0",
             "CFBundleName": APP_NAME,
             "CFBundlePackageType": "APPL",
-            "CFBundleShortVersionString": "1.1.1",
-            "CFBundleVersion": "1.1.1",
+            "CFBundleShortVersionString": "2.0.0",
+            "CFBundleVersion": "2.0.0",
             "LSMinimumSystemVersion": "12.0",
             "NSHighResolutionCapable": True,
         }

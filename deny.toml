@@ -2,7 +2,7 @@
 vulnerability = "deny"
 unmaintained = "warn"
 notice = "warn"
-unsound = "denn"
+unsound = "deny"
 
 [licenses]
 unlicensed = "deny"
@@ -16,7 +16,7 @@ allow = [
     "Zlib",
     "Unicode-DFS-2016",
     "CC0-1.0",
-    "BSF-1-Clause",
+    "BSD-1-Clause",
 ]
 deny = []
 copyleft = "warn"

@@ -12,6 +12,25 @@ pub enum TypstEngineError {
 #[derive(Default)]
 pub struct TypstEngine;
 
+/// Escapes reserved Typst characters within content blocks:
+/// `\`, `[`, `]`, `#`, `*`, `_`, `$`
+pub fn escape_typst_content(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for ch in text.chars() {
+        match ch {
+            '\\' => out.push_str("\\\\"),
+            '[' => out.push_str("\\["),
+            ']' => out.push_str("\\]"),
+            '#' => out.push_str("\\#"),
+            '*' => out.push_str("\\*"),
+            '_' => out.push_str("\\_"),
+            '$' => out.push_str("\\$"),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
 impl TypstEngine {
     pub fn new() -> Self {
         Self
@@ -58,7 +77,7 @@ impl TypstEngine {
         .map_err(|e| TypstEngineError::Typst(format!("Panic in typst thread: {}", e)))?
     }
 
-    fn generate_markup(&self, stmt: &BankStatement) -> String {
+    pub fn generate_markup(&self, stmt: &BankStatement) -> String {
         let bank_name = stmt.bank_name.as_deref().unwrap_or("Generic");
         match bank_name {
             "Chase" => self.generate_chase_markup(stmt),
@@ -93,8 +112,8 @@ impl TypstEngine {
         out.push_str("  [*Date*], [*Description*], [*Debit*], [*Credit*], [*Balance*],\n");
 
         for tx in &stmt.transactions {
-            let date = tx.date.replace("[", "\\[").replace("]", "\\]");
-            let desc = tx.raw_text.replace("[", "\\[").replace("]", "\\]");
+            let date = escape_typst_content(&tx.date);
+            let desc = escape_typst_content(&tx.raw_text);
             let debit = tx.debit.map(|d| format!("\\${:.2}", d)).unwrap_or_default();
             let credit = tx
                 .credit
@@ -147,11 +166,11 @@ impl TypstEngine {
         out.push_str("#table(\n");
         out.push_str("  columns: (1fr, 4fr, 1.5fr, 1.5fr, 1.5fr),\n");
         out.push_str("  align: (col, row) => if col > 1 { right } else { left },\n");
-        out.push_str("  [*Date*], [*Description*], [*Amount*], [*Credit*], [*Balance*],\n");
+        out.push_str("  [*Date*], [*Description*], [*Credit*], [*Debit*], [*Balance*],\n");
 
         for tx in &stmt.transactions {
-            let date = tx.date.replace("[", "\\[").replace("]", "\\]");
-            let desc = tx.raw_text.replace("[", "\\[").replace("]", "\\]");
+            let date = escape_typst_content(&tx.date);
+            let desc = escape_typst_content(&tx.raw_text);
             let debit = tx.debit.map(|d| format!("\\${:.2}", d)).unwrap_or_default();
             let credit = tx
                 .credit
@@ -164,11 +183,7 @@ impl TypstEngine {
 
             out.push_str(&format!(
                 "  [{}], [{}], [{}], [{}], [{}],\n",
-                date,
-                desc,
-                credit,
-                debit,
-                bal // Chase usually has amounts out vs amounts in
+                date, desc, credit, debit, bal
             ));
         }
         out.push_str(")\n\n");
@@ -209,8 +224,8 @@ impl TypstEngine {
         out.push_str("  text(fill: white)[*Date*], text(fill: white)[*Description*], text(fill: white)[*Deposits*], text(fill: white)[*Withdrawals*], text(fill: white)[*Balance*],\n");
 
         for tx in &stmt.transactions {
-            let date = tx.date.replace("[", "\\[").replace("]", "\\]");
-            let desc = tx.raw_text.replace("[", "\\[").replace("]", "\\]");
+            let date = escape_typst_content(&tx.date);
+            let desc = escape_typst_content(&tx.raw_text);
             let debit = tx.debit.map(|d| format!("\\${:.2}", d)).unwrap_or_default();
             let credit = tx
                 .credit

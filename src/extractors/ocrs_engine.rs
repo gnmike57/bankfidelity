@@ -164,7 +164,10 @@ mod tests {
 
     #[test]
     fn extract_fails_gracefully_without_models() -> anyhow::Result<()> {
-        let engine = OcrsEngine::new(OcrsConfig::default());
+        let engine = OcrsEngine::new(OcrsConfig {
+            detection_model_path: "nonexistent/det.rten".into(),
+            recognition_model_path: "nonexistent/rec.rten".into(),
+        });
         // Create a minimal 1x1 white PNG
         let mut buf = Vec::new();
         let img = image::DynamicImage::new_luma8(1, 1);

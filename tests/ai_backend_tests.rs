@@ -33,7 +33,7 @@ async fn test_ai_backend_cascade_success_on_primary() {
     let mock_gemini = server
         .mock(
             "POST",
-            "/v1beta/models/gemini-pro-preview:generateContent?key=gemini-key",
+            "/v1beta/models/gemini-3.7-flash:generateContent?key=gemini-key",
         )
         .with_status(500)
         .expect(0)
@@ -77,21 +77,30 @@ async fn test_ai_backend_cascade_fallback() {
         .expect(4) // 1 initial + 3 retries
         .create_async().await;
 
-    // Cascade to Gemini, which succeeds!
+    // Gemini is intentionally excluded from the text cascade ("Zero Gemini"):
+    // even when configured, it must never be called as a fallback.
     let mock_gemini = server
         .mock(
             "POST",
-            "/v1beta/models/gemini-pro-preview:generateContent?key=gemini-key",
+            "/v1beta/models/gemini-3.7-flash:generateContent?key=gemini-key",
         )
+        .with_status(500)
+        .expect(0)
+        .create_async()
+        .await;
+
+    // Cascade to Groq (separate base URL so the OpenRouter 500 mock is not
+    // re-matched), which succeeds.
+    let mut groq_server = Server::new_async().await;
+    let mock_groq = groq_server
+        .mock("POST", "/chat/completions")
         .with_status(200)
         .with_header("content-type", "application/json")
         .with_body(
             json!({
-                "candidates": [{
-                    "content": {
-                        "parts": [{
-                            "text": "{\"is_mathematically_sound\": true}"
-                        }]
+                "choices": [{
+                    "message": {
+                        "content": "{\"is_math_consistent\": true}"
                     }
                 }]
             })
@@ -114,7 +123,7 @@ async fn test_ai_backend_cascade_fallback() {
     ));
     backend.groq = Some(OpenAiClient::with_base_url(
         "groq-key".to_string(),
-        server.url(),
+        groq_server.url(),
         "groq-model".to_string(),
     ));
 
@@ -125,6 +134,7 @@ async fn test_ai_backend_cascade_fallback() {
 
     mock_or.assert_async().await;
     mock_gemini.assert_async().await;
+    mock_groq.assert_async().await;
 }
 
 #[tokio::test]
@@ -141,10 +151,12 @@ async fn test_ai_backend_cascade_all_failed() {
     let mock_gemini = server
         .mock(
             "POST",
-            "/v1beta/models/gemini-pro-preview:generateContent?key=gemini-key",
+            "/v1beta/models/gemini-3.7-flash:generateContent?key=gemini-key",
         )
         .with_status(500)
-        .expect_at_least(1)
+        // Gemini is excluded from the text cascade ("Zero Gemini"): it must
+        // not be contacted even when every other provider fails.
+        .expect(0)
         .create_async()
         .await;
 

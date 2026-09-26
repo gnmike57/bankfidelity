@@ -40,7 +40,7 @@ PASSPHRASE = "pywinauto-e2e-passphrase-12345678"
 @pytest.fixture(scope="module")
 def app_instance():
     """Start the GUI and tear it down after the module."""
-    if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
+    if (os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS")) and not os.environ.get("ALLOW_INTERACTIVE_CI"):
         pytest.skip("PyWinAuto GUI E2E requires an interactive desktop (not CI)")
 
     if not os.path.exists(APP_PATH):

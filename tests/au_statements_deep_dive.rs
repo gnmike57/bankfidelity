@@ -25,7 +25,7 @@ fn drain_until<F: Fn(&JobResult) -> bool>(
 }
 
 #[test]
-#[ignore]
+#[ignore = "requires live Document AI and Gemini keys, network access, and takes significant time; run manually with --ignored"]
 fn test_all_au_statements() {
     let _ = dotenvy::dotenv();
     let mut cfg_obj = AppConfig::from_env().unwrap();

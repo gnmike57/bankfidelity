@@ -1,13 +1,11 @@
 import hashlib
 import importlib.util
-import json
 import tempfile
 import unittest
 from pathlib import Path
 
 import numpy as np
 import pymupdf
-
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = Path(__file__).with_name("pymupdf_pro_integration.py")

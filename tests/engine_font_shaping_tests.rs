@@ -9,10 +9,11 @@ fn test_font_path() -> PathBuf {
 #[test]
 fn calculates_exact_width_deterministically() {
     let font_path = test_font_path();
-    if !font_path.exists() {
-        eprintln!("fixture unavailable: {}", font_path.display());
-        return;
-    }
+    assert!(
+        font_path.exists(),
+        "fixture unavailable: {}",
+        font_path.display()
+    );
 
     let width = calculate_exact_width(&font_path, "Hello, World!", 12.0)
         .expect("valid fixture font must shape");

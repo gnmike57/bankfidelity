@@ -4,15 +4,12 @@ use predicates::prelude::*;
 use std::path::PathBuf;
 
 fn get_test_pdf() -> PathBuf {
-    let path = PathBuf::from("test_doc.pdf");
-    if !path.exists() {
-        // Fallback to examples/sample.pdf if test_doc.pdf is missing
-        let sample = PathBuf::from("examples/sample.pdf");
-        if sample.exists() {
-            return sample;
-        }
-    }
-    path
+    let sample = PathBuf::from("examples/sample.pdf");
+    assert!(
+        sample.exists(),
+        "committed fixture examples/sample.pdf must exist"
+    );
+    sample
 }
 
 fn get_cmd() -> Command {
@@ -61,11 +58,6 @@ fn test_cli_doctor() {
 #[test]
 fn test_cli_analyze_fonts() {
     let pdf = get_test_pdf();
-    if !pdf.exists() {
-        eprintln!("[skip] test PDF not found; test self-skipped");
-        return;
-    }
-
     let mut cmd = get_cmd();
     cmd.arg("analyze-fonts")
         .arg("--input")
@@ -79,10 +71,6 @@ fn test_cli_analyze_fonts() {
 #[test]
 fn test_cli_text() {
     let pdf = get_test_pdf();
-    if !pdf.exists() {
-        eprintln!("[skip] test PDF not found; test self-skipped");
-        return;
-    }
     let out = tempfile::NamedTempFile::new().unwrap().into_temp_path();
 
     let mut cmd = get_cmd();
@@ -106,11 +94,6 @@ fn test_cli_text() {
 #[test]
 fn test_cli_balance() {
     let pdf = get_test_pdf();
-    if !pdf.exists() {
-        eprintln!("[skip] test PDF not found; test self-skipped");
-        return;
-    }
-
     let out = tempfile::NamedTempFile::new().unwrap().into_temp_path();
 
     let mut cmd = get_cmd();
@@ -126,10 +109,6 @@ fn test_cli_balance() {
 #[test]
 fn test_cli_auto_balance() {
     let pdf = get_test_pdf();
-    if !pdf.exists() {
-        eprintln!("[skip] test PDF not found; test self-skipped");
-        return;
-    }
     let out = tempfile::NamedTempFile::new().unwrap().into_temp_path();
 
     let mut cmd = get_cmd();
@@ -145,11 +124,6 @@ fn test_cli_auto_balance() {
 #[test]
 fn test_cli_extract() {
     let pdf = get_test_pdf();
-    if !pdf.exists() {
-        eprintln!("[skip] test PDF not found; test self-skipped");
-        return;
-    }
-
     let out = tempfile::NamedTempFile::new().unwrap().into_temp_path();
 
     let mut cmd = get_cmd();
@@ -165,11 +139,6 @@ fn test_cli_extract() {
 #[test]
 fn test_cli_ai_fix_visual() {
     let pdf = get_test_pdf();
-    if !pdf.exists() {
-        eprintln!("[skip] test PDF not found; test self-skipped");
-        return;
-    }
-
     let mut cmd = get_cmd();
     cmd.arg("ai-fix-visual")
         .arg("--input")
@@ -186,10 +155,6 @@ fn test_cli_ai_fix_visual() {
 #[test]
 fn test_cli_adjust_dates() {
     let pdf = get_test_pdf();
-    if !pdf.exists() {
-        eprintln!("[skip] test PDF not found; test self-skipped");
-        return;
-    }
     let out = tempfile::NamedTempFile::new().unwrap().into_temp_path();
 
     let mut cmd = get_cmd();
@@ -207,18 +172,17 @@ fn test_cli_adjust_dates() {
 #[test]
 fn test_cli_transfer_transactions() {
     let pdf = get_test_pdf();
-    if !pdf.exists() {
-        eprintln!("[skip] test PDF not found; test self-skipped");
-        return;
-    }
     let out = tempfile::NamedTempFile::new().unwrap().into_temp_path();
 
     let mut cmd = get_cmd();
     // Use the same PDF as source and target just for testing the execution path
     cmd.arg("transfer-transactions")
-        .arg("--source-pdf").arg(&pdf)
-        .arg("--target-pdf").arg(&pdf)
-        .arg("--output").arg(out.as_os_str())
+        .arg("--source-pdf")
+        .arg(&pdf)
+        .arg("--target-pdf")
+        .arg(&pdf)
+        .arg("--output")
+        .arg(out.as_os_str())
         .assert()
         // Transfer might fail because it requires Document AI, but we ensure it runs
         .code(predicate::eq(0).or(predicate::eq(1)));
@@ -227,11 +191,6 @@ fn test_cli_transfer_transactions() {
 #[test]
 fn test_cli_run_transfer_tests() {
     let pdf = get_test_pdf();
-    if !pdf.exists() {
-        eprintln!("[skip] test PDF not found; test self-skipped");
-        return;
-    }
-
     let mut cmd = get_cmd();
     cmd.arg("run-transfer-tests")
         .arg("--statements")

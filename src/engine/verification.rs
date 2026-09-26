@@ -28,7 +28,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct VerificationReport {
     pub math_valid: bool,
     pub visual_diff_score: f64,
@@ -38,30 +38,83 @@ pub struct VerificationReport {
     /// Stage G / Item #17: the worst-scoring localized tile across all
     /// checked pages (outside the intended-edit regions). This is the value
     /// the `only_intended_changes` gate is actually computed from.
-    #[serde(default)]
     pub max_tile_score: f64,
     /// Stage G / Item #20: the worst per-edit replacement-fidelity score
     /// (how faithfully the new glyphs reproduce the original style after
     /// best-shift alignment). Higher = more drift/shape mismatch.
-    #[serde(default)]
     pub max_edit_region_score: f64,
     /// Recommendation #5: worst (minimum) perceptual SSIM across checked
     /// pages, computed outside the intended-edit regions. `1.0` = pixel-perfect
     /// structural match; lower = the page diverged structurally from the
     /// original somewhere it should not have.
-    #[serde(default = "default_min_ssim")]
     pub min_ssim: f64,
     /// Independent structural, semantic, financial, provider, and evidence
     /// outcomes. Mandatory gates must be `passed` for the overall disposition.
+    pub gates: Vec<VerificationGate>,
+}
+
+#[derive(Deserialize)]
+struct VerificationReportRaw {
+    pub math_valid: bool,
+    pub visual_diff_score: f64,
+    pub only_intended_changes: bool,
+    pub report_files: Vec<String>,
+    pub message: String,
+    #[serde(default)]
+    pub max_tile_score: f64,
+    #[serde(default)]
+    pub max_edit_region_score: f64,
+    pub min_ssim: Option<f64>,
     #[serde(default)]
     pub gates: Vec<VerificationGate>,
 }
 
-/// Serde default so reports deserialised from older runs (which lack the
-/// field) report a perfect SSIM rather than `0.0` (which would read as a
-/// catastrophic mismatch).
+impl<'de> Deserialize<'de> for VerificationReport {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = VerificationReportRaw::deserialize(deserializer)?;
+        let (min_ssim, ssim_missing) = match raw.min_ssim {
+            Some(val) => (val, false),
+            None => (default_min_ssim(), true),
+        };
+        let mut gates = raw.gates;
+        let mut only_intended_changes = raw.only_intended_changes;
+        if ssim_missing {
+            only_intended_changes = false;
+            if let Some(gate) = gates
+                .iter_mut()
+                .find(|g| g.id == "visual.perceptual_structure")
+            {
+                gate.status = VerificationGateStatus::Unavailable;
+                gate.message = "minimum SSIM was not recorded (unavailable)".to_string();
+            } else {
+                gates.push(VerificationGate::mandatory(
+                    "visual.perceptual_structure",
+                    VerificationGateStatus::Unavailable,
+                    "minimum SSIM was not recorded (unavailable)",
+                ));
+            }
+        }
+        Ok(VerificationReport {
+            math_valid: raw.math_valid,
+            visual_diff_score: raw.visual_diff_score,
+            only_intended_changes,
+            report_files: raw.report_files,
+            message: raw.message,
+            max_tile_score: raw.max_tile_score,
+            max_edit_region_score: raw.max_edit_region_score,
+            min_ssim,
+            gates,
+        })
+    }
+}
+
+/// Serde default: missing min_ssim must not read as pixel-perfect (1.0).
+/// When missing, min_ssim defaults to 0.0 and perceptual_structure gate reports Unavailable.
 fn default_min_ssim() -> f64 {
-    1.0
+    0.0
 }
 
 impl VerificationReport {
@@ -195,6 +248,14 @@ pub enum VerificationError {
     Structural(String),
     #[error("Balance error: {0}")]
     Balance(#[from] BalanceError),
+    #[error("Degenerate region: {0}")]
+    DegenerateRegion(String),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum RegionFidelityFailure {
+    Failed(String),
+    Unavailable(String),
 }
 
 pub struct MathInputs {
@@ -415,10 +476,12 @@ fn to_gray(img: &RgbaImage) -> GrayImage {
 /// Sobel-style gradient magnitude image. Glyph edges dominate the gradient,
 /// so a diff of gradient images is highly sensitive to spacing / shape
 /// changes that a flat luminance diff averages away (Item #17).
-fn gradient_magnitude(g: &GrayImage) -> GrayImage {
+fn gradient_magnitude(g: &GrayImage) -> Result<GrayImage, String> {
     let (w, h) = (g.width(), g.height());
     if w < 3 || h < 3 {
-        return GrayImage::new(w, h);
+        return Err(format!(
+            "image dimensions too small for gradient: {w}x{h} (minimum 3x3)"
+        ));
     }
     // Recommendation #3: the Sobel pass is the heaviest per-page CPU loop in
     // the verifier. Compute it row-parallel with rayon; each output row only
@@ -441,7 +504,8 @@ fn gradient_magnitude(g: &GrayImage) -> GrayImage {
                 row[x as usize] = ((gx * gx + gy * gy) as f64).sqrt().min(255.0) as u8;
             }
         });
-    GrayImage::from_raw(w, h, buf).unwrap_or_else(|| GrayImage::new(w, h))
+    GrayImage::from_raw(w, h, buf)
+        .ok_or_else(|| "failed to create gradient magnitude image buffer".to_string())
 }
 
 /// Recommendation #5 - mean Structural Similarity Index (SSIM) over two
@@ -454,18 +518,18 @@ fn gradient_magnitude(g: &GrayImage) -> GrayImage {
 /// centre lies inside any `exclude` rect (image space) are skipped so the
 /// intended edits don't drag the score down. Window evaluation is parallelised
 /// with rayon (Recommendation #3).
-fn mean_ssim(a: &GrayImage, b: &GrayImage, exclude: &[(u32, u32, u32, u32)]) -> f64 {
-    // We want to compute SSIM but completely ignore the regions in `exclude`.
-    // The `image-compare` crate computes a global SSIM map.
-    // If we mask out the exclude rects by replacing them with the exact same
-    // baseline color in BOTH images, they will perfectly match and contribute
-    // a 1.0 to the SSIM score for those regions, diluting the score (but correctly
-    // neutralizing differences inside the intended edit region).
-    // For a more accurate "outside only" score without dilution, we should
-    // compute SSIM and filter the per-pixel score map if the crate allows it.
-    // But as a robust baseline that works out-of-the-box, masking works perfectly
-    // to ensure intended edits don't cause failures.
-
+fn mean_ssim(
+    a: &GrayImage,
+    b: &GrayImage,
+    exclude: &[(u32, u32, u32, u32)],
+) -> Result<f64, String> {
+    if a.dimensions() != b.dimensions() {
+        return Err(format!(
+            "image dimensions differ for SSIM: {:?} vs {:?}",
+            a.dimensions(),
+            b.dimensions()
+        ));
+    }
     let mut masked_a = a.clone();
     let mut masked_b = b.clone();
     for &(x0, y0, x1, y1) in exclude {
@@ -479,14 +543,36 @@ fn mean_ssim(a: &GrayImage, b: &GrayImage, exclude: &[(u32, u32, u32, u32)]) -> 
         }
     }
 
-    match image_compare::gray_similarity_structure(
+    let result = image_compare::gray_similarity_structure(
         &image_compare::Algorithm::MSSIMSimple,
         &masked_a,
         &masked_b,
-    ) {
-        Ok(result) => result.score,
-        Err(_) => 1.0,
+    )
+    .map_err(|e| format!("SSIM computation error: {e:?}"))?;
+
+    if exclude.is_empty() {
+        return Ok(result.score);
     }
+
+    let sim_gray = result.image.to_color_map().into_luma8();
+    let mut sum = 0.0f64;
+    let mut count = 0u64;
+    let (w, h) = sim_gray.dimensions();
+    for y in 0..h {
+        for x in 0..w {
+            let is_excluded = exclude
+                .iter()
+                .any(|(x0, y0, x1, y1)| x >= *x0 && x < *x1 && y >= *y0 && y < *y1);
+            if !is_excluded {
+                sum += sim_gray.get_pixel(x, y)[0] as f64 / 255.0;
+                count += 1;
+            }
+        }
+    }
+    if count == 0 {
+        return Err("all image regions were excluded from SSIM comparison".to_string());
+    }
+    Ok(sum / count as f64)
 }
 
 /// Item #17: localized tile-max score over a region of two aligned gray
@@ -557,13 +643,22 @@ fn tile_max_score(
 /// (stroke style, weight, spacing rhythm) rather than raw luminance, and take
 /// the best alignment so a pure positional offset is reported as drift rather
 /// than inflating the shape residual.
-fn region_fidelity_score(orig_gray: &GrayImage, edit_gray: &GrayImage) -> (f64, i32, i32) {
-    let og = gradient_magnitude(orig_gray);
-    let eg = gradient_magnitude(edit_gray);
+fn region_fidelity_score(
+    orig_gray: &GrayImage,
+    edit_gray: &GrayImage,
+) -> Result<(f64, i32, i32), RegionFidelityFailure> {
+    let og = gradient_magnitude(orig_gray).map_err(|e| {
+        RegionFidelityFailure::Unavailable(format!("gradient calculation unavailable: {e}"))
+    })?;
+    let eg = gradient_magnitude(edit_gray).map_err(|e| {
+        RegionFidelityFailure::Unavailable(format!("gradient calculation unavailable: {e}"))
+    })?;
     let w = og.width().min(eg.width());
     let h = og.height().min(eg.height());
     if w < 4 || h < 4 {
-        return (0.0, 0, 0);
+        return Err(RegionFidelityFailure::Failed(format!(
+            "region dimensions too small ({w}x{h}, minimum 4x4)"
+        )));
     }
     let rng = 6i32;
     let mut best = f64::MAX;
@@ -596,9 +691,11 @@ fn region_fidelity_score(orig_gray: &GrayImage, edit_gray: &GrayImage) -> (f64, 
         }
     }
     if best == f64::MAX {
-        best = 0.0;
+        return Err(RegionFidelityFailure::Unavailable(
+            "no comparable interior pixels found for region alignment".to_string(),
+        ));
     }
-    (best, best_dx, best_dy)
+    Ok((best, best_dx, best_dy))
 }
 
 /// Item #18 + #20: render a single page sub-rectangle (in PDF points) at
@@ -637,7 +734,9 @@ fn render_region_gray(
     let px1 = ((x1 * scale).ceil() as u32).min(full.width());
     let py1 = ((y1 * scale).ceil() as u32).min(full.height());
     if px1 <= px0 || py1 <= py0 {
-        return Ok(GrayImage::new(1, 1));
+        return Err(VerificationError::DegenerateRegion(format!(
+            "degenerate region crop: [{px0}, {py0}, {px1}, {py1}]"
+        )));
     }
     let crop = image::imageops::crop_imm(&full, px0, py0, px1 - px0, py1 - py0).to_image();
     Ok(to_gray(&crop))
@@ -657,116 +756,155 @@ fn persist_verification_evidence(
 ) -> Result<(), VerificationError> {
     let report_path = output_dir.join("verification_report.json");
     let evidence_path = output_dir.join("verification_evidence.json");
-    let rendered_artifacts = report
-        .report_files
-        .iter()
-        .map(PathBuf::from)
-        .filter(|path| path.is_file())
-        .map(|path| {
-            let bytes = std::fs::read(&path).map_err(|error| {
-                VerificationError::Evidence(format!(
-                    "cannot read rendered evidence {}: {error}",
-                    path.display()
-                ))
-            })?;
-            Ok(VerificationArtifact {
-                path: path.to_string_lossy().into_owned(),
-                sha256: crate::engine::workflow::sha256_hex_of(&bytes),
-                bytes: bytes.len() as u64,
-            })
-        })
-        .collect::<Result<Vec<_>, VerificationError>>()?;
-    for path in [&report_path, &evidence_path] {
-        let rendered = path.to_string_lossy().into_owned();
-        if !report.report_files.contains(&rendered) {
-            report.report_files.push(rendered);
+    let res = (|| -> Result<(), VerificationError> {
+        // Speculatively mark persistence gate passed for serialization and readback validation
+        if let Some(gate) = report
+            .gates
+            .iter_mut()
+            .find(|g| g.id == "evidence.persistence")
+        {
+            gate.status = VerificationGateStatus::Passed;
+            gate.message =
+                "report and replay evidence are atomically persisted and read back before return"
+                    .to_string();
         }
-    }
 
-    let hash_file = |path: &Path| -> Result<String, VerificationError> {
-        let bytes = std::fs::read(path).map_err(|error| {
-            VerificationError::Hash(format!("cannot read {}: {error}", path.display()))
-        })?;
-        Ok(crate::engine::workflow::sha256_hex_of(&bytes))
-    };
-    let disposition = if report.mandatory_local_pass() {
-        VerificationDisposition::Passed
-    } else {
-        VerificationDisposition::Failed
-    };
-    let package = VerificationEvidencePackage {
-        schema_version: VERIFICATION_EVIDENCE_SCHEMA,
-        verifier_version: env!("CARGO_PKG_VERSION").to_string(),
-        disposition,
-        original_sha256: hash_file(original)?,
-        edited_sha256: hash_file(edited)?,
-        config: VerificationConfigSnapshot {
-            policy_id: VERIFICATION_POLICY_ID.to_string(),
-            calibration_manifest_sha256: crate::engine::workflow::sha256_hex_of(
-                VERIFICATION_CALIBRATION_MANIFEST,
-            ),
-            auto_match_dpi,
-            default_dpi: 300.0,
-            auto_match_target_width_px: 2400.0,
-            visual_diff_threshold: VISUAL_DIFF_THRESHOLD,
-            ssim_failure_floor: SSIM_FAILURE_FLOOR,
-            edit_region_failure_threshold: EDIT_REGION_FAILURE_THRESHOLD,
-            edit_region_dpi: EDIT_REGION_DPI,
-            tile_px: TILE_PX,
-            mask_padding_pts,
-            checked_pages: only_pages.map(ToOwned::to_owned),
-            intended_bboxes: intended_bboxes.to_vec(),
-            intended_edits: intended_edits.to_vec(),
-            renderer: "Pdfium pinned render configuration; LCD text disabled; text/path/image smoothing enabled".into(),
-        },
-        artifacts: rendered_artifacts,
-        report: report.clone(),
-    };
+        let rendered_artifacts = report
+            .report_files
+            .iter()
+            .map(PathBuf::from)
+            .filter(|path| path.is_file())
+            .map(|path| {
+                let bytes = std::fs::read(&path).map_err(|error| {
+                    VerificationError::Evidence(format!(
+                        "cannot read rendered evidence {}: {error}",
+                        path.display()
+                    ))
+                })?;
+                Ok(VerificationArtifact {
+                    path: path.to_string_lossy().into_owned(),
+                    sha256: crate::engine::workflow::sha256_hex_of(&bytes),
+                    bytes: bytes.len() as u64,
+                })
+            })
+            .collect::<Result<Vec<_>, VerificationError>>()?;
+        for path in [&report_path, &evidence_path] {
+            let rendered = path.to_string_lossy().into_owned();
+            if !report.report_files.contains(&rendered) {
+                report.report_files.push(rendered);
+            }
+        }
 
-    let report_json = serde_json::to_vec_pretty(report)
-        .map_err(|error| VerificationError::Evidence(format!("serialize report: {error}")))?;
-    let evidence_json = serde_json::to_vec_pretty(&package)
-        .map_err(|error| VerificationError::Evidence(format!("serialize evidence: {error}")))?;
+        let hash_file = |path: &Path| -> Result<String, VerificationError> {
+            let bytes = std::fs::read(path).map_err(|error| {
+                VerificationError::Hash(format!("cannot read {}: {error}", path.display()))
+            })?;
+            Ok(crate::engine::workflow::sha256_hex_of(&bytes))
+        };
+        let disposition = if report.mandatory_local_pass() {
+            VerificationDisposition::Passed
+        } else {
+            VerificationDisposition::Failed
+        };
+        let package = VerificationEvidencePackage {
+            schema_version: VERIFICATION_EVIDENCE_SCHEMA,
+            verifier_version: env!("CARGO_PKG_VERSION").to_string(),
+            disposition,
+            original_sha256: hash_file(original)?,
+            edited_sha256: hash_file(edited)?,
+            config: VerificationConfigSnapshot {
+                policy_id: VERIFICATION_POLICY_ID.to_string(),
+                calibration_manifest_sha256: crate::engine::workflow::sha256_hex_of(
+                    VERIFICATION_CALIBRATION_MANIFEST,
+                ),
+                auto_match_dpi,
+                default_dpi: 300.0,
+                auto_match_target_width_px: 2400.0,
+                visual_diff_threshold: VISUAL_DIFF_THRESHOLD,
+                ssim_failure_floor: SSIM_FAILURE_FLOOR,
+                edit_region_failure_threshold: EDIT_REGION_FAILURE_THRESHOLD,
+                edit_region_dpi: EDIT_REGION_DPI,
+                tile_px: TILE_PX,
+                mask_padding_pts,
+                checked_pages: only_pages.map(ToOwned::to_owned),
+                intended_bboxes: intended_bboxes.to_vec(),
+                intended_edits: intended_edits.to_vec(),
+                renderer: "Pdfium pinned render configuration; LCD text disabled; text/path/image smoothing enabled".into(),
+            },
+            artifacts: rendered_artifacts,
+            report: report.clone(),
+        };
 
-    let mut staged_report = tempfile::NamedTempFile::new_in(output_dir)?;
-    staged_report.write_all(&report_json)?;
-    staged_report.flush()?;
-    staged_report.as_file().sync_all()?;
-    let mut staged_evidence = tempfile::NamedTempFile::new_in(output_dir)?;
-    staged_evidence.write_all(&evidence_json)?;
-    staged_evidence.flush()?;
-    staged_evidence.as_file().sync_all()?;
+        let report_json = serde_json::to_vec_pretty(report)
+            .map_err(|error| VerificationError::Evidence(format!("serialize report: {error}")))?;
+        let evidence_json = serde_json::to_vec_pretty(&package)
+            .map_err(|error| VerificationError::Evidence(format!("serialize evidence: {error}")))?;
 
-    let mut barrier = crate::app::commit::FileCommitBarrier::new();
-    barrier.publish(staged_report.path(), &report_path)?;
-    barrier.publish(staged_evidence.path(), &evidence_path)?;
+        let mut staged_report = tempfile::NamedTempFile::new_in(output_dir)?;
+        staged_report.write_all(&report_json)?;
+        staged_report.flush()?;
+        staged_report.as_file().sync_all()?;
+        let mut staged_evidence = tempfile::NamedTempFile::new_in(output_dir)?;
+        staged_evidence.write_all(&evidence_json)?;
+        staged_evidence.flush()?;
+        staged_evidence.as_file().sync_all()?;
 
-    let persisted_report: VerificationReport =
-        serde_json::from_slice(&std::fs::read(&report_path).map_err(|error| {
-            VerificationError::Evidence(format!("read back {}: {error}", report_path.display()))
-        })?)
-        .map_err(|error| {
-            VerificationError::Evidence(format!("decode persisted report: {error}"))
-        })?;
-    let persisted_evidence: VerificationEvidencePackage =
-        serde_json::from_slice(&std::fs::read(&evidence_path).map_err(|error| {
-            VerificationError::Evidence(format!("read back {}: {error}", evidence_path.display()))
-        })?)
-        .map_err(|error| {
-            VerificationError::Evidence(format!("decode persisted evidence: {error}"))
-        })?;
-    if persisted_report.mandatory_local_pass() != report.mandatory_local_pass()
-        || persisted_evidence.disposition != disposition
-        || persisted_evidence.original_sha256 != package.original_sha256
-        || persisted_evidence.edited_sha256 != package.edited_sha256
-        || persisted_evidence.artifacts != package.artifacts
+        let mut barrier = crate::app::commit::FileCommitBarrier::new();
+        barrier.publish(staged_report.path(), &report_path)?;
+        barrier.publish(staged_evidence.path(), &evidence_path)?;
+
+        let persisted_report: VerificationReport =
+            serde_json::from_slice(&std::fs::read(&report_path).map_err(|error| {
+                VerificationError::Evidence(format!("read back {}: {error}", report_path.display()))
+            })?)
+            .map_err(|error| {
+                VerificationError::Evidence(format!("decode persisted report: {error}"))
+            })?;
+        let persisted_evidence: VerificationEvidencePackage =
+            serde_json::from_slice(&std::fs::read(&evidence_path).map_err(|error| {
+                VerificationError::Evidence(format!(
+                    "read back {}: {error}",
+                    evidence_path.display()
+                ))
+            })?)
+            .map_err(|error| {
+                VerificationError::Evidence(format!("decode persisted evidence: {error}"))
+            })?;
+        if persisted_report.mandatory_local_pass() != report.mandatory_local_pass()
+            || persisted_evidence.disposition != disposition
+            || persisted_evidence.original_sha256 != package.original_sha256
+            || persisted_evidence.edited_sha256 != package.edited_sha256
+            || persisted_evidence.artifacts != package.artifacts
+        {
+            return Err(VerificationError::Evidence(
+                "persisted evidence readback does not match the verified run".into(),
+            ));
+        }
+        barrier.commit();
+        Ok(())
+    })();
+
+    if let Err(ref e) = res {
+        if let Some(gate) = report
+            .gates
+            .iter_mut()
+            .find(|g| g.id == "evidence.persistence")
+        {
+            gate.status = VerificationGateStatus::Failed;
+            gate.message = format!("evidence persistence failed: {e}");
+        }
+    } else if let Some(gate) = report
+        .gates
+        .iter_mut()
+        .find(|g| g.id == "evidence.persistence")
     {
-        return Err(VerificationError::Evidence(
-            "persisted evidence readback does not match the verified run".into(),
-        ));
+        gate.status = VerificationGateStatus::Passed;
+        gate.message =
+            "report and replay evidence are atomically persisted and read back before return"
+                .to_string();
     }
-    barrier.commit();
-    Ok(())
+
+    res
 }
 
 pub async fn verify_edit(
@@ -999,6 +1137,10 @@ async fn verify_edit_pages_with_intents_and_padding(
     let mut legacy_pixel_score: f64 = 0.0;
     // Recommendation #5: track the worst (minimum) perceptual SSIM across pages.
     let mut min_ssim: f64 = 1.0;
+    let mut outside_regions_unavailable_messages = Vec::new();
+    let mut ssim_unavailable_messages = Vec::new();
+    let mut edit_region_failed_messages = Vec::new();
+    let mut edit_region_unavailable_messages = Vec::new();
 
     for i in 0..original_len {
         let page_idx = i as u16;
@@ -1035,7 +1177,6 @@ async fn verify_edit_pages_with_intents_and_padding(
             .map_err(|e| VerificationError::PdfiumRender(e.to_string()))?
             .as_image()
             .to_rgba8();
-
         let e_img = edited_page
             .render_with_config(&render_config)
             .map_err(|e| VerificationError::PdfiumRender(e.to_string()))?
@@ -1080,20 +1221,28 @@ async fn verify_edit_pages_with_intents_and_padding(
         let edit_gray = to_gray(&edited_img);
         let orig_grad = gradient_magnitude(&orig_gray);
         let edit_grad = gradient_magnitude(&edit_gray);
-        let page_tile_score = tile_max_score(
-            &orig_gray,
-            &edit_gray,
-            &orig_grad,
-            &edit_grad,
-            &exclude_rects,
-        );
-        max_tile_score = max_tile_score.max(page_tile_score);
+        match (orig_grad, edit_grad) {
+            (Ok(og), Ok(eg)) => {
+                let page_tile_score =
+                    tile_max_score(&orig_gray, &edit_gray, &og, &eg, &exclude_rects);
+                max_tile_score = max_tile_score.max(page_tile_score);
+            }
+            (Err(e), _) | (_, Err(e)) => {
+                outside_regions_unavailable_messages.push(e);
+            }
+        }
 
         // Recommendation #5: perceptual SSIM on the same grayscale buffers,
         // skipping the intended-edit regions. This is the trustworthy
         // "does the rest of the page still look identical?" signal.
-        let page_ssim = mean_ssim(&orig_gray, &edit_gray, &exclude_rects);
-        min_ssim = min_ssim.min(page_ssim);
+        match mean_ssim(&orig_gray, &edit_gray, &exclude_rects) {
+            Ok(page_ssim) => {
+                min_ssim = min_ssim.min(page_ssim);
+            }
+            Err(e) => {
+                ssim_unavailable_messages.push(e);
+            }
+        }
 
         // Optional provider evidence is explicit and never overrides mandatory
         // local structural or visual gates.
@@ -1150,17 +1299,27 @@ async fn verify_edit_pages_with_intents_and_padding(
         let normalised_hamming = hash1.dist(&hash2) as f64 / 256.0;
 
         let mut total_diff: u64 = 0;
+        let mut unmasked_pixel_count: u64 = 0;
         let mut diff_img = RgbaImage::new(original_img.width(), original_img.height());
         for (x, y, p1) in masked_o.enumerate_pixels() {
-            let p2 = masked_e.get_pixel(x, y);
-            let r_diff = (p1[0] as i16 - p2[0] as i16).unsigned_abs() as u8;
-            let g_diff = (p1[1] as i16 - p2[1] as i16).unsigned_abs() as u8;
-            let b_diff = (p1[2] as i16 - p2[2] as i16).unsigned_abs() as u8;
-            total_diff += (r_diff as u64) + (g_diff as u64) + (b_diff as u64);
-            diff_img.put_pixel(x, y, image::Rgba([r_diff, g_diff, b_diff, 255]));
+            let is_excluded = exclude_rects
+                .iter()
+                .any(|(x0, y0, x1, y1)| x >= *x0 && x < *x1 && y >= *y0 && y < *y1);
+            if !is_excluded {
+                let p2 = masked_e.get_pixel(x, y);
+                let r_diff = (p1[0] as i16 - p2[0] as i16).unsigned_abs() as u8;
+                let g_diff = (p1[1] as i16 - p2[1] as i16).unsigned_abs() as u8;
+                let b_diff = (p1[2] as i16 - p2[2] as i16).unsigned_abs() as u8;
+                total_diff += (r_diff as u64) + (g_diff as u64) + (b_diff as u64);
+                diff_img.put_pixel(x, y, image::Rgba([r_diff, g_diff, b_diff, 255]));
+                unmasked_pixel_count += 1;
+            }
         }
-        let pixel_count = original_img.width() as u64 * original_img.height() as u64;
-        let normalised_pixel_diff = total_diff as f64 / (255.0 * 3.0 * pixel_count.max(1) as f64);
+        let normalised_pixel_diff = if unmasked_pixel_count > 0 {
+            total_diff as f64 / (255.0 * 3.0 * unmasked_pixel_count as f64)
+        } else {
+            0.0
+        };
         legacy_pixel_score = legacy_pixel_score.max(normalised_hamming.max(normalised_pixel_diff));
 
         let diff_png_path = output_dir.join(format!("visual_diff_p{}_300dpi.png", i + 1));
@@ -1179,11 +1338,24 @@ async fn verify_edit_pages_with_intents_and_padding(
             if *page != i {
                 continue;
             }
-            let o_region =
-                render_region_gray(&original_doc, page_idx, *bbox, 3.0, EDIT_REGION_DPI)?;
-            let e_region = render_region_gray(&edited_doc, page_idx, *bbox, 3.0, EDIT_REGION_DPI)?;
-            let (score, _dx, _dy) = region_fidelity_score(&o_region, &e_region);
-            max_edit_region_score = max_edit_region_score.max(score);
+            let o_res = render_region_gray(&original_doc, page_idx, *bbox, 3.0, EDIT_REGION_DPI);
+            let e_res = render_region_gray(&edited_doc, page_idx, *bbox, 3.0, EDIT_REGION_DPI);
+            match (o_res, e_res) {
+                (Ok(o_region), Ok(e_region)) => match region_fidelity_score(&o_region, &e_region) {
+                    Ok((score, _dx, _dy)) => {
+                        max_edit_region_score = max_edit_region_score.max(score);
+                    }
+                    Err(RegionFidelityFailure::Failed(msg)) => {
+                        edit_region_failed_messages.push(msg);
+                    }
+                    Err(RegionFidelityFailure::Unavailable(msg)) => {
+                        edit_region_unavailable_messages.push(msg);
+                    }
+                },
+                (Err(e), _) | (_, Err(e)) => {
+                    edit_region_failed_messages.push(e.to_string());
+                }
+            }
         }
     }
 
@@ -1191,14 +1363,74 @@ async fn verify_edit_pages_with_intents_and_padding(
     drop(original_doc);
     drop(edited_doc);
 
-    // Item #17 + Recommendation #5: the gate is the worst localized tile
-    // OUTSIDE intended edits, AND a catastrophic-mismatch floor on perceptual
-    // SSIM. The SSIM floor is intentionally lenient (it only trips when a page
-    // diverges structurally far beyond a faithful edit) so it strengthens the
-    // gate against gross corruption/blank-page renders without flipping the
-    // many legitimately-passing edits the tile gate already accepts.
-    let only_intended_changes =
-        max_tile_score < VISUAL_DIFF_THRESHOLD && min_ssim >= SSIM_FAILURE_FLOOR;
+    // Gate construction and fail-close determinations
+    let outside_status = if !outside_regions_unavailable_messages.is_empty() {
+        VerificationGateStatus::Unavailable
+    } else if max_tile_score < VISUAL_DIFF_THRESHOLD {
+        VerificationGateStatus::Passed
+    } else {
+        VerificationGateStatus::Failed
+    };
+    let outside_message = if !outside_regions_unavailable_messages.is_empty() {
+        format!(
+            "outside-region verification unavailable: {}",
+            outside_regions_unavailable_messages.join("; ")
+        )
+    } else {
+        format!("worst outside-region tile score={max_tile_score:.6}, threshold={VISUAL_DIFF_THRESHOLD:.6}")
+    };
+
+    let ssim_status = if !ssim_unavailable_messages.is_empty() {
+        VerificationGateStatus::Unavailable
+    } else if min_ssim >= SSIM_FAILURE_FLOOR {
+        VerificationGateStatus::Passed
+    } else {
+        VerificationGateStatus::Failed
+    };
+    let ssim_message = if !ssim_unavailable_messages.is_empty() {
+        format!(
+            "SSIM calculation unavailable: {}",
+            ssim_unavailable_messages.join("; ")
+        )
+    } else {
+        format!("minimum SSIM={min_ssim:.6}, floor={SSIM_FAILURE_FLOOR:.6}")
+    };
+
+    let intended_region_status = if intended_bboxes.is_empty() {
+        VerificationGateStatus::NotApplicable
+    } else if !edit_region_failed_messages.is_empty() {
+        VerificationGateStatus::Failed
+    } else if !edit_region_unavailable_messages.is_empty() {
+        VerificationGateStatus::Unavailable
+    } else if max_edit_region_score < EDIT_REGION_FAILURE_THRESHOLD {
+        VerificationGateStatus::Passed
+    } else {
+        VerificationGateStatus::Failed
+    };
+    let intended_region_message = if intended_bboxes.is_empty() {
+        "no intended edit regions were supplied".to_string()
+    } else if !edit_region_failed_messages.is_empty() {
+        format!(
+            "edit region verification failed: {}",
+            edit_region_failed_messages.join("; ")
+        )
+    } else if !edit_region_unavailable_messages.is_empty() {
+        format!(
+            "edit region verification unavailable: {}",
+            edit_region_unavailable_messages.join("; ")
+        )
+    } else {
+        format!(
+            "maximum edit-region residual={max_edit_region_score:.6}, threshold={EDIT_REGION_FAILURE_THRESHOLD:.6}"
+        )
+    };
+
+    let only_intended_changes = outside_status == VerificationGateStatus::Passed
+        && ssim_status == VerificationGateStatus::Passed
+        && matches!(
+            intended_region_status,
+            VerificationGateStatus::Passed | VerificationGateStatus::NotApplicable
+        );
     // Report number favours the most sensitive signal we computed.
     let max_visual_score = max_tile_score.max(legacy_pixel_score);
 
@@ -1217,41 +1449,25 @@ async fn verify_edit_pages_with_intents_and_padding(
     let mut gates = structural_gates;
     gates.push(VerificationGate::mandatory(
         "visual.outside_intended_regions",
-        if max_tile_score < VISUAL_DIFF_THRESHOLD {
-            VerificationGateStatus::Passed
-        } else {
-            VerificationGateStatus::Failed
-        },
-        format!(
-            "worst outside-region tile score={max_tile_score:.6}, threshold={VISUAL_DIFF_THRESHOLD:.6}"
-        ),
+        outside_status,
+        outside_message,
     ));
     gates.push(VerificationGate::mandatory(
         "visual.perceptual_structure",
-        if min_ssim >= SSIM_FAILURE_FLOOR {
-            VerificationGateStatus::Passed
-        } else {
-            VerificationGateStatus::Failed
-        },
-        format!("minimum SSIM={min_ssim:.6}, floor={SSIM_FAILURE_FLOOR:.6}"),
+        ssim_status,
+        ssim_message,
     ));
     gates.push(if intended_bboxes.is_empty() {
         VerificationGate::optional(
             "visual.intended_region_fidelity",
-            VerificationGateStatus::NotApplicable,
-            "no intended edit regions were supplied",
+            intended_region_status,
+            intended_region_message,
         )
     } else {
         VerificationGate::mandatory(
             "visual.intended_region_fidelity",
-            if max_edit_region_score < EDIT_REGION_FAILURE_THRESHOLD {
-                VerificationGateStatus::Passed
-            } else {
-                VerificationGateStatus::Failed
-            },
-            format!(
-                "maximum edit-region residual={max_edit_region_score:.6}, threshold={EDIT_REGION_FAILURE_THRESHOLD:.6}"
-            ),
+            intended_region_status,
+            intended_region_message,
         )
     });
     gates.push(VerificationGate {
@@ -1301,8 +1517,8 @@ async fn verify_edit_pages_with_intents_and_padding(
     ));
     gates.push(VerificationGate::mandatory(
         "evidence.persistence",
-        VerificationGateStatus::Passed,
-        "report and replay evidence are atomically persisted and read back before return",
+        VerificationGateStatus::Failed,
+        "evidence persistence pending verification",
     ));
 
     let mandatory_disposition = if gates
@@ -1344,7 +1560,7 @@ async fn verify_edit_pages_with_intents_and_padding(
         min_ssim,
         gates,
     };
-    persist_verification_evidence(
+    if let Err(e) = persist_verification_evidence(
         original,
         edited,
         output_dir,
@@ -1354,7 +1570,17 @@ async fn verify_edit_pages_with_intents_and_padding(
         mask_padding_pts,
         auto_match_dpi,
         &mut report,
-    )?;
+    ) {
+        if let Some(gate) = report
+            .gates
+            .iter_mut()
+            .find(|g| g.id == "evidence.persistence")
+        {
+            gate.status = VerificationGateStatus::Failed;
+            gate.message = format!("evidence persistence failed: {e}");
+        }
+        return Err(e);
+    }
     Ok(report)
 }
 
@@ -1509,8 +1735,8 @@ mod stage_g_tests {
         let orig = img_with_block(w, h, Some((100, 100, 130, 140)));
         let edited = img_with_block(w, h, Some((104, 100, 134, 140)));
 
-        let orig_grad = gradient_magnitude(&orig);
-        let edit_grad = gradient_magnitude(&edited);
+        let orig_grad = gradient_magnitude(&orig).unwrap();
+        let edit_grad = gradient_magnitude(&edited).unwrap();
 
         // Whole-page average luminance diff - the OLD gate signal.
         let mut total = 0u64;
@@ -1545,8 +1771,8 @@ mod stage_g_tests {
         let h = 400;
         let orig = img_with_block(w, h, Some((100, 100, 130, 140)));
         let edited = img_with_block(w, h, Some((104, 100, 134, 140)));
-        let orig_grad = gradient_magnitude(&orig);
-        let edit_grad = gradient_magnitude(&edited);
+        let orig_grad = gradient_magnitude(&orig).unwrap();
+        let edit_grad = gradient_magnitude(&edited).unwrap();
 
         // Exclude a generous box around the change.
         let exclude = vec![rect_around(80, 80, 160, 160)];
@@ -1566,7 +1792,7 @@ mod stage_g_tests {
         // Two identical "glyph" crops.
         let a = img_with_block(w, h, Some((40, 30, 60, 60)));
         let b = img_with_block(w, h, Some((40, 30, 60, 60)));
-        let (score_same, dx, dy) = region_fidelity_score(&a, &b);
+        let (score_same, dx, dy) = region_fidelity_score(&a, &b).unwrap();
         assert!(
             score_same < 0.01,
             "identical regions ~0 (got {score_same:.5})"
@@ -1575,7 +1801,7 @@ mod stage_g_tests {
 
         // A much heavier stroke (wrong weight) should score worse than identical.
         let heavy = img_with_block(w, h, Some((38, 28, 64, 62)));
-        let (score_heavy, _, _) = region_fidelity_score(&a, &heavy);
+        let (score_heavy, _, _) = region_fidelity_score(&a, &heavy).unwrap();
         assert!(
             score_heavy > score_same,
             "wrong-weight glyph must score worse ({score_heavy:.5} > {score_same:.5})"
@@ -1590,7 +1816,7 @@ mod stage_g_tests {
         let h = 80;
         let a = img_with_block(w, h, Some((40, 30, 60, 60)));
         let shifted = img_with_block(w, h, Some((43, 30, 63, 60)));
-        let (score, dx, _dy) = region_fidelity_score(&a, &shifted);
+        let (score, dx, _dy) = region_fidelity_score(&a, &shifted).unwrap();
         assert!(
             dx != 0 || score < 0.02,
             "translation should be recovered by alignment (dx={dx}, score={score:.5})"
@@ -1605,7 +1831,7 @@ mod stage_g_tests {
     #[test]
     fn ssim_identical_images_returns_one() {
         let a = GrayImage::from_pixel(200, 200, Luma([128]));
-        let score = mean_ssim(&a, &a, &[]);
+        let score = mean_ssim(&a, &a, &[]).unwrap();
         assert!(
             score > 0.999,
             "SSIM of identical images should be ~1.0 (got {score:.6})"
@@ -1619,7 +1845,7 @@ mod stage_g_tests {
     fn ssim_blank_vs_content_is_very_low() {
         let white = GrayImage::from_pixel(200, 200, Luma([255]));
         let black = GrayImage::from_pixel(200, 200, Luma([0]));
-        let score = mean_ssim(&white, &black, &[]);
+        let score = mean_ssim(&white, &black, &[]).unwrap();
         assert!(
             score < SSIM_FAILURE_FLOOR,
             "SSIM of white vs black should be below {SSIM_FAILURE_FLOOR} (got {score:.6})"
@@ -1634,9 +1860,9 @@ mod stage_g_tests {
         let a = img_with_block(w, h, None);
         let b = img_with_block(w, h, Some((50, 50, 100, 100)));
         // Without exclusion the block difference drags SSIM down.
-        let without = mean_ssim(&a, &b, &[]);
+        let without = mean_ssim(&a, &b, &[]).unwrap();
         // With the block excluded, the rest is identical -> SSIM ≈ 1.0.
-        let with_exclusion = mean_ssim(&a, &b, &[(50, 50, 100, 100)]);
+        let with_exclusion = mean_ssim(&a, &b, &[(50, 50, 100, 100)]).unwrap();
         assert!(
             with_exclusion > without,
             "Excluding the diff region should raise SSIM (without={without:.4}, with={with_exclusion:.4})"
@@ -1704,5 +1930,105 @@ mod stage_g_tests {
             ],
         };
         assert!(report.mandatory_local_pass());
+    }
+
+    #[test]
+    fn site1_mean_ssim_dimension_mismatch_returns_unavailable_error() {
+        let a = GrayImage::new(100, 100);
+        let b = GrayImage::new(120, 100);
+        let res = mean_ssim(&a, &b, &[]);
+        assert!(res.is_err());
+        assert!(res.unwrap_err().contains("image dimensions differ"));
+    }
+
+    #[test]
+    fn site2_gradient_magnitude_small_dim_returns_unavailable_error() {
+        let small = GrayImage::new(2, 2);
+        let res = gradient_magnitude(&small);
+        assert!(res.is_err());
+        assert!(res.unwrap_err().contains("too small for gradient"));
+    }
+
+    #[test]
+    fn site3_region_fidelity_nomatch_returns_unavailable() {
+        // Dimensions 10x10 are >= 4, but with rng=6, rng..(h-rng) has no iterations,
+        // so best remains f64::MAX and returns Unavailable rather than 0.0
+        let a = GrayImage::new(10, 10);
+        let b = GrayImage::new(10, 10);
+        let res = region_fidelity_score(&a, &b);
+        assert_eq!(
+            res,
+            Err(RegionFidelityFailure::Unavailable(
+                "no comparable interior pixels found for region alignment".to_string()
+            ))
+        );
+    }
+
+    #[test]
+    fn site4_region_fidelity_small_dim_returns_failed() {
+        // Dimensions < 4x4 return Failed rather than (0.0, 0, 0)
+        let a = GrayImage::new(3, 3);
+        let b = GrayImage::new(3, 3);
+        let res = region_fidelity_score(&a, &b);
+        assert!(matches!(res, Err(RegionFidelityFailure::Failed(_))));
+    }
+
+    #[test]
+    fn site7_deserializing_report_missing_min_ssim_reports_unavailable() {
+        let json = r#"{
+            "math_valid": true,
+            "visual_diff_score": 0.0,
+            "only_intended_changes": true,
+            "report_files": [],
+            "message": "",
+            "max_tile_score": 0.0,
+            "max_edit_region_score": 0.0,
+            "gates": [
+                {
+                    "id": "visual.outside_intended_regions",
+                    "mandatory": true,
+                    "status": "passed",
+                    "message": "passed"
+                }
+            ]
+        }"#;
+        let report: VerificationReport = serde_json::from_str(json).unwrap();
+        // Must NOT read as pixel-perfect (1.0)
+        assert_eq!(report.min_ssim, 0.0);
+        assert!(!report.only_intended_changes);
+        assert!(!report.mandatory_local_pass());
+        let gate = report
+            .gates
+            .iter()
+            .find(|g| g.id == "visual.perceptual_structure")
+            .expect("perceptual_structure gate must be injected when min_ssim is missing");
+        assert_eq!(gate.status, VerificationGateStatus::Unavailable);
+    }
+
+    #[test]
+    fn mask_dilution_proof_more_masked_regions_does_not_score_higher() {
+        let w = 200;
+        let h = 200;
+        let a = img_with_block(w, h, None);
+        let b = img_with_block(w, h, Some((10, 10, 30, 30)));
+        let base = mean_ssim(&a, &b, &[]).unwrap();
+        let clean = mean_ssim(&a, &b, &[(10, 10, 30, 30)]).unwrap();
+        assert!(clean > base);
+
+        // Many additional masks placed across identical white areas must NOT dilute
+        // the remaining score upwards
+        let many_excludes = vec![
+            (10, 10, 30, 30),
+            (50, 50, 70, 70),
+            (80, 80, 100, 100),
+            (110, 110, 130, 130),
+            (140, 140, 160, 160),
+            (170, 170, 190, 190),
+        ];
+        let score_many = mean_ssim(&a, &b, &many_excludes).unwrap();
+        assert!(
+            score_many <= clean + 1e-4,
+            "score with many masks ({score_many:.6}) must not exceed clean score ({clean:.6})"
+        );
     }
 }

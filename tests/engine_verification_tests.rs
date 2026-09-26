@@ -120,6 +120,61 @@ async fn test_verify_edit_pages_identical() {
         report.only_intended_changes
     );
     assert!(dir.path().join("verification_report.json").is_file());
+    let persistence_gate = report
+        .gates
+        .iter()
+        .find(|g| g.id == "evidence.persistence")
+        .expect("evidence.persistence gate must be present");
+    assert_eq!(
+        persistence_gate.status,
+        dual_core_pdf_pipeline::engine::verification::VerificationGateStatus::Passed
+    );
+}
+
+#[tokio::test]
+async fn test_verify_edit_pages_degenerate_region_fails_gate() {
+    let dir = tempfile::tempdir().unwrap();
+    let orig = dir.path().join("orig_degen.pdf");
+    let edited = dir.path().join("edited_degen.pdf");
+
+    create_simple_pdf(&orig, &[("100.00", 50.0, 700.0)]);
+    create_simple_pdf(&edited, &[("100.00", 50.0, 700.0)]);
+
+    let math = MathInputs {
+        transactions: vec![],
+        expected_transactions: None,
+        opening_balance: dec!(0.0),
+        expected_final_balance: None,
+        required: false,
+    };
+
+    // Degenerate bounding box where x0 > x1
+    let degenerate_bbox = [100.0, 100.0, 50.0, 50.0];
+
+    let report = verify_edit_pages(
+        &orig,
+        &edited,
+        dir.path(),
+        &[(0, degenerate_bbox)],
+        math,
+        None,
+        false,
+        None,
+    )
+    .await
+    .expect("Verification should execute and return report");
+
+    let gate = report
+        .gates
+        .iter()
+        .find(|g| g.id == "visual.intended_region_fidelity")
+        .expect("intended_region_fidelity gate must exist");
+    assert_eq!(
+        gate.status,
+        dual_core_pdf_pipeline::engine::verification::VerificationGateStatus::Failed
+    );
+    assert!(!report.mandatory_local_pass());
+    assert!(!report.only_intended_changes);
 }
 
 #[tokio::test]

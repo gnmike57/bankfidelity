@@ -109,6 +109,15 @@ jobs:
           $Manifest = Get-Content "$Root/bundle-manifest.json" -Raw | ConvertFrom-Json
           if ($Manifest.platform -ne "windows-x86_64") { throw "wrong platform" }
 
+      - name: Build MSI Installer
+        shell: pwsh
+        run: |
+          Expand-Archive wix.zip -DestinationPath wix_bin -Force
+          $env:PATH += ";$PWD\wix_bin"
+          $Version = (Get-Content Cargo.toml | Select-String '^version\s*=\s*"(.*?)"$').Matches.Groups[1].Value
+          candle.exe -arch x64 wix/main.wxs -dVersion=$Version -dCargoTargetBinDir=target/release
+          light.exe -ext WixUIExtension main.wixobj -o "target/release/artifacts/BankStatementFidelityEditor-$Version-windows-x86_64.msi"
+
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
@@ -116,6 +125,7 @@ jobs:
           path: |
             target/release/artifacts/BankStatementFidelityEditor-*-windows-x86_64.zip
             target/release/artifacts/BankStatementFidelityEditor-*-windows-x86_64.zip.sha256
+            target/release/artifacts/BankStatementFidelityEditor-*-windows-x86_64.msi
           if-no-files-found: error
           compression-level: 0
 
@@ -151,6 +161,7 @@ jobs:
           files: |
             release-artifacts/**/*.zip
             release-artifacts/**/*.tar.gz
+            release-artifacts/**/*.msi
             release-artifacts/**/*.sha256
           body: |
             ## BankFidelity ${{ steps.tag.outputs.tag }}
@@ -162,7 +173,8 @@ jobs:
             | Platform | File |
             | :--- | :--- |
             | **macOS (Apple Silicon)** | `BankStatementFidelityEditor-*-macos-aarch64.tar.gz` |
-            | **Windows (x64)** | `BankStatementFidelityEditor-*-windows-x86_64.zip` |
+            | **Windows (x64) Portable** | `BankStatementFidelityEditor-*-windows-x86_64.zip` |
+            | **Windows (x64) Installer** | `BankStatementFidelityEditor-*-windows-x86_64.msi` |
 
             ### Supported Banks
             ANZ · Bankwest · CommBank · ING · Macquarie · NAB · Westpac

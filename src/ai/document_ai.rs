@@ -2146,6 +2146,7 @@ mod tests {
             adc_path: "".into(),
             gcs_output_uri: "".into(),
             passphrase: "".into(),
+            default_processor_version: "".into(),
         });
 
         let res = DocumentAiClient::from_app_config(&cfg);

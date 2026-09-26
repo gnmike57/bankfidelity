@@ -1,8 +1,9 @@
-use crate::app::gui::{ActiveModal, MyApp, Theme, ToastKind};
+use crate::app::gui::state::{
+    is_supported_font_path, ActiveModal, AppModals, CommandPalette, MyApp, Theme, ToastKind,
+};
 use crate::app::runtime::Job;
 use egui_plot::{Line, Plot};
 use std::path::PathBuf;
-
 fn capability_selectable_value<T: PartialEq>(
     ui: &mut egui::Ui,
     current: &mut T,
@@ -20,10 +21,6 @@ fn capability_selectable_value<T: PartialEq>(
     if !enabled {
         response.on_hover_text(reason);
     }
-}
-
-pub trait CommandPalette {
-    fn draw_command_palette(&mut self, ctx: &egui::Context);
 }
 
 impl CommandPalette for MyApp {
@@ -99,24 +96,6 @@ impl CommandPalette for MyApp {
             self.active_modal = ActiveModal::None;
         }
     }
-}
-
-#[allow(dead_code)]
-pub(crate) trait AppModals {
-    fn draw_settings_modal(&mut self, ctx: &egui::Context);
-    fn draw_backend_preferences(&mut self, ui: &mut egui::Ui);
-    fn draw_transfer_dialog(&mut self, ctx: &egui::Context);
-    fn draw_date_adjust_dialog(&mut self, ctx: &egui::Context);
-    fn draw_ai_confirmation_dialog(&mut self, ctx: &egui::Context);
-    fn draw_interactive_fallback_modal(&mut self, ctx: &egui::Context);
-    fn draw_autofix_modal(&mut self, ctx: &egui::Context);
-    fn draw_workflow_hitl_modal(&mut self, ctx: &egui::Context);
-    fn draw_transfer_test_dialog(&mut self, ctx: &egui::Context);
-    fn draw_api_keys_editor(&mut self, ui: &mut egui::Ui);
-    fn draw_feedback_modal(&mut self, ctx: &egui::Context);
-    fn draw_modals(&mut self, ctx: &egui::Context);
-    fn draw_stuck_watchdog_modal(&mut self, ctx: &egui::Context);
-    fn draw_discard_draft_confirm_modal(&mut self, ctx: &egui::Context);
 }
 
 impl AppModals for MyApp {
@@ -394,9 +373,28 @@ impl AppModals for MyApp {
                                 });
                             });
 
-                            if ctx.input(|i| !i.raw.dropped_files.is_empty()) {
-                                // Dummy logic for now until native backend is wired
-                                self.toast(ToastKind::Success, "Custom font embedded successfully.");
+                            // Font uploads are detected ONLY when the drop
+                            // lands on this target and only for supported
+                            // font files. Any other drop (e.g. a PDF over the
+                            // window, handled by the document-open path in
+                            // `gui.rs`) must not raise this font-specific
+                            // error.
+                            let font_drop_on_target = ctx.input(|i| {
+                                i.pointer
+                                    .hover_pos()
+                                    .is_some_and(|pos| response.rect.contains(pos))
+                                    && i.raw.dropped_files.iter().any(|file| {
+                                        file.path
+                                            .as_deref()
+                                            .is_some_and(is_supported_font_path)
+                                    })
+                            });
+                            if font_drop_on_target {
+                                // Font embedding has no native backend yet; do not report success.
+                                self.toast(
+                                    ToastKind::Error,
+                                    "Custom font embedding is not yet available. Dropped fonts were ignored.",
+                                );
                             }
                         });
                 });
@@ -465,6 +463,11 @@ impl AppModals for MyApp {
                         egui::ComboBox::from_id_salt("doc_parser_mode")
                             .selected_text(self.settings.document_parser.label())
                             .show_ui(ui, |ui| {
+                                ui.selectable_value(
+                                    &mut self.settings.document_parser,
+                                    DocumentParserMode::Reducto,
+                                    DocumentParserMode::Reducto.label(),
+                                );
                                 capability_selectable_value(
                                     ui,
                                     &mut self.settings.document_parser,
@@ -491,10 +494,10 @@ impl AppModals for MyApp {
                         egui::ComboBox::from_id_salt("pdf_engine_mode")
                             .selected_text(match self.edit_engine_mode {
                                 PdfEngineMode::DualConcurrent => "Dual Concurrent",
-                                PdfEngineMode::PyMuPdfProPrimary => "PyMuPDF Pro Primary",
-                                PdfEngineMode::NativeOnly => "Native Only",
-                                PdfEngineMode::PyMuPdfOnly => "PyMuPDF Only",
-                                PdfEngineMode::TypstReconstruct => "Typst Reconstruct",
+                                PdfEngineMode::PyMuPdfProPrimary => "Rank 1: PyMuPDF Pro Primary (Baseline)",
+                                PdfEngineMode::NativeOnly => "Rank 2: Native (Fallback)",
+                                PdfEngineMode::PyMuPdfOnly => "PyMuPDF Only (Unranked)",
+                                PdfEngineMode::TypstReconstruct => "Rank 3: Typst Reconstruct (Backup)",
                             })
                             .show_ui(ui, |ui| {
                                 capability_selectable_value(
@@ -672,6 +675,7 @@ impl AppModals for MyApp {
                         )
                     }
                     DocumentParserMode::LocalOcrs => {}
+                    DocumentParserMode::Reducto => {}
                     DocumentParserMode::OfflineHeuristic => {}
                 }
 
@@ -2084,13 +2088,13 @@ impl AppModals for MyApp {
         if force_fallback {
             self.in_flight = 0; // reset state to unlock UI
             self.toast(
-                crate::app::gui::ToastKind::Warn,
+                ToastKind::Warn,
                 "Watchdog triggered. Forcing fallback...".to_string(),
             );
             match &self.workflow_stage {
                 crate::engine::workflow::WorkflowStage::Parsing => {
                     self.toast(
-                        crate::app::gui::ToastKind::Info,
+                        ToastKind::Info,
                         "Falling back to Offline Parser...".to_string(),
                     );
                     if let Err(e) =
@@ -2107,7 +2111,7 @@ impl AppModals for MyApp {
                 }
                 crate::engine::workflow::WorkflowStage::Rendering { .. } => {
                     self.toast(
-                        crate::app::gui::ToastKind::Info,
+                        ToastKind::Info,
                         "Falling back to Native rendering...".to_string(),
                     );
                     self.dispatch_confirm_and_render(false, false);

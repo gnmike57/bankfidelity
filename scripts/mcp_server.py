@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
 """
+DEPRECATED: This python-based MCP server is obsolete.
+The BankFidelity orchestrator now runs its own native MCP stdio server
+in Rust (src/ai/mcp.rs) as part of the Dual-Core architecture.
+Do not use this script; instead, register the compiled dual-core-pdf-pipeline.exe
+as the MCP server.
+
+This file is retained only for historical reference and will be removed in v3.0.
+"""
+"""
 BankFidelity MCP Server
 =======================
 A full Model Context Protocol (MCP) server that exposes every function of the
@@ -622,7 +631,9 @@ async def tool_update_api_key(provider: str, api_key: str) -> dict:
     try:
         await _api_post("/job", {"job": "reload_config"})
         return {"status": "updated", "provider": provider, "env_var": env_var, "reloaded": True}
-    except Exception:
+    except Exception as e:
+
+        import traceback; traceback.print_exc()
         return {"status": "updated", "provider": provider, "env_var": env_var, "reloaded": False,
                 "note": "Backend not running; key saved to .env for next startup"}
 
@@ -783,7 +794,9 @@ async def tool_list_available_pdfs(directory: str | None = None) -> dict:
                         info["bank"] = bank
                         break
                 doc.close()
-            except Exception:
+            except Exception as e:
+
+                import traceback; traceback.print_exc()
                 pass
         results.append(info)
     return {"directory": str(d), "count": len(results), "pdfs": results}

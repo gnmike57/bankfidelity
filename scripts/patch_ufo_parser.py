@@ -23,7 +23,7 @@ def patch_ufo_parser(ufo_dir: str):
     # If the user already cloned it, we could inject directly into `json_parser` if it exists.
     # For now, we will just inject a robust function at the bottom.
     
-    robust_parser = """
+    robust_parser = r"""
 # --- INJECTED BY BANKFIDELITY ---
 import re
 import json

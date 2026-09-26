@@ -10,13 +10,16 @@
 //!   4. WorkflowConfirmAndRender: binary edit → visual loop → final DocAI re-parse
 //!   5. Assert: rendered PDF exists, math is valid, visual diff is below threshold
 //!
-//! Marked `#[ignore]` because it requires real API keys + the AU sample PDF
-//! and produces network traffic. Run manually with:
+//! Marked `#[ignore]` because it requires live DOCUMENT_AI_* + GEMINI_API_KEY
+//! credentials and produces real network traffic and API spend. Run manually
+//! with:
 //!
 //!   cargo test --test workflow_e2e -- --ignored --nocapture
 //!
-//! When the AU statement file is missing (e.g. CI without test data), the
-//! test self-skips with a clear message.
+//! The statement fixture is always available: the test prefers the full AU
+//! sample (`AU Bank Statements/commbank_smartaccess_example.pdf`) and falls
+//! back to the committed `tests/fixtures/synthetic_au_statement.pdf`, so a
+//! missing fixture can never silently turn this test into a fake pass.
 
 use dual_core_pdf_pipeline::app::audit::AuditLog;
 use dual_core_pdf_pipeline::app::config::AppConfig;
@@ -43,16 +46,25 @@ fn drain_until<F: Fn(&JobResult) -> bool>(
     None
 }
 
+/// Fixture lookup: prefer the real AU sample, fall back to the committed
+/// synthetic statement. Returns `None` only if the checkout is broken.
+fn find_fixture() -> Option<PathBuf> {
+    const CANDIDATES: &[&str] = &[
+        "AU Bank Statements/commbank_smartaccess_example.pdf",
+        "tests/fixtures/synthetic_au_statement.pdf",
+    ];
+    CANDIDATES.iter().map(PathBuf::from).find(|p| p.exists())
+}
+
+#[ignore = "requires live DOCUMENT_AI_* + GEMINI_API_KEY credentials, network access, and spends real API quota; run manually with --ignored"]
 #[test]
 fn end_to_end_workflow_against_au_statement() {
-    let pdf = PathBuf::from("AU Bank Statements/commbank_smartaccess_example.pdf");
-    if !pdf.exists() {
-        eprintln!(
-            "[skip] AU statement not present at {}; e2e test self-skipped",
-            pdf.display()
+    let Some(pdf) = find_fixture() else {
+        panic!(
+            "no statement fixture found (expected 'AU Bank Statements/commbank_smartaccess_example.pdf' \
+             or committed 'tests/fixtures/synthetic_au_statement.pdf')"
         );
-        return;
-    }
+    };
 
     // Real config is required — the test self-skips if Document AI / Gemini
     // aren't configured, since we'd just get auth failures otherwise.

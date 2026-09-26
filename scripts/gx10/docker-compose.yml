@@ -1,0 +1,60 @@
+# GX10 serving stack: vLLM (VLM) + BankFidelity server.
+#
+# Nothing here pins a model or image tag on purpose - both must be chosen and
+# verified for the GB10 (aarch64 + CUDA) before use:
+#   VLLM_IMAGE      an NVIDIA/vLLM aarch64 CUDA image you have pulled
+#   VLM_MODEL       HF id or local path (e.g. a merged model from train_lora.py)
+#   DUAL_CORE_PASSPHRASE  >= 16 chars
+#
+#   VLLM_IMAGE=... VLM_MODEL=... DUAL_CORE_PASSPHRASE=... docker compose up
+#
+# BankFidelity then reaches the VLM at http://vlm:8000/v1 as an additive
+# evidence source; it is never the parser of record.
+
+services:
+  vlm:
+    image: ${VLLM_IMAGE:?set VLLM_IMAGE to an aarch64 CUDA vLLM image}
+    command:
+      - --model
+      - ${VLM_MODEL:?set VLM_MODEL}
+      - --served-model-name
+      - ${VLM_SERVED_NAME:-bankfidelity-vlm}
+      - --port
+      - "8000"
+      - --gpu-memory-utilization
+      - ${VLM_GPU_UTIL:-0.55}
+      - --max-model-len
+      - ${VLM_MAX_LEN:-8192}
+    volumes:
+      - ${MODELS_DIR:-./models}:/models:ro
+      - hf-cache:/root/.cache/huggingface
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  bankfidelity:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.gx10
+    depends_on: [vlm]
+    environment:
+      DUAL_CORE_PASSPHRASE: ${DUAL_CORE_PASSPHRASE:?set DUAL_CORE_PASSPHRASE}
+      LOCAL_VLM_URL: http://vlm:8000/v1
+      LOCAL_VLM_MODEL: ${VLM_SERVED_NAME:-bankfidelity-vlm}
+      LOCAL_LLM_URL: http://vlm:8000/v1
+      LOCAL_LLM_MODEL: ${VLM_SERVED_NAME:-bankfidelity-vlm}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data/audit:/app/audit
+      - ./data/output:/app/output
+    restart: unless-stopped
+
+volumes:
+  hf-cache:

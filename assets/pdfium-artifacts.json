@@ -8,6 +8,13 @@
     "licenses/"
   ],
   "artifacts": {
+    "linux-aarch64": {
+      "asset": "pdfium-linux-arm64.tgz",
+      "size_bytes": 3597708,
+      "archive_sha256": "974107999784a438149605024475d42d80dd306799d90e1af5f6fa63f976455f",
+      "library_member": "lib/libpdfium.so",
+      "library_sha256": "38832b476d8a6d2f9862bc8b3ab5a7171cfb5c6d830ef5f73b2918ab96515382"
+    },
     "linux-x86_64": {
       "asset": "pdfium-linux-x64.tgz",
       "size_bytes": 3650783,

@@ -295,4 +295,62 @@ impl OpenAiClient {
             serde_json::from_str(&out).map_err(|e| OpenAiError::Format(e.to_string()))?;
         Ok(parsed)
     }
+
+    pub async fn apply_natural_language_edit(
+        &self,
+        prompt: &str,
+        transactions: &[Transaction],
+    ) -> Result<Vec<Transaction>, OpenAiError> {
+        let sys = "You are an expert financial analyst specialising in bank statements. Apply the user's natural language edit precisely to the transactions. If amounts change, strictly cascade the running balance. Return a JSON object containing a 'transactions' array where each item has: page (int), line_on_page (int), date (string), raw_text (string), debit (number or null), credit (number or null), running_balance (number or null).";
+        let user = format!(
+            "Instruction: {}\n\nTransactions:\n{}",
+            prompt,
+            serde_json::to_string(transactions).unwrap_or_default()
+        );
+        let out = self.post_json(sys, &user).await?;
+        let parsed: serde_json::Value =
+            serde_json::from_str(&out).map_err(|e| OpenAiError::Format(e.to_string()))?;
+
+        let items = parsed
+            .get("transactions")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_else(|| {
+                if parsed.is_array() {
+                    parsed.as_array().cloned().unwrap_or_default()
+                } else {
+                    vec![]
+                }
+            });
+
+        #[derive(serde::Deserialize)]
+        struct EditedTx {
+            page: usize,
+            line_on_page: usize,
+            date: String,
+            raw_text: String,
+            debit: Option<f64>,
+            credit: Option<f64>,
+            running_balance: Option<f64>,
+        }
+
+        let mut result = transactions.to_vec();
+        for val in items {
+            if let Ok(edit) = serde_json::from_value::<EditedTx>(val) {
+                if let Some(tx) = result
+                    .iter_mut()
+                    .find(|t| t.page == edit.page && t.line_on_page == edit.line_on_page)
+                {
+                    tx.date = edit.date;
+                    tx.raw_text = edit.raw_text;
+                    tx.debit = edit.debit.and_then(rust_decimal::Decimal::from_f64_retain);
+                    tx.credit = edit.credit.and_then(rust_decimal::Decimal::from_f64_retain);
+                    tx.running_balance = edit
+                        .running_balance
+                        .and_then(rust_decimal::Decimal::from_f64_retain);
+                }
+            }
+        }
+        Ok(result)
+    }
 }

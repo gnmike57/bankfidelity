@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 PyMuPDF Pro Smart Targeted Editor v2.1
 - Get all text blocks with accurate bounding boxes
@@ -11,8 +10,9 @@ import os
 import re
 import sys
 from decimal import Decimal, InvalidOperation
+from typing import Any, Optional, Dict, List, Tuple, Union, Set
 
-# ── Windows DLL search-path fix (must run BEFORE import pymupdf) ─────────────
+# â”€â”€ Windows DLL search-path fix (must run BEFORE import pymupdf) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # pymupdf/_extra.pyd depends on mupdfcpp64.dll which lives inside the pymupdf
 # package directory in site-packages. The pymupdf package is also aliased as
 # "fitz", so find_spec("pymupdf") may resolve to the fitz folder which does NOT
@@ -50,22 +50,22 @@ try:
     _PYMUPDF_AVAILABLE = True
 except ImportError:
     _PYMUPDF_AVAILABLE = False
+import gc
 import json
 import math
-import gc
 
 _FONT_RESOURCE_PROFILES = None
 
 # PyMuPDF Pro lives in the separate `pymupdfpro` package and exposes the
 # `pymupdf.pro` submodule. Import it defensively: if the Pro package is not
-# installed (or fails to load), we must NOT crash the whole module — doing so
+# installed (or fails to load), we must NOT crash the whole module â€” doing so
 # would take down the entire Python actor and disable even non-Pro helpers.
 # Instead we record availability and fail loudly only when a Pro-gated call is
 # actually made. This keeps the headless health server and any non-Pro paths
 # working, and turns an opaque "PyEngine init failed" into an actionable error
 # at the exact call site.
 try:
-    import pymupdf.pro  # noqa: F401  (registers the pymupdf.pro submodule)
+    import pymupdf.pro
     _PYMUPDF_PRO_AVAILABLE = True
     _PYMUPDF_PRO_IMPORT_ERROR = None
 except Exception as _e:  # ImportError or any loader-level failure
@@ -79,6 +79,33 @@ except Exception as _e:  # ImportError or any loader-level failure
     )
 
 PYMUPDF_PRO_KEY = os.environ.get("PYMUPDF_PRO_KEY", "")
+
+_STANDARD_14_FONTS = {
+    "helv", "hebo", "heit", "hebi", "times", "tibo", "tiit", "tibi",
+    "couri", "cobo", "coit", "cobi", "symb", "zapt",
+    "helvetica", "helvetica-bold", "helvetica-oblique", "helvetica-boldoblique",
+    "times-roman", "times-bold", "times-italic", "times-bolditalic",
+    "courier", "courier-bold", "courier-oblique", "courier-boldoblique",
+    "symbol", "zapfdingbats"
+}
+
+def _safe_pymupdf_font(fontname: str | None = None) -> Any:
+    if not fontname:
+        try:
+            return pymupdf.Font(fontname="helv")
+        except Exception:
+            return None
+    name_clean = str(fontname).strip().lower()
+    if name_clean in _STANDARD_14_FONTS:
+        try:
+            return pymupdf.Font(fontname=fontname)
+        except Exception:
+            pass
+    try:
+        return pymupdf.Font(fontname="helv")
+    except Exception:
+        return None
+
 
 # ---------------------------------------------------------------------------
 # PyMuPDF Pro 3-page licensing limit (Requirement 5).
@@ -196,7 +223,7 @@ def render_page_to_png(pdf_path: str, page_num: int = 0, dpi: float = 150.0):
 
     Returns a dict with keys: png_bytes (base64), width_pts, height_pts.
     This uses the standard (free) PyMuPDF rasteriser which handles all fonts,
-    embedded images, vector graphics, etc. — producing a faithful preview
+    embedded images, vector graphics, etc. â€” producing a faithful preview
     even when the native Rust engine cannot.
     """
     import base64
@@ -282,19 +309,21 @@ def generate_visual_proof(pdf_path: str, output_path: str, edits_json: str):
         annot.set_opacity(0.3)
         annot.update()
         
-        # Inject the new_text onto the page in red
+        # Inject the new_text onto the page in red anchored to vector baseline
         if new_text:
-            # We don't have perfect font logic here, so we use a standard font 
-            # and position it at the top-left of the bounding box.
-            # PyMuPDF insert_textbox is robust.
             font_size = edit.get("size", 10.0)
-            page.insert_textbox(
-                r,
-                new_text,
+            origin = edit.get("origin")
+            if origin:
+                baseline_point = pymupdf.Point(origin[0], origin[1])
+            else:
+                baseline_point = pymupdf.Point(r.x0, r.y0 + font_size * 0.82)
+            page.insert_text(
+                point=baseline_point,
+                text=new_text,
                 fontsize=font_size,
                 color=(1, 0, 0), # Red overlay text
                 fontname="helv",
-                align=0 # Left aligned
+                overlay=True
             )
 
     doc.save(output_path)
@@ -534,7 +563,7 @@ def analyze_fonts(pdf_path: str) -> dict:
 
         # Fidelity impact and creation-scope language.
         if not missing:
-            impact = "✅ All characters used in this document are covered by the embedded subset -- no font creation needed."
+            impact = "âœ… All characters used in this document are covered by the embedded subset -- no font creation needed."
             scope = "None -- all used glyphs already present."
         else:
             fonts_needing_action += 1
@@ -553,7 +582,7 @@ def analyze_fonts(pdf_path: str) -> dict:
 
             preview = "".join(missing[:12])
             if len(missing) > 12:
-                preview += "…"
+                preview += "â€¦"
 
             scope = (
                 f"Create only the {len(missing)} missing glyph(s): "
@@ -562,28 +591,28 @@ def analyze_fonts(pdf_path: str) -> dict:
 
             if role == "digits":
                 impact = (
-                    f"⚠ Digits-only font -- {len(missing)} glyph(s) missing in this document. "
+                    f"âš  Digits-only font -- {len(missing)} glyph(s) missing in this document. "
                     f"Only those specific glyph(s) need creation; the full alphabet is not required."
                 )
             elif role == "punctuation":
                 impact = (
-                    f"⚠ Punctuation-only font -- {len(missing)} glyph(s) missing. "
+                    f"âš  Punctuation-only font -- {len(missing)} glyph(s) missing. "
                     f"Targeted creation of those glyph(s) only."
                 )
             elif role == "letters":
                 impact = (
-                    f"⚠ Letters font -- {len(missing)} letter(s) missing. "
+                    f"âš  Letters font -- {len(missing)} letter(s) missing. "
                     f"Only those specific letter glyph(s) need creation; the full alphabet is not required."
                 )
             elif role == "mixed":
                 # The users rule: even if used spans letters+digits, the
                 # creation scope is the actual missing set, not the universe.
                 impact = (
-                    f"⚠ Mixed font (letters + digits) -- {len(missing)} glyph(s) missing. "
+                    f"âš  Mixed font (letters + digits) -- {len(missing)} glyph(s) missing. "
                     f"Creation scope is limited to those glyph(s) only ({kinds_str})."
                 )
             else:
-                impact = f"⚠ {len(missing)} glyph(s) missing in role '{role}'."
+                impact = f"âš  {len(missing)} glyph(s) missing in role '{role}'."
 
         fonts_out.append({
             "name": rec["name"],
@@ -665,8 +694,7 @@ def _normalized_money_identity(value):
     text = re.sub(r"\s+(?:CR|DR)\s*$", "", text)
     text = re.sub(r"^(?:AUD\s*)?\$?", "", text)
     text = text.replace(",", "").strip()
-    if text.startswith("+"):
-        text = text[1:]
+    text = text.removeprefix("+")
     try:
         amount = Decimal(text)
     except (InvalidOperation, ValueError):
@@ -1177,6 +1205,145 @@ def _type3_source_resource_plan(
     }
 
 
+def scan_content_stream_text_strings(stream: bytes):
+    """
+    Scans a PDF content stream byte-by-byte, accurately recognizing:
+    - Comments: % ... \r?\n (skipped)
+    - Inline images: BI ... ID <whitespace> <raw_image_data> \s+EI (skipped, never parsed as text)
+    - String literals: ( ... ) with balanced parentheses and backslash escapes (\\), \\(, \\\\, etc.)
+    - Hex strings: < ... > (not << dictionary)
+    - Font state updates: /<FontName> <FontSize> Tf
+
+    Yields:
+      {
+        'type': 'literal' or 'hex',
+        'inner_offset': start of payload in stream (after '(' or '<'),
+        'inner_len': length of payload,
+        'inner_bytes': bytes inside delimiters,
+        'token_start': start index of '(' or '<',
+        'token_end': end index after ')' or '>',
+        'font_alias': currently active font alias (e.g. 'F1'),
+        'font_size': currently active font size (float),
+        'operator': following text-showing operator (e.g. b'Tj', b'TJ', b"'", b'"')
+      }
+    """
+    pos = 0
+    n = len(stream)
+    active_font_alias = None
+    active_font_size = None
+
+    while pos < n:
+        b = stream[pos]
+        # Whitespace
+        if b in b" \t\r\n\x00\x0c":
+            pos += 1
+            continue
+        # Comment
+        if b == ord("%"):
+            newline = stream.find(b"\n", pos)
+            if newline < 0:
+                pos = n
+            else:
+                pos = newline + 1
+            continue
+        # Inline image BI ... ID ... EI
+        if stream[pos:pos+2] == b"BI" and (pos + 2 >= n or stream[pos+2] in b" \t\r\n\x00\x0c/[]<>"):
+            id_match = re.search(rb"\bID[\s\r\n]", stream[pos:])
+            if id_match:
+                data_start = pos + id_match.end()
+                ei_match = re.search(rb"[\s\r\n]EI(?=[\s\r\n/\[<({\x00-\x20]|\Z)", stream[data_start:])
+                if ei_match:
+                    pos = data_start + ei_match.end()
+                else:
+                    pos = n
+            else:
+                pos = n
+            continue
+        # Font operator /Alias Size Tf
+        if b == ord("/"):
+            tf_match = re.match(rb"/([A-Za-z0-9_.-]+)\s+([0-9.]+)\s+Tf\b", stream[pos:])
+            if tf_match:
+                active_font_alias = tf_match.group(1).decode("ascii", errors="replace")
+                active_font_size = float(tf_match.group(2))
+                pos += tf_match.end()
+                continue
+        # Literal string (...)
+        if b == ord("("):
+            token_start = pos
+            paren_depth = 1
+            p = pos + 1
+            while p < n and paren_depth > 0:
+                cb = stream[p]
+                if cb == ord("\\"):
+                    p += 2
+                elif cb == ord("("):
+                    paren_depth += 1
+                    p += 1
+                elif cb == ord(")"):
+                    paren_depth -= 1
+                    p += 1
+                else:
+                    p += 1
+            token_end = p
+            inner_offset = token_start + 1
+            inner_bytes = stream[inner_offset : token_end - 1] if token_end > token_start + 1 else b""
+
+            # Check following operator
+            op_p = token_end
+            while op_p < n and stream[op_p] in b" \t\r\n\x00\x0c":
+                op_p += 1
+            op_match = re.match(rb"([A-Za-z'\"*]+)", stream[op_p:])
+            op = op_match.group(1) if op_match else b""
+
+            yield {
+                "type": "literal",
+                "inner_offset": inner_offset,
+                "inner_len": len(inner_bytes),
+                "inner_bytes": inner_bytes,
+                "token_start": token_start,
+                "token_end": token_end,
+                "font_alias": active_font_alias,
+                "font_size": active_font_size,
+                "operator": op,
+            }
+            pos = token_end
+            continue
+        # Hex string <...>
+        if b == ord("<"):
+            if pos + 1 < n and stream[pos+1] == ord("<"):
+                pos += 2
+                continue
+            token_start = pos
+            end_bracket = stream.find(b">", pos + 1)
+            if end_bracket < 0:
+                pos = n
+                continue
+            token_end = end_bracket + 1
+            inner_offset = token_start + 1
+            inner_bytes = stream[inner_offset:end_bracket]
+
+            op_p = token_end
+            while op_p < n and stream[op_p] in b" \t\r\n\x00\x0c":
+                op_p += 1
+            op_match = re.match(rb"([A-Za-z'\"*]+)", stream[op_p:])
+            op = op_match.group(1) if op_match else b""
+
+            yield {
+                "type": "hex",
+                "inner_offset": inner_offset,
+                "inner_len": len(inner_bytes),
+                "inner_bytes": inner_bytes,
+                "token_start": token_start,
+                "token_end": token_end,
+                "font_alias": active_font_alias,
+                "font_size": active_font_size,
+                "operator": op,
+            }
+            pos = token_end
+            continue
+        pos += 1
+
+
 def _replace_type3_inplace(page, span: dict, rect_obj, plan: dict, old_text: str, new_text: str):
     old_codes = bytes.fromhex(str(plan.get("source_encoded_hex") or ""))
     new_codes = bytes.fromhex(str(plan.get("encoded_hex") or ""))
@@ -1210,23 +1377,29 @@ def _replace_type3_inplace(page, span: dict, rect_obj, plan: dict, old_text: str
 
     document = page.parent
     stream_matches = []
-    font_pattern = re.compile(rb"/([A-Za-z0-9_.-]+)\s+([0-9.]+)\s+Tf")
     for content_xref in page.get_contents():
         stream = document.xref_stream(int(content_xref)) or b""
-        start = 0
-        while True:
-            offset = stream.find(old_codes, start)
-            if offset < 0:
-                break
-            active_fonts = list(font_pattern.finditer(stream[:offset]))
-            if active_fonts and active_fonts[-1].group(1).decode("ascii") == alias:
-                stream_matches.append({
-                    "xref": int(content_xref),
-                    "offset": offset,
-                    "stream": stream,
-                    "font_size": float(active_fonts[-1].group(2)),
-                })
-            start = offset + 1
+        for token in scan_content_stream_text_strings(stream):
+            if token["font_alias"] == alias:
+                if token["type"] == "literal":
+                    idx = token["inner_bytes"].find(old_codes)
+                    if idx >= 0:
+                        stream_matches.append({
+                            "xref": int(content_xref),
+                            "offset": token["inner_offset"] + idx,
+                            "stream": stream,
+                            "font_size": float(token["font_size"] or 0.0),
+                        })
+                elif token["type"] == "hex":
+                    old_hex = old_codes.hex().encode("ascii")
+                    idx = token["inner_bytes"].lower().find(old_hex.lower())
+                    if idx >= 0:
+                        stream_matches.append({
+                            "xref": int(content_xref),
+                            "offset": token["inner_offset"] + idx,
+                            "stream": stream,
+                            "font_size": float(token["font_size"] or 0.0),
+                        })
     if len(stream_matches) != 1:
         raise ValueError(f"TYPE3_INPLACE_STREAM_MATCH_COUNT:{len(stream_matches)}")
 
@@ -1514,28 +1687,16 @@ def _one_byte_same_length_plan(page, span: dict, font_xref, old_text: str, new_t
             "ambiguous_chars": [],
             "reason": "one-byte source font does not cover the replacement",
         }
-    font_pattern = re.compile(rb"/([A-Za-z0-9_.-]+)\s+([0-9.]+)\s+Tf")
     matches = []
     literal_matches = []
     for content_xref in page.get_contents():
         stream = page.parent.xref_stream(int(content_xref)) or b""
-        start = 0
-        while True:
-            offset = stream.find(source_bytes, start)
-            if offset < 0:
-                break
-            active_fonts = list(font_pattern.finditer(stream[:offset]))
-            tail = offset + len(source_bytes)
-            literal = (
-                offset > 0
-                and stream[offset - 1:offset] == b"("
-                and stream[tail:tail + 3] == b")Tj"
-            )
-            if literal:
-                literal_matches.append((int(content_xref), offset))
-                if active_fonts and active_fonts[-1].group(1).decode("ascii") == resource_alias:
-                    matches.append((int(content_xref), offset))
-            start = offset + 1
+        for token in scan_content_stream_text_strings(stream):
+            if token["type"] == "literal" and token["inner_bytes"] == source_bytes:
+                if token["operator"] in (b"Tj", b"'", b"\""):
+                    literal_matches.append((int(content_xref), token["inner_offset"]))
+                    if token["font_alias"] == resource_alias:
+                        matches.append((int(content_xref), token["inner_offset"]))
     match_basis = "font-resource"
     if not matches:
         same_font_spans = []
@@ -1606,29 +1767,17 @@ def _replace_one_byte_same_length_inplace(page, plan: dict):
     alias = str(plan.get("resource_alias") or "")
     if not old_bytes or len(old_bytes) != len(new_bytes):
         raise ValueError("ONE_BYTE_INPLACE_LENGTH_MISMATCH")
-    font_pattern = re.compile(rb"/([A-Za-z0-9_.-]+)\s+([0-9.]+)\s+Tf")
     matches = []
     literal_matches = []
     document = page.parent
     for content_xref in page.get_contents():
         stream = document.xref_stream(int(content_xref)) or b""
-        start = 0
-        while True:
-            offset = stream.find(old_bytes, start)
-            if offset < 0:
-                break
-            active_fonts = list(font_pattern.finditer(stream[:offset]))
-            tail = offset + len(old_bytes)
-            literal = (
-                offset > 0
-                and stream[offset - 1:offset] == b"("
-                and stream[tail:tail + 3] == b")Tj"
-            )
-            if literal:
-                literal_matches.append((int(content_xref), offset, stream))
-                if active_fonts and active_fonts[-1].group(1).decode("ascii") == alias:
-                    matches.append((int(content_xref), offset, stream))
-            start = offset + 1
+        for token in scan_content_stream_text_strings(stream):
+            if token["type"] == "literal" and token["inner_bytes"] == old_bytes:
+                if token["operator"] in (b"Tj", b"'", b"\""):
+                    literal_matches.append((int(content_xref), token["inner_offset"], stream))
+                    if token["font_alias"] == alias:
+                        matches.append((int(content_xref), token["inner_offset"], stream))
     if not matches and plan.get("match_basis") == "geometry-ordinal-inherited-font-state":
         matches = literal_matches
     match_ordinal = int(plan.get("match_ordinal", 0))
@@ -1844,26 +1993,21 @@ def _profiled_type0_inplace_matches(page, plan: dict):
     alias = str(plan.get("resource_alias") or "")
     if not re.fullmatch(r"[A-Za-z0-9_.-]+", alias):
         return []
-    font_pattern = re.compile(rb"/([A-Za-z0-9_.-]+)\s+([0-9.]+)\s+Tf")
     matches = []
     document = page.parent
     for content_xref in page.get_contents():
         stream = document.xref_stream(int(content_xref)) or b""
-        searchable = stream.lower()
-        start = 0
-        while True:
-            offset = searchable.find(old_hex.lower(), start)
-            if offset < 0:
-                break
-            active_fonts = list(font_pattern.finditer(stream[:offset]))
-            if active_fonts and active_fonts[-1].group(1).decode("ascii") == alias:
-                matches.append((
-                    int(content_xref),
-                    offset,
-                    stream,
-                    float(active_fonts[-1].group(2)),
-                ))
-            start = offset + 1
+        for token in scan_content_stream_text_strings(stream):
+            if token["type"] == "hex" and token["font_alias"] == alias:
+                inner_hex = token["inner_bytes"]
+                idx = inner_hex.lower().find(old_hex.lower())
+                if idx >= 0:
+                    matches.append((
+                        int(content_xref),
+                        token["inner_offset"] + idx,
+                        stream,
+                        float(token["font_size"] or 0.0),
+                    ))
     return matches
 
 
@@ -1970,7 +2114,7 @@ def _emit_source_resource(page, placement: dict, plan: dict, fontsize: float, co
 # The single most important fidelity fix. The old emit path re-inserted the
 # new text with `page.insert_text(fontname=<original_basefont_name>)`. For any
 # subsetted or non-standard font (`ABCDEF+ArialMT`, `F1`, ...) PyMuPDF cannot
-# resolve that name, throws, and silently drops to Helvetica metrics — exactly
+# resolve that name, throws, and silently drops to Helvetica metrics â€” exactly
 # on the fonts where fidelity matters most.
 #
 # These helpers extract the original embedded glyph program (the actual TTF/
@@ -2215,7 +2359,7 @@ def classify_background(page, rect_obj):
     if len(clusters) == 1:
         return ("solid", edge_color)
 
-    # 2 clusters and roughly evenly split → striped.
+    # 2 clusters and roughly evenly split â†’ striped.
     if len(clusters) == 2:
         return ("striped", edge_color)
 
@@ -2311,7 +2455,7 @@ def _scan_content_stream_for_cmyk(page, span_bbox) -> bool:
     throughout (the common case) and slightly over-eager for documents
     that mix CMYK images with RGB text. The over-eager case still
     rounds-trips correctly in DeviceCMYK output, just at slightly higher
-    rendering cost — no fidelity loss.
+    rendering cost â€” no fidelity loss.
     """
     _ = span_bbox  # unused for now; future work could narrow by line
     try:
@@ -2508,7 +2652,7 @@ def _tight_glyph_bbox(page, rect_obj, fallback_pad: float = 0.5, fg_color=None):
     rightmost columns containing ink.
 
     Item #12: ink detection is now COLOUR-AWARE. A fixed luminance cutoff
-    mis-detects light-grey subtotals and coloured (e.g. red) negatives —
+    mis-detects light-grey subtotals and coloured (e.g. red) negatives â€”
     either missing them (under-clear, leaving original glyphs) or grabbing
     background. Instead we estimate the local paper colour from the row's
     border pixels and flag any pixel that deviates from it by more than a
@@ -2558,7 +2702,7 @@ def _tight_glyph_bbox(page, rect_obj, fallback_pad: float = 0.5, fg_color=None):
         fg255 = (fg_color[0] * 255.0, fg_color[1] * 255.0, fg_color[2] * 255.0)
 
     # Ink = deviation from paper of more than ~14% of full range on any
-    # channel-summed distance. Tuned so faint grey (≈0.75 luminance on white)
+    # channel-summed distance. Tuned so faint grey (â‰ˆ0.75 luminance on white)
     # still registers while JPEG/AA noise on a flat background does not.
     paper_margin = 0.14 * (255.0 * 3)
     fg_margin = 0.20 * (255.0 * 3)
@@ -2687,7 +2831,7 @@ def _detect_column_alignment(page, rect_obj, fontsize: float = 10.0):
     x0_count = x0_buckets.get(target_x0, 0)
     x1_count = x1_buckets.get(target_x1, 0)
 
-    _ = (cy, height)  # unused — left for future per-row narrowing
+    _ = (cy, height)  # unused â€” left for future per-row narrowing
 
     if x1_count > x0_count + 1:
         return "right"
@@ -2707,8 +2851,8 @@ def _looks_numeric(text: str) -> bool:
     digit_count = sum(1 for c in cleaned if c.isdigit())
     if digit_count == 0:
         return False
-    # Allow $, €, £, ¥, ',', '.', '-', '+', '(', ')', and whitespace.
-    allowed = set("0123456789$€£¥,.-+() \t")
+    # Allow $, â‚¬, Â£, Â¥, ',', '.', '-', '+', '(', ')', and whitespace.
+    allowed = set("0123456789$â‚¬Â£Â¥,.-+() \t")
     return all(c in allowed for c in cleaned)
 
 
@@ -2725,18 +2869,13 @@ def _measure_text_width(text: str, fontname: str, fontsize: float, supplied_font
             return float(supplied_font.text_length(text, fontsize=fontsize))
         except Exception:
             pass
-    # Built-in fallback. Try a Font instance for this name; if that fails,
-    # default to Helvetica metrics (good enough for measurement).
-    try:
-        f = pymupdf.Font(fontname=fontname)
-        return float(f.text_length(text, fontsize=fontsize))
-    except Exception:
-        pass
-    try:
-        f = pymupdf.Font(fontname="helv")
-        return float(f.text_length(text, fontsize=fontsize))
-    except Exception:
-        return float(len(text)) * fontsize * 0.5
+    f = _safe_pymupdf_font(fontname)
+    if f is not None:
+        try:
+            return float(f.text_length(text, fontsize=fontsize))
+        except Exception:
+            pass
+    return float(len(text)) * fontsize * 0.5
 
 
 def _detect_number_format(old_text: str) -> dict:
@@ -2770,7 +2909,7 @@ def _detect_number_format(old_text: str) -> dict:
         info["trailing_sign"] = True
 
     # Currency
-    for sym in ("$", "€", "£", "¥"):
+    for sym in ("$", "â‚¬", "Â£", "Â¥"):
         if sym in txt:
             info["currency"] = sym
             txt = txt.replace(sym, "")
@@ -2783,10 +2922,10 @@ def _detect_number_format(old_text: str) -> dict:
         return info
 
     # Find separators. Pattern detection:
-    #   "1,234.56" → thousand=’,’ decimal=’.’
-    #   "1.234,56" → thousand=’.’ decimal=’,’
-    #   "1234.56"  → thousand=’’ decimal=’.’
-    #   "1234"     → no decimals
+    #   "1,234.56" â†’ thousand=â€™,â€™ decimal=â€™.â€™
+    #   "1.234,56" â†’ thousand=â€™.â€™ decimal=â€™,â€™
+    #   "1234.56"  â†’ thousand=â€™â€™ decimal=â€™.â€™
+    #   "1234"     â†’ no decimals
     last_dot = txt.rfind(".")
     last_comma = txt.rfind(",")
     if last_dot >= 0 and last_comma >= 0:
@@ -2797,7 +2936,7 @@ def _detect_number_format(old_text: str) -> dict:
             info["thousand_sep"] = "."
             info["decimal_sep"] = ","
     elif last_dot >= 0:
-        # Dot only -- could be thousands (’1.234’) or decimal (’123.45’).
+        # Dot only -- could be thousands (â€™1.234â€™) or decimal (â€™123.45â€™).
         # Heuristic: if the dot is exactly 3 digits from the right and the
         # whole digit run is >= 4 digits, treat as thousands. Otherwise
         # decimal.
@@ -2890,15 +3029,14 @@ def _neighbour_left_edge(page, rect_obj, exclude_span_id: str = "") -> float:
         for line in block["lines"]:
             for span in line.get("spans", []):
                 bbox = span.get("bbox") or [0, 0, 0, 0]
-                # Same-row check: span’s vertical centre is within rect_obj’s y range.
+                # Same-row check: spanâ€™s vertical centre is within rect_objâ€™s y range.
                 span_cy = (bbox[1] + bbox[3]) / 2.0
                 if span_cy < rect_obj.y0 - 1.0 or span_cy > rect_obj.y1 + 1.0:
                     continue
                 # Strictly to the right (with a 0.5pt tolerance to avoid
                 # picking up the original span on the redaction edge).
                 if bbox[0] > rect_obj.x1 + 0.5:
-                    if bbox[0] < right_edge:
-                        right_edge = bbox[0]
+                    right_edge = min(right_edge, bbox[0])
     # Leave a small gutter so we do not kiss the neighbour.
     return max(rect_obj.x1, right_edge - 1.0)
 
@@ -2938,7 +3076,7 @@ def _snap_origin_phase(new_x: float, ref_x: float, dpi: float = _SNAP_DPI) -> fl
     grid matches the reference origin `ref_x`'s fractional position. The
     integer pixel placement is preserved (we move by < 1 px), so the number
     stays where the layout put it, but glyph edges land on the same
-    sub-pixel phase as the original — eliminating AA shimmer at the
+    sub-pixel phase as the original â€” eliminating AA shimmer at the
     rasteriser.
     """
     px = dpi / 72.0
@@ -2966,8 +3104,8 @@ def _placement_for_edit(
     Bundles items #1 (right-align numerics), #2 (width fit + collision),
     and #4 (sub-pixel baseline preservation). Returns a dict.
     """
-    # Sub-pixel baseline: use span’s `origin` exactly. Without this we
-    # rounded to the bbox’s bottom-left which loses sub-point precision and
+    # Sub-pixel baseline: use spanâ€™s `origin` exactly. Without this we
+    # rounded to the bboxâ€™s bottom-left which loses sub-point precision and
     # shows up as a half-pixel diff at >=200 DPI.
     origin_x, origin_y = span.get("origin") or (rect_obj.x0, rect_obj.y1)
 
@@ -2989,7 +3127,7 @@ def _placement_for_edit(
     if not is_numeric and column_alignment == "right":
         is_numeric = True
 
-    # Right-align numerics: anchor the new text at the original cell’s
+    # Right-align numerics: anchor the new text at the original cellâ€™s
     # right edge.
     if is_numeric:
         target_x1 = float(rect_obj.x1)
@@ -3041,7 +3179,7 @@ def _placement_for_edit(
         # sub-pixel phase so glyph edges rasterise identically.
         new_origin_x = _snap_origin_phase(new_origin_x, float(origin_x))
         # Redaction rect: from new_origin_x to target_x1, plus the original
-        # vertical extent. Don’t shrink below the original cell -- we always
+        # vertical extent. Donâ€™t shrink below the original cell -- we always
         # want to clear the original glyphs first.
         redact_x0 = min(float(rect_obj.x0), new_origin_x - 1.0)
         # Stage 14b / Item #9: pad the redact rect by half a space-width so
@@ -3132,7 +3270,7 @@ def _placement_for_edit(
 # This is conservative: if a (prev,next) pair appears in the new text but
 # not in the original, we have no signal so we use the default. We also
 # only build the map when the original has more than one glyph and both
-# the original and the replacement share at least one matching pair —
+# the original and the replacement share at least one matching pair â€”
 # otherwise the simple `insert_text` path is used.
 # ===========================================================================
 
@@ -3152,16 +3290,11 @@ def _extract_kern_map(page, span: dict, font_obj=None) -> dict:
         return {}
     fontsize = float(span.get("size", 0.0)) or 10.0
 
-    # Resolve a Font object we can measure with.
     f = font_obj
     if f is None:
-        try:
-            f = pymupdf.Font(fontname=span.get("font", "helv"))
-        except Exception:
-            try:
-                f = pymupdf.Font(fontname="helv")
-            except Exception:
-                return {}
+        f = _safe_pymupdf_font(span.get("font", "helv"))
+    if f is None:
+        return {}
 
     # Pull per-character bboxes from the rawdict of the same line.
     # We need flag bit 16 (TEXTFLAGS_RAWDICT) to get char-level data.
@@ -3312,15 +3445,7 @@ def _insert_kerned_text(
     reuse exact glyph origins. Otherwise emit the full string (preferred)
     or walk advances with kern_map / extra_spacing / h_scale.
     """
-    f = measure_font
-    if f is None:
-        try:
-            f = pymupdf.Font(fontname=fontname)
-        except Exception:
-            try:
-                f = pymupdf.Font(fontname="helv")
-            except Exception:
-                f = None
+    f = measure_font or _safe_pymupdf_font(fontname)
     if f is None:
         page.insert_text(
             point=pymupdf.Point(origin[0], origin[1]),
@@ -3397,7 +3522,7 @@ def _insert_kerned_text(
             adv = float(f.text_length(ch, fontsize=fontsize)) * h_scale
         except Exception:
             adv = fontsize * 0.5
-        pair_kern = float((kern_map or {}).get((chars[i], chars[i + 1]), 0.0))
+        pair_kern = float((kern_map or {}).get((ch, chars[i + 1]), 0.0))
         step = adv + pair_kern + extra_spacing
         cx += dx * step
         cy += dy * step
@@ -3439,7 +3564,7 @@ def _insert_text_with_placement(
 ):
     """Insert text using `placement.origin` and `placement.char_spacing`.
 
-    `fontname` MUST be a name the page can already resolve — either a
+    `fontname` MUST be a name the page can already resolve â€” either a
     standard-14 builtin code or a name registered via `insert_font`
     (e.g. the ``embf_<xref>`` refname from `_resolve_embedded_font`).
     `measure_font` is the matching `pymupdf.Font` used for advance/width
@@ -3643,14 +3768,14 @@ def _build_apply_report(
     }
 
 
-def apply_many_edits(pdf_path: str, output_path: str, edits: list, font_path: str = None):
+def apply_many_edits(pdf_path: str, output_path: str, edits: list, font_path: str = None, strict_fidelity: bool = False):
     """Apply many targeted edits in a single open/save pass.
 
     Stage 3 / Item #14: each `replace_text_in_rect` call opens, modifies and
     saves the PDF, which is wasteful when the caller has N edits to apply
     sequentially. This function takes the whole batch, opens the file once,
     walks every edit (grouped per page so we touch each page object exactly
-    once), and saves once at the end. ~5-10× faster than the N-call loop on
+    once), and saves once at the end. ~5-10Ã— faster than the N-call loop on
     multi-edit batches.
 
     `edits` is a list of dicts:
@@ -4017,6 +4142,7 @@ def apply_many_edits(pdf_path: str, output_path: str, edits: list, font_path: st
 
         if (
             not coverage_ok
+            and not strict_fidelity
             and all(_winansi_covers(character) for character in new_text)
             and (
                 bool(span.get("_ocr_identity_verified"))
@@ -4076,18 +4202,9 @@ def apply_many_edits(pdf_path: str, output_path: str, edits: list, font_path: st
         elif method == "supplied":
             emit_fontname = insert_font_name
             measure_font = supplied_measure_font
-        elif method == "verified-standard14":
+        elif method == "verified-standard14" or is_std14:
             emit_fontname = _fallback_standard14(original_font_name)
-            try:
-                measure_font = pymupdf.Font(fontname=emit_fontname)
-            except Exception:
-                measure_font = None
-        elif is_std14:
-            emit_fontname = _fallback_standard14(original_font_name)
-            try:
-                measure_font = pymupdf.Font(fontname=emit_fontname)
-            except Exception:
-                measure_font = None
+            measure_font = _safe_pymupdf_font(emit_fontname)
         else:  # embedded, non-standard
             if not embedded or not embedded.get("refname"):
                 doc.close()
@@ -4541,7 +4658,6 @@ def analyze_background(pdf_path: str, page_num: int, rect: list) -> tuple[bool, 
         return (True, (1.0, 1.0, 1.0))
 
 
-import re
 
 def _get_all_transactions_legacy(pdf_path: str):
     """Extract ALL transactions using geometry clustering and header regex detection."""
@@ -5427,7 +5543,7 @@ def dry_run_edit_preview(
             }
         old_text = str(source_span["text"])
 
-        # Skip the cascade — for a preview we just want the visual.
+        # Skip the cascade â€” for a preview we just want the visual.
         try:
             res = replace_text_in_rect(
                 pdf_path=pdf_path,
@@ -5470,11 +5586,12 @@ def dry_run_edit_preview(
 
 
 def extract_font_with_fonttools(pdf_path: str, output_path: str):
+
     import pymupdf
-    import os
     try:
-        from fontTools.ttLib import TTFont
         from io import BytesIO
+
+        from fontTools.ttLib import TTFont
     except ImportError:
         return {"success": False, "error": "fonttools not installed"}
 
@@ -5628,7 +5745,7 @@ def remove_pages(pdf_path: str, output_path: str, page_indices: list):
     (post-clone if cloning was applied first).  They are processed in
     **descending** order so each deletion doesn't shift later indices.
 
-    A safety guard prevents removing ALL pages — at least one page is always
+    A safety guard prevents removing ALL pages â€” at least one page is always
     kept (the first page if everything else is removed).
 
     Returns ``{"success": True, "removed": N, "new_page_count": M}``.
@@ -5651,6 +5768,7 @@ def remove_pages(pdf_path: str, output_path: str, page_indices: list):
 def extract_font(pdf_path: str, output_path: str, font_name: str = ""):
     """Extract a font from a PDF and save it as a valid TTF/OTF using fonttools."""
     import io
+
     from fontTools.ttLib import TTFont
 
     _ensure_pro_unlocked()
@@ -5708,3 +5826,4 @@ def extract_font(pdf_path: str, output_path: str, font_name: str = ""):
             return {"success": True, "output_path": output_path, "xref": target_xref, "warning": f"fontTools failed ({e}), saved raw buffer"}
         except Exception as e2:
             return {"success": False, "error": str(e2)}
+

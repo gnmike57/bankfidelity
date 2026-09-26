@@ -84,6 +84,11 @@ PAYLOADS = {
         "page_num": 0,
         "dpi": 144.0,
     },
+    "generate_visual_proof": {
+        "pdf_path": "fixtures/input.pdf",
+        "output_path": "scratch/output.pdf",
+        "edits_json": "[]",
+    },
 }
 
 
@@ -102,7 +107,13 @@ def make_request(operation: str, index: int) -> dict[str, object]:
 
 def build_fixture() -> dict[str, object]:
     cases: list[dict[str, object]] = []
-    mutating = {"replace_text_in_rect", "apply_many_edits", "clone_pages", "remove_pages"}
+    mutating = {
+        "replace_text_in_rect",
+        "apply_many_edits",
+        "clone_pages",
+        "remove_pages",
+        "generate_visual_proof",
+    }
     pro_operations = {
         "replace_text_in_rect",
         "complete_font_with_adaption",

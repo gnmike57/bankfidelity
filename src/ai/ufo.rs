@@ -1,8 +1,64 @@
-use serde_json::{json, Value};
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct UfoTaskResult {
+    pub status: String,
+    pub task_id: String,
+    pub output: Option<String>,
+    pub error_type: Option<String>,
+    pub error_message: Option<String>,
+    pub traceback: Option<String>,
+}
+
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum UfoError {
+    #[error("Hallucination: {0}")]
+    Hallucination(String),
+    #[error("Crash: {0}")]
+    Crash(String),
+    #[error("Dependency: {0}")]
+    Dependency(String),
+    #[error("Unknown: {0}")]
+    Unknown(String),
+}
+
+impl From<String> for UfoError {
+    fn from(err: String) -> Self {
+        UfoError::Unknown(err)
+    }
+}
+
+impl UfoTaskResult {
+    /// Programmatically intercepts generated PDF artifacts from the UFO output log / result string
+    /// using strict regex: `(?i)[a-z]:\\[^<>\x22\|\?\*]+\.pdf`
+    pub fn extract_pdf_artifacts(&self) -> Vec<std::path::PathBuf> {
+        let mut paths = Vec::new();
+        let text = match (&self.output, &self.error_message) {
+            (Some(out), Some(err)) => format!("{}\n{}", out, err),
+            (Some(out), None) => out.clone(),
+            (None, Some(err)) => err.clone(),
+            (None, None) => return paths,
+        };
+
+        // Strict path extraction: Windows drive-letter paths and POSIX absolute paths.
+        let windows_re = regex::Regex::new(r"(?i)[a-zA-Z]:\\[^<>\x22\|\?\*\n\r]+\.pdf");
+        let posix_re = regex::Regex::new(r"/[A-Za-z0-9._~/-]+\.pdf");
+        for re in [windows_re, posix_re].into_iter().flatten() {
+            for cap in re.find_iter(&text) {
+                let p = std::path::PathBuf::from(cap.as_str().trim());
+                if p.exists() && !paths.contains(&p) {
+                    paths.push(p);
+                }
+            }
+        }
+        paths
+    }
+}
 
 pub struct UfoClient;
 
@@ -39,17 +95,73 @@ impl UfoClient {
     ///
     /// Returns `Err` when UFO is missing, the process fails to start, or the
     /// UFO process exits non-zero. Concurrent dispatches cancel the previous task.
-    pub fn dispatch_task<F>(request: &str, mut on_log: Option<F>) -> Result<Value, String>
+    pub fn dispatch_task<F>(request: &str, mut on_log: Option<F>) -> Result<UfoTaskResult, UfoError>
+    where
+        F: FnMut(String) + Send + 'static,
+    {
+        let mut attempts = 0;
+        let max_attempts = 2;
+        loop {
+            attempts += 1;
+            let res = Self::execute_single_attempt(request, &mut on_log);
+            match res {
+                Ok(r) => return Ok(r),
+                Err(e) => {
+                    if attempts >= max_attempts {
+                        return Err(e);
+                    }
+                    if let UfoError::Hallucination(msg) = &e {
+                        tracing::warn!(
+                            "UFO Hallucinated (attempt {}/{}): {}. Retrying...",
+                            attempts,
+                            max_attempts,
+                            msg
+                        );
+                        continue;
+                    }
+                    return Err(e);
+                }
+            }
+        }
+    }
+
+    /// Resolves the Python interpreter used to launch UFO.
+    /// Priority: PYO3_PYTHON > PYTHON_EXE > BANKFIDELITY_UFO_PYTHON >
+    /// UFO's bundled `<ufo_dir>/ufo/python_env/python.exe` > `python` on PATH.
+    /// No machine-specific absolute paths are hardcoded; configure via env vars.
+    fn resolve_python_command(ufo_dir: &std::path::Path) -> String {
+        for var in ["PYO3_PYTHON", "PYTHON_EXE", "BANKFIDELITY_UFO_PYTHON"] {
+            if let Ok(val) = std::env::var(var) {
+                if !val.trim().is_empty() {
+                    return val;
+                }
+            }
+        }
+        let candidate1 = ufo_dir.join("ufo").join("python_env").join("python.exe");
+        if candidate1.exists() {
+            return candidate1.to_string_lossy().to_string();
+        }
+        let candidate2 = ufo_dir.join("python_env").join("python.exe");
+        if candidate2.exists() {
+            return candidate2.to_string_lossy().to_string();
+        }
+        "python".to_string()
+    }
+
+    fn execute_single_attempt<F>(
+        request: &str,
+        on_log: &mut Option<F>,
+    ) -> Result<UfoTaskResult, UfoError>
     where
         F: FnMut(String) + Send + 'static,
     {
         let ufo_dir = Self::ufo_dir();
 
         if !ufo_dir.exists() {
-            return Err(format!(
+            return Err(UfoError::Unknown(format!(
                 "UFO framework not found at {:?}. Install Microsoft UFO or set BANKFIDELITY_UFO_DIR.",
                 ufo_dir
-            ));
+            )));
         }
 
         // Avoid orphaning a previous UFO process when a new task starts.
@@ -69,26 +181,18 @@ impl UfoClient {
             std::env::current_dir().unwrap_or_default()
         );
 
-        let python_cmd = if let Ok(pyo3_py) = std::env::var("PYO3_PYTHON") {
-            pyo3_py
-        } else if let Ok(py_exe) = std::env::var("PYTHON_EXE") {
-            py_exe
-        } else if ufo_dir.join("ufo").join("python_env").join("python.exe").exists() {
+        let python_cmd = Self::resolve_python_command(&ufo_dir);
+        let work_dir = if ufo_dir.join("ufo").join("__main__.py").exists() {
+            ufo_dir.clone()
+        } else if ufo_dir.join("__main__.py").exists() {
             ufo_dir
-                .join("ufo")
-                .join("python_env")
-                .join("python.exe")
-                .to_string_lossy()
-                .to_string()
-        } else if std::path::Path::new(
-            "C:\\Users\\zbook\\Downloads\\python-3.15.0rc1-embed-amd64\\python.exe",
-        )
-        .exists()
-        {
-            "C:\\Users\\zbook\\Downloads\\python-3.15.0rc1-embed-amd64\\python.exe".to_string()
+                .parent()
+                .map(|p| p.to_path_buf())
+                .unwrap_or_else(|| ufo_dir.clone())
         } else {
-            "python".to_string()
+            ufo_dir.clone()
         };
+
         let mut child = Command::new(&python_cmd)
             .arg("-m")
             .arg("ufo")
@@ -96,7 +200,7 @@ impl UfoClient {
             .arg(&task_id)
             .arg("--request")
             .arg(&context_prompt)
-            .current_dir(&ufo_dir)
+            .current_dir(&work_dir)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
@@ -126,41 +230,115 @@ impl UfoClient {
             }
         });
 
-        let reader = BufReader::new(stdout);
-        for line in reader.lines().map_while(Result::ok) {
-            tracing::info!("[UFO] {line}");
-            if let Some(cb) = on_log.as_mut() {
-                cb(line);
+        // Pump stdout on a dedicated thread so a hung UFO process that keeps
+        // its stdout open can never starve the watchdog poll below.
+        let mut on_log = on_log.take();
+        let stdout_thread = std::thread::spawn(move || {
+            let reader = BufReader::new(stdout);
+            for line in reader.lines().map_while(Result::ok) {
+                tracing::info!("[UFO] {line}");
+                if let Some(cb) = on_log.as_mut() {
+                    cb(line);
+                }
             }
-        }
+        });
 
-        let status = child
-            .wait()
-            .map_err(|e| format!("Failed to wait on UFO process: {e}"))?;
+        let start_wait = std::time::Instant::now();
+        let timeout = std::time::Duration::from_secs(600);
+        let status = loop {
+            match child.try_wait() {
+                Ok(Some(s)) => break s,
+                Ok(None) => {
+                    if start_wait.elapsed() > timeout {
+                        tracing::error!(
+                            "UFO task timed out after 10 minutes. Killing process tree."
+                        );
+                        kill_process_tree(child.id());
+                        return Err(UfoError::Crash(
+                            "UFO task timed out (indefinite hang detected)".into(),
+                        ));
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                }
+                Err(e) => return Err(UfoError::Crash(format!("Failed to wait on UFO: {e}"))),
+            }
+        };
         UFO_ACTIVE_PID.store(0, std::sync::atomic::Ordering::SeqCst);
+        // Exiting/killing the child closes its pipes, releasing the pump threads.
+        let _ = stdout_thread.join();
         let _ = stderr_thread.join();
 
         let stderr_str = stderr_buf.lock().map(|s| s.clone()).unwrap_or_default();
 
-        let log_path = ufo_dir.join("logs").join(&task_id).join("output.md");
-        let ufo_result = if log_path.exists() {
-            std::fs::read_to_string(&log_path)
-                .unwrap_or_else(|e| format!("Failed to read output.md: {e}"))
+        let candidate_log_dirs = [
+            ufo_dir.join("logs").join(&task_id),
+            ufo_dir.join("ufo").join("logs").join(&task_id),
+            work_dir.join("logs").join(&task_id),
+        ];
+
+        let mut found_result_json = None;
+        let mut found_output_md = None;
+        for dir in &candidate_log_dirs {
+            let r = dir.join("result.json");
+            if r.exists() && found_result_json.is_none() {
+                found_result_json = Some(r);
+            }
+            let o = dir.join("output.md");
+            if o.exists() && found_output_md.is_none() {
+                found_output_md = Some(o);
+            }
+        }
+
+        if let Some(result_json_path) = found_result_json {
+            let json_str = std::fs::read_to_string(&result_json_path).unwrap_or_default();
+            match serde_json::from_str::<UfoTaskResult>(&json_str) {
+                Ok(res) => {
+                    if res.status == "error" {
+                        let err_msg = res.error_message.clone().unwrap_or_default();
+                        let err_type = res.error_type.as_deref().unwrap_or("");
+                        match err_type {
+                            "ValueError" | "AssertionError" => {
+                                return Err(UfoError::Hallucination(err_msg))
+                            }
+                            "ImportError" | "ModuleNotFoundError" => {
+                                return Err(UfoError::Dependency(err_msg))
+                            }
+                            _ => return Err(UfoError::Crash(err_msg)),
+                        }
+                    }
+                    return Ok(res);
+                }
+                Err(e) => {
+                    tracing::warn!("result.json was corrupted. Synthesizing crash report.");
+                    return Err(UfoError::Crash(format!(
+                        "UFO payload corrupted ({e}). Stderr snapshot: {}",
+                        stderr_str
+                    )));
+                }
+            }
+        }
+
+        // Fallback if result.json wasn't written
+        let ufo_result = if let Some(log_path) = found_output_md {
+            std::fs::read_to_string(&log_path).unwrap_or_default()
         } else {
-            "UFO did not generate an output.md file.".into()
+            "".into()
         };
 
         if !status.success() {
-            return Err(format!(
-                "UFO task failed (exit={status}).\nStderr:\n{stderr_str}\n\nLog Output:\n{ufo_result}"
-            ));
+            return Err(UfoError::Crash(format!(
+                "Exit {status}. Stderr: {stderr_str}"
+            )));
         }
 
-        Ok(json!({
-            "status": "success",
-            "output": ufo_result,
-            "task_id": task_id
-        }))
+        Ok(UfoTaskResult {
+            status: "success".into(),
+            task_id,
+            output: Some(ufo_result),
+            error_type: None,
+            error_message: None,
+            traceback: None,
+        })
     }
 }
 
@@ -197,6 +375,10 @@ mod tests {
         let result = UfoClient::dispatch_task("noop", None::<fn(String)>);
         std::env::remove_var("BANKFIDELITY_UFO_DIR");
         let err = result.expect_err("missing UFO must be Err");
+        let err = match err {
+            UfoError::Unknown(s) => s,
+            _ => String::new(),
+        };
         assert!(
             err.contains("UFO framework not found"),
             "unexpected error: {err}"
@@ -218,5 +400,45 @@ mod tests {
         let dir = UfoClient::ufo_dir();
         std::env::remove_var("BANKFIDELITY_UFO_DIR");
         assert_eq!(dir, std::path::PathBuf::from("D:\\custom\\ufo"));
+    }
+
+    #[test]
+    fn python_env_override_is_respected_for_interpreter() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        std::env::set_var("BANKFIDELITY_UFO_PYTHON", "D:\\custom\\python.exe");
+        let cmd = UfoClient::resolve_python_command(std::path::Path::new("C:\\UFO"));
+        std::env::remove_var("BANKFIDELITY_UFO_PYTHON");
+        assert_eq!(cmd, "D:\\custom\\python.exe");
+    }
+
+    #[test]
+    fn empty_python_env_override_falls_through() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        std::env::set_var("BANKFIDELITY_UFO_PYTHON", "  ");
+        let cmd = UfoClient::resolve_python_command(std::path::Path::new("__missing__"));
+        std::env::remove_var("BANKFIDELITY_UFO_PYTHON");
+        assert_eq!(cmd, "python");
+    }
+
+    #[test]
+    fn extract_pdf_artifacts_finds_existing_files() {
+        let pdf = std::env::temp_dir().join("bankfidelity_ufo_artifact_test.pdf");
+        std::fs::write(&pdf, b"%PDF-1.4\n").expect("write temp pdf stub");
+        let result = UfoTaskResult {
+            status: "success".into(),
+            task_id: "t".into(),
+            output: Some(format!("Saved document to {}", pdf.display())),
+            error_type: None,
+            error_message: None,
+            traceback: None,
+        };
+        let found = result.extract_pdf_artifacts();
+        let _ = std::fs::remove_file(&pdf);
+        assert!(
+            found.iter().any(|p| p == &pdf),
+            "expected {:?} in {:?}",
+            pdf,
+            found
+        );
     }
 }

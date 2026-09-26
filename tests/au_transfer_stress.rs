@@ -94,7 +94,7 @@ impl PairResult {
 // ── The Test ─────────────────────────────────────────────────────────────────
 
 #[test]
-#[ignore]
+#[ignore = "requires live Document AI + Gemini keys, network access, and takes significant time; run manually with --ignored"]
 fn test_all_au_transfer_pairs() {
     let _ = dotenvy::dotenv();
     let mut cfg_obj = AppConfig::from_env().unwrap();
@@ -138,13 +138,13 @@ fn test_all_au_transfer_pairs() {
                 let pair_start = Instant::now();
 
                 // Each pair gets its own Runtime to avoid state leaks.
-                let tmp =
-                    std::path::PathBuf::from("C:\\bankfidelity\\bankfidelity\\stress_test_outputs");
-                std::fs::create_dir_all(&tmp).unwrap();
-                let audit = AuditLog::open(&tmp).unwrap();
+                let tmp = tempfile::tempdir().unwrap();
+                let audit = AuditLog::open(tmp.path()).unwrap();
                 let (_runtime, job_tx, job_rx) = Runtime::start(audit, cfg);
 
-                let output = tmp.join(format!("{}__to__{}.pdf", stem(&source), stem(&target)));
+                let output =
+                    tmp.path()
+                        .join(format!("{}__to__{}.pdf", stem(&source), stem(&target)));
 
                 // Send the transfer job
                 job_tx

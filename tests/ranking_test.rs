@@ -28,7 +28,7 @@ fn get_test_pdfs() -> Vec<PathBuf> {
 }
 
 #[tokio::test]
-#[ignore]
+#[ignore = "requires live Document AI and LlamaParse credentials and network access; run manually with --ignored"]
 async fn test_parser_ranking() {
     let _ = dotenvy::dotenv();
     let cfg = match AppConfig::from_env() {

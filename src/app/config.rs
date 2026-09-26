@@ -92,6 +92,12 @@ impl ProKeyStatus {
     }
 }
 
+/// Current Google-managed Bank Statement processor version used as the
+/// default when the user has not picked one explicitly. Single source of
+/// truth — previously this string was duplicated across the GUI state and
+/// the runtime fallback.
+pub const DEFAULT_DOCAI_PROCESSOR_VERSION: &str = "pretrained-bankstatement-v5.0-2023-12-06";
+
 #[derive(Debug, Clone, Default)]
 pub struct DocumentAiConfig {
     pub project_id: String,
@@ -110,6 +116,22 @@ pub struct DocumentAiConfig {
     pub gcs_output_uri: String,
     /// Passphrase for encrypting the local Document AI cache
     pub passphrase: String,
+    /// Configured default processor version override
+    /// (`DOCUMENT_AI_PROCESSOR_VERSION`). Empty means "use
+    /// [`DEFAULT_DOCAI_PROCESSOR_VERSION`]".
+    pub default_processor_version: String,
+}
+
+impl DocumentAiConfig {
+    /// Effective default processor version: the configured override if set,
+    /// otherwise the built-in [`DEFAULT_DOCAI_PROCESSOR_VERSION`].
+    pub fn effective_default_version(&self) -> &str {
+        if self.default_processor_version.is_empty() {
+            DEFAULT_DOCAI_PROCESSOR_VERSION
+        } else {
+            &self.default_processor_version
+        }
+    }
 }
 
 /// How the Gemini calls authenticate.
@@ -234,8 +256,10 @@ impl AiProviderMode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DocumentParserMode {
-    /// LlamaParse (API-based document parser using LLMs for extraction).
+    /// Reducto API (API-based document parser returning structured JSON for tables/fields).
     #[default]
+    Reducto,
+    /// LlamaParse (API-based document parser using LLMs for extraction).
     LlamaParse,
     /// Pure Rust heuristic parsing (regex + layout), highly accurate for standard banking formats.
     OfflineHeuristic,
@@ -249,8 +273,26 @@ pub enum DocumentParserMode {
 }
 
 impl DocumentParserMode {
+    /// Resolves the active parser from `DOCUMENT_PARSER_MODE`.
+    /// Default is Reducto; unknown/empty values keep the Reducto default.
+    pub fn from_env() -> Self {
+        match std::env::var("DOCUMENT_PARSER_MODE")
+            .unwrap_or_default()
+            .trim()
+            .to_lowercase()
+            .as_str()
+        {
+            "llamaparse" => Self::LlamaParse,
+            "document_ai" | "document-ai" => Self::DocumentAi,
+            "offline_heuristic" | "offline-heuristic" | "offline" => Self::OfflineHeuristic,
+            "local_ocrs" | "local-ocrs" => Self::LocalOcrs,
+            _ => Self::Reducto,
+        }
+    }
+
     pub fn label(self) -> &'static str {
         match self {
+            Self::Reducto => "Reducto",
             Self::DocumentAi => "Google Document AI",
 
             Self::LlamaParse => "LlamaParse",
@@ -379,7 +421,11 @@ impl Default for AppConfig {
             document_ai: None,
 
             pymupdf_pro_key: None,
-            passphrase: "DEV_PASSPHRASE".into(),
+            // SECURITY INVARIANT: no usable default passphrase. Production
+            // paths must fail fast via [`AppConfig::encryption_passphrase`]
+            // ("DUAL_CORE_PASSPHRASE not set") instead of silently encrypting
+            // local caches with a known constant.
+            passphrase: String::new(),
             otel_endpoint: None,
             otel_service_name: "dual-core-pdf-pipeline".into(),
             log_dir: PathBuf::from("./logs"),
@@ -505,6 +551,8 @@ impl AppConfig {
                     adc_path: adc_path.unwrap_or_default(),
                     gcs_output_uri,
                     passphrase: String::new(), // Filled in by AppConfig later
+                    default_processor_version: clean_key(env::var("DOCUMENT_AI_PROCESSOR_VERSION"))
+                        .unwrap_or_default(),
                 })
             }
             _ => None,
@@ -637,6 +685,28 @@ impl AppConfig {
         errors
     }
 
+    /// Fail-fast accessor for the local-cache encryption passphrase.
+    ///
+    /// # Invariant (loud, not silent)
+    ///
+    /// Production paths that derive encryption keys MUST call this instead of
+    /// reading `passphrase` directly. An empty passphrase means
+    /// `DUAL_CORE_PASSPHRASE` was not set; silently encrypting with an empty
+    /// or well-known constant is a security hole, so this returns a
+    /// [`ConfigError::MissingRequired`] naming the variable instead.
+    ///
+    /// Dev-mode length shortening (`is_dev_mode`) is unaffected: it only
+    /// relaxes the *minimum length* checks in [`Self::validate`] and
+    /// [`Self::from_env`], never the requirement that a passphrase exists.
+    pub fn encryption_passphrase(&self) -> Result<&str, ConfigError> {
+        if self.passphrase.is_empty() {
+            return Err(ConfigError::MissingRequired(
+                "DUAL_CORE_PASSPHRASE".to_string(),
+            ));
+        }
+        Ok(&self.passphrase)
+    }
+
     /// Reports whether PyMuPDF Pro per-segment editing/rendering (Subsystem B)
     /// is available, based on the `PYMUPDF_PRO_KEY` this config holds.
     ///
@@ -730,6 +800,8 @@ impl AppConfig {
                 .map(|d| d.has_auth())
                 .unwrap_or(false),
 
+            mindee: self.mindee_api_key.is_some(),
+            reducto: std::env::var("REDUCTO_API_KEY").is_ok_and(|k| !k.trim().is_empty()),
             llamaparse: self.llamaparse_api_key.is_some(),
             pdfrest: self.pdfrest_api_key.is_some(),
             pymupdf_pro: self.pro_editing_available(),
@@ -737,6 +809,7 @@ impl AppConfig {
             ocr: cfg!(feature = "ocr")
                 && std::path::Path::new("models/text-detection.rten").exists()
                 && std::path::Path::new("models/text-recognition.rten").exists(),
+            local_vlm: crate::ai::local_vlm::is_configured(),
         }
     }
 }
@@ -766,7 +839,9 @@ pub struct ApiAvailability {
     /// Google Document AI processor + auth are fully configured.
     pub document_ai: bool,
     /// `MINDEE_API_KEY` is set.
-
+    pub mindee: bool,
+    /// `REDUCTO_API_KEY` is set (layout-agnostic transaction-transfer parser).
+    pub reducto: bool,
     /// `LLAMAPARSE_API_KEY` is set.
     pub llamaparse: bool,
     /// `PDFREST_API_KEY` is set.
@@ -778,6 +853,10 @@ pub struct ApiAvailability {
     /// Local OCR is available: `ocr` Cargo feature enabled AND
     /// `models/text-detection.rten` + `models/text-recognition.rten` present.
     pub ocr: bool,
+    /// `LOCAL_VLM_URL` and `LOCAL_VLM_MODEL` are set (local vision-language
+    /// model, e.g. vLLM on a GX10). Additive evidence only; never a parser
+    /// of record.
+    pub local_vlm: bool,
 }
 
 impl ApiAvailability {
@@ -790,11 +869,14 @@ impl ApiAvailability {
             "groq" => self.groq_api_key = false,
             "openrouter" => self.openrouter_api_key = false,
             "mistral" => self.mistral_api_key = false,
+            "mindee" => self.mindee = false,
+            "reducto" => self.reducto = false,
 
             "llamaparse" => self.llamaparse = false,
             "document ai" | "document ai (vertex)" => self.document_ai = false,
             "vision ai" => self.vision_ai = false,
             "pdfrest" => self.pdfrest = false,
+            "local vlm" | "local_vlm" => self.local_vlm = false,
             _ => {}
         }
     }
@@ -840,6 +922,15 @@ impl ApiAvailability {
                     Some("OCR model files not found. Download text-detection.rten and text-recognition.rten into the models/ directory.")
                 }
             }
+            "local_vlm" if !self.local_vlm => {
+                Some("LOCAL_VLM_URL and LOCAL_VLM_MODEL not set. Point them at an OpenAI-compatible vision server (e.g. vLLM).")
+            }
+            "mindee" if !self.mindee => {
+                Some("MINDEE_API_KEY not configured. Set it in Settings -> API Keys or .env.")
+            }
+            "reducto" if !self.reducto => {
+                Some("REDUCTO_API_KEY not configured. Set it in .env to enable the Reducto parser.")
+            }
             _ => None,
         }
     }
@@ -851,11 +942,14 @@ impl ApiAvailability {
             gemini_vertex = self.gemini_vertex,
             mistral_api = self.mistral_api_key,
             document_ai = self.document_ai,
+            mindee = self.mindee,
+            reducto = self.reducto,
             llamaparse = self.llamaparse,
             pdfrest = self.pdfrest,
             pymupdf_pro = self.pymupdf_pro,
             vision_ai = self.vision_ai,
             ocr = self.ocr,
+            local_vlm = self.local_vlm,
             "[boot] API availability detected"
         );
     }
@@ -1074,6 +1168,7 @@ mod tests {
             api_key: "".into(),
             gcs_output_uri: "".into(),
             passphrase: "".into(),
+            default_processor_version: "".into(),
         });
         assert!(cfg.has_ai_for_balancing());
 
@@ -1094,6 +1189,45 @@ mod tests {
     }
 
     #[test]
+    fn default_config_does_not_validate_in_non_dev_mode() {
+        let mut cfg = AppConfig::default();
+        assert!(
+            cfg.passphrase.is_empty(),
+            "default config must not ship a usable passphrase"
+        );
+        cfg.is_dev_mode = false;
+        let errors = cfg.validate();
+        assert!(
+            !errors.is_empty(),
+            "default config must NOT validate in non-dev mode"
+        );
+        assert!(errors.iter().any(|e| e.contains("DUAL_CORE_PASSPHRASE")));
+    }
+
+    #[test]
+    fn encryption_passphrase_fails_fast_when_unset() {
+        let cfg = AppConfig::default();
+        let err = cfg
+            .encryption_passphrase()
+            .expect_err("empty passphrase must fail fast");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("DUAL_CORE_PASSPHRASE"),
+            "error should name the missing variable, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn encryption_passphrase_returns_value_when_set() {
+        let mut cfg = AppConfig::default();
+        cfg.passphrase = "a-real-passphrase-from-env".into();
+        assert_eq!(
+            cfg.encryption_passphrase().unwrap(),
+            "a-real-passphrase-from-env"
+        );
+    }
+
+    #[test]
     fn detect_availability_exposes_backend_state_and_helpful_reasons() {
         let mut cfg = AppConfig::default();
         cfg.gemini_api_key = Some("gemini".into());
@@ -1108,6 +1242,7 @@ mod tests {
             api_key: "".into(),
             gcs_output_uri: "".into(),
             passphrase: "".into(),
+            default_processor_version: "".into(),
         });
         cfg.llamaparse_api_key = Some("llama".into());
         cfg.pdfrest_api_key = Some("pdfrest".into());

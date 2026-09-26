@@ -1398,4 +1398,32 @@ mod tests {
             assert_eq!(row.debit, Some(dec!(2750.00)));
         }
     }
+
+    #[test]
+    fn test_scale_expense_half() {
+        let txns = sample_transactions();
+        let result = parse_and_apply("halve my rent", txns).expect("should parse");
+        assert_eq!(result.rows_changed, 3);
+        let rent_row = result
+            .transactions
+            .iter()
+            .find(|t| t.raw_text.to_lowercase().contains("rent"))
+            .expect("must find rent row");
+        assert_eq!(rent_row.credit, Some(dec!(600.00)));
+    }
+
+    #[test]
+    fn test_set_amount_fixed() {
+        let txns = sample_transactions();
+        let result = parse_and_apply("set Maree's pay to $3200", txns).expect("should parse");
+        assert_eq!(result.rows_changed, 3);
+        let maree_rows: Vec<_> = result
+            .transactions
+            .iter()
+            .filter(|t| t.raw_text.to_lowercase().contains("maree"))
+            .collect();
+        for row in &maree_rows {
+            assert_eq!(row.debit, Some(dec!(3200.00)));
+        }
+    }
 }

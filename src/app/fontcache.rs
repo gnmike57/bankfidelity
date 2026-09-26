@@ -263,4 +263,30 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn bootstrap_degrades_gracefully_without_panicking_on_network_failure() {
+        let dir =
+            std::env::temp_dir().join(format!("dcpp-fontcache-netfail-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+
+        // In a real air-gapped run, the reqwest calls inside `bootstrap` will
+        // fail with DNS or connection errors. `bootstrap` must return `Ok(BootstrapReport)`
+        // where the `failed` vector contains those errors, instead of panicking.
+        let report_result = bootstrap(&dir, false);
+        assert!(
+            report_result.is_ok(),
+            "bootstrap must return Ok(Report) even if all network calls fail"
+        );
+        let report = report_result.unwrap();
+
+        // Sum of success + skipped + failed must equal the total seed count.
+        assert_eq!(
+            report.downloaded.len() + report.already_cached.len() + report.failed.len(),
+            SEED.len(),
+            "every font seed must be accounted for"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

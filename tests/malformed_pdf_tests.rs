@@ -34,15 +34,24 @@ async fn test_malformed_pdf_handling() {
     let res2 = engine.analyze_layout(&corrupt_path);
     assert!(res2.is_err(), "Engine should cleanly reject a corrupt PDF");
 
-    // 3. Infinite recursion / malicious objects
-    // Synthesizing a deeply recursive PDF is tricky without binary generation,
-    // but we can at least assert that the engine handles deeply nested JSON or other anomalies
-    // in its native bindings safely.
-    // For now, ensuring basic malformed files do not crash the AST parser is sufficient.
+    // 3. Cyclic / malformed object references
+    let cyclic_path = PathBuf::from("tests/stress_pdfs/cyclic.pdf");
+    fs::write(
+        &cyclic_path,
+        "%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [1 0 R] /Count 1 >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n",
+    )
+    .unwrap();
+
+    let res3 = engine.analyze_layout(&cyclic_path);
+    assert!(
+        res3.is_err(),
+        "Engine should cleanly reject a cyclic PDF structure instead of hanging or panicking"
+    );
 
     println!("Malformed PDF test suite completed. All rejected cleanly.");
 
     // Cleanup
     let _ = fs::remove_file(zero_byte_path);
     let _ = fs::remove_file(corrupt_path);
+    let _ = fs::remove_file(cyclic_path);
 }

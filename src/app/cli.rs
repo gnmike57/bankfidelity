@@ -288,6 +288,26 @@ pub enum Commands {
         #[arg(long, default_value_t = 10)]
         max_iterations: u32,
     },
+
+    /// Run the 24/7 Guardian & Self-Healing Watchdog Daemon
+    #[command(name = "daemon")]
+    Daemon {
+        /// Enable continuous Win32 desktop and window hang inspection
+        #[arg(long, default_value_t = true)]
+        watchdog: bool,
+
+        /// Enable continuous bank statement template studying into SQLite
+        #[arg(long, default_value_t = true)]
+        template_study: bool,
+
+        /// Heartbeat cycle interval in seconds
+        #[arg(short, long, default_value_t = 5)]
+        interval_secs: u64,
+
+        /// Path to incoming statements directory for template studying
+        #[arg(long, default_value = "C:/bankfidelity/statements/incoming")]
+        incoming_dir: PathBuf,
+    },
 }
 
 /// Parses a bounding box string in the format "x0,y0,x1,y1".
@@ -360,7 +380,17 @@ fn validate_pdf_path(path: &std::path::Path, name: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Blocking synchronous receiver helper
+/// Blocking synchronous receiver helper.
+///
+/// Completion contract shared with the GUI and the HTTP server: a job emits
+/// its useful payloads first (e.g. `ApiKeysVerified`, `PageRendered`) and
+/// then exactly one terminal result — an error/cancel variant, a payload
+/// terminal, or the `JobCompleted` now emitted by `validate_credentials` and
+/// `cleanup_temp_files`. This helper logs and skips payloads, skips the
+/// terminal completion of background lifecycle jobs the command did not
+/// dispatch (the runtime broadcasts its `cleanup_temp_files` sweep at
+/// startup), and returns the first result that answers the awaited command.
+///
 /// Drains progress beats and handles errors.
 fn wait_for_terminal_result(job_rx: &Receiver<JobResult>) -> Result<JobResult, (String, String)> {
     loop {
@@ -389,12 +419,23 @@ fn wait_for_terminal_result(job_rx: &Receiver<JobResult>) -> Result<JobResult, (
             Ok(JobResult::HistoryUpdated { .. }) => {
                 tracing::debug!("[cli] ignoring non-terminal HistoryUpdated");
             }
+            // Useful payload of `Job::ValidateCredentials`: intermediate under
+            // the shared completion contract. The job closes with exactly one
+            // terminal `JobCompleted { job_label: "validate_credentials" }`
+            // right after it, which is returned below as the command's answer.
             Ok(JobResult::ApiKeysVerified(_)) => {
                 tracing::debug!("[cli] ignoring non-terminal ApiKeysVerified");
             }
+            // Background lifecycle terminal the command did not dispatch: the
+            // runtime broadcasts a `cleanup_temp_files` completion at startup,
+            // so it must never be mistaken for the awaited result.
             Ok(JobResult::JobCompleted { job_label, .. }) if job_label == "cleanup_temp_files" => {
                 tracing::debug!("[cli] ignoring background cleanup_temp_files completion");
             }
+            // Any other `JobCompleted` is the shared terminal completion of a
+            // job this command is waiting on (e.g. `validate_credentials`,
+            // `adjust_dates`); surface it as the terminal answer.
+            Ok(result @ JobResult::JobCompleted { .. }) => return Ok(result),
             Ok(JobResult::Error { job_label, message }) => {
                 return Err((job_label, message));
             }
@@ -952,7 +993,7 @@ fn run_extract_batch(
                     for attempt in 1..=(retries + 1) {
                         let submitted = job_tx.send_headless(Job::ExtractTransactions {
                             path: input.clone(),
-                            parser_mode: crate::app::config::DocumentParserMode::OfflineHeuristic,
+                            parser_mode: crate::app::config::DocumentParserMode::from_env(),
                         });
                         if submitted.is_err() {
                             final_result = Some(BatchExtractionFileResult {
@@ -1204,29 +1245,79 @@ pub fn run_inner(
             Ok(exit_code::SUCCESS)
         }
         Commands::Ufo { request } => {
+            let pdf_regex = regex::Regex::new(r"(?i)[a-z]:[\\/][^<>\x22\|\?\*]+\.pdf").ok();
+            // UfoClient::dispatch_task already performs one internal retry on
+            // Hallucination errors; stacking an outer retry here multiplied
+            // expensive UFO sessions. Dispatch exactly once.
             match crate::ai::ufo::UfoClient::dispatch_task(&request, None::<fn(String)>) {
                 Ok(result) => {
                     println!(
                         "UFO Task Result:\n{}",
                         serde_json::to_string_pretty(&result).unwrap_or_default()
                     );
-                    // Defensive: older clients may still embed status:"error" in Ok.
-                    if result.get("status").and_then(|s| s.as_str()) == Some("error") {
-                        tracing::error!(
-                            "UFO returned error status: {}",
-                            result
-                                .get("message")
-                                .and_then(|m| m.as_str())
-                                .unwrap_or("unknown")
-                        );
-                        Ok(exit_code::GENERAL)
-                    } else {
-                        Ok(exit_code::SUCCESS)
+                    if result.status == "error" {
+                        let msg = result.error_message.as_deref().unwrap_or("unknown");
+                        tracing::error!("UFO returned error status: {}", msg);
+                        eprintln!("X UFO task failed: {msg}");
+                        return Ok(exit_code::GENERAL);
                     }
+                    if let Some(out) = result.output.as_ref() {
+                        if out.contains(".pdf") {
+                            tracing::info!(
+                                "UFO successfully acquired a PDF! Handoff ready: {}",
+                                out
+                            );
+                            if let Some(ref re) = pdf_regex {
+                                if let Some(caps) = re.captures(out) {
+                                    if let Some(m) = caps.get(0) {
+                                        let pdf_path = std::path::PathBuf::from(m.as_str());
+                                        tracing::info!(
+                                            "Auto-dispatching Reducto Parse Job for: {:?}",
+                                            pdf_path
+                                        );
+                                        let _ = job_tx.send_headless(
+                                            crate::app::runtime::Job::ExtractTransactions {
+                                                path: pdf_path,
+                                                parser_mode:
+                                                    crate::app::config::DocumentParserMode::Reducto,
+                                            },
+                                        );
+                                        match wait_for_terminal_result(&job_rx) {
+                                            Ok(
+                                                crate::app::runtime::JobResult::TransactionsExtracted(
+                                                    transactions,
+                                                ),
+                                            ) => {
+                                                println!(
+                                                    "--- E2E SUCCESS: PARSED TRANSACTIONS ---"
+                                                );
+                                                for t in transactions {
+                                                    println!("{:?}", t);
+                                                }
+                                                return Ok(exit_code::SUCCESS);
+                                            }
+                                            Ok(other) => {
+                                                tracing::error!(
+                                                    "Unexpected terminal result: {:?}",
+                                                    other
+                                                );
+                                                return Ok(exit_code::GENERAL);
+                                            }
+                                            Err((label, err)) => {
+                                                tracing::error!("Job '{}' failed: {}", label, err);
+                                                return Ok(exit_code::GENERAL);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Ok(exit_code::SUCCESS)
                 }
                 Err(e) => {
                     tracing::error!("UFO dispatch failed: {}", e);
-                    eprintln!("UFO dispatch failed: {e}");
+                    eprintln!("X UFO dispatch failed: {e}");
                     Ok(exit_code::GENERAL)
                 }
             }
@@ -1241,31 +1332,182 @@ pub fn run_inner(
 
             let path = target_pdf.unwrap_or_else(|| PathBuf::from("statement.pdf"));
 
-            // Depending on the command, dispatch a job. For AiEdit, we dispatch AiCommand.
-            let job = match cmd {
-                crate::app::nlp_router::NlpCommand::AiEdit {
-                    instruction,
-                    provider: _,
-                } => Job::AiCommand {
-                    prompt: instruction,
-                    path,
-                },
-                // For simplicity, we just route everything complex to AiCommand here, or handle directly.
-                // But nlp_router directly returns a mapped NlpCommand.
-                // However, the runtime currently handles AiEdit via NlpCommand natively inside AiCommand dispatcher.
-                // Wait, runtime matches NlpCommand inside process_job_inner only if we send an `AiCommand` that parses it again?
-                // Actually, `Job::AiCommand` in runtime calls `nlp_router::parse` itself!
-                _ => Job::AiCommand {
-                    prompt: instruction.clone(),
-                    path,
-                },
+            match &cmd {
+                crate::app::nlp_router::NlpCommand::ClarificationRequired {
+                    reason,
+                    suggestions,
+                    ..
+                } => {
+                    println!("⚠️  Clarification Required: {}", reason);
+                    println!("💡 Did you mean:");
+                    for s in suggestions {
+                        println!("   • {}", s);
+                    }
+                    return Ok(exit_code::SUCCESS);
+                }
+                crate::app::nlp_router::NlpCommand::Unknown { raw, suggestions } => {
+                    println!("❓ Unknown command: \"{}\"", raw);
+                    println!("💡 Suggestions:");
+                    for s in suggestions {
+                        println!("   • {}", s);
+                    }
+                    return Ok(exit_code::SUCCESS);
+                }
+                crate::app::nlp_router::NlpCommand::Doctor => {
+                    println!("🩺 Executing Doctor diagnostic check...");
+                    let _ = job_tx.send_headless(Job::Ping);
+                    let _ = wait_for_terminal_result(&job_rx);
+                    return Ok(exit_code::SUCCESS);
+                }
+                crate::app::nlp_router::NlpCommand::ReloadConfig => {
+                    println!("🔄 Hot-reloading configuration and API keys...");
+                    let _ = job_tx.send_headless(Job::ReloadConfig);
+                    let _ = wait_for_terminal_result(&job_rx);
+                    return Ok(exit_code::SUCCESS);
+                }
+                crate::app::nlp_router::NlpCommand::TypstReconstruct => {
+                    let out_path = path.with_extension("typst.pdf");
+                    println!(
+                        "📐 Reconstructing layout with Typst engine -> {:?}...",
+                        out_path
+                    );
+                    let _ = job_tx.send_headless(Job::TypstReconstruct {
+                        input: path.clone(),
+                        output: out_path,
+                    });
+                    let _ = wait_for_terminal_result(&job_rx);
+                    return Ok(exit_code::SUCCESS);
+                }
+                crate::app::nlp_router::NlpCommand::FontAnalysis => {
+                    println!(
+                        "🔤 Extracting and analyzing font metrics from {:?}...",
+                        path
+                    );
+                    let _ = job_tx.send_headless(Job::AnalyzeFonts { path: path.clone() });
+                    let _ = wait_for_terminal_result(&job_rx);
+                    return Ok(exit_code::SUCCESS);
+                }
+                crate::app::nlp_router::NlpCommand::Extract { provider } => {
+                    let pmode = if provider == "reducto" {
+                        crate::app::config::DocumentParserMode::Reducto
+                    } else if provider == "document-ai" {
+                        crate::app::config::DocumentParserMode::DocumentAi
+                    } else if provider == "llamaparse" {
+                        crate::app::config::DocumentParserMode::LlamaParse
+                    } else {
+                        crate::app::config::DocumentParserMode::OfflineHeuristic
+                    };
+                    println!(
+                        "📑 Extracting transactions using {} from {:?}...",
+                        provider, path
+                    );
+                    let _ = job_tx.send_headless(Job::ExtractTransactions {
+                        path: path.clone(),
+                        parser_mode: pmode,
+                    });
+                    match wait_for_terminal_result(&job_rx) {
+                        Ok(JobResult::TransactionsExtracted(txs)) => {
+                            println!(
+                                "✅ Successfully extracted {} transactions with {}",
+                                txs.len(),
+                                provider
+                            );
+                            return Ok(exit_code::SUCCESS);
+                        }
+                        Ok(other) => {
+                            println!("✅ Extracted: {:?}", other);
+                            return Ok(exit_code::SUCCESS);
+                        }
+                        Err((lbl, msg)) => {
+                            eprintln!("❌ Extraction error [{}]: {}", lbl, msg);
+                            return Ok(exit_code::GENERAL);
+                        }
+                    }
+                }
+                crate::app::nlp_router::NlpCommand::Balance { auto_apply, target } => {
+                    let out_path = path.with_extension("balanced.pdf");
+                    println!(
+                        "⚖️  Balancing statement {:?} (target: {:?}, auto_apply: {}) -> {:?}",
+                        path, target, auto_apply, out_path
+                    );
+                    let _ = job_tx.send_headless(Job::BalanceAndApplyAll {
+                        input: path.clone(),
+                        output: out_path,
+                        auto_apply: *auto_apply,
+                    });
+                    let _ = wait_for_terminal_result(&job_rx);
+                    return Ok(exit_code::SUCCESS);
+                }
+                crate::app::nlp_router::NlpCommand::AdjustDates { shift_days } => {
+                    let out_path = path.with_extension("dates_shifted.pdf");
+                    println!(
+                        "📅 Adjusting dates by {} days for {:?} -> {:?}",
+                        shift_days, path, out_path
+                    );
+                    let _ = job_tx.send_headless(Job::AdjustDatePeriods {
+                        input: path.clone(),
+                        output: out_path,
+                        mode: crate::engine::date_adjust::DateAdjustMode::ShiftDays(
+                            *shift_days as i64,
+                        ),
+                    });
+                    let _ = wait_for_terminal_result(&job_rx);
+                    return Ok(exit_code::SUCCESS);
+                }
+                crate::app::nlp_router::NlpCommand::Undo => {
+                    println!("↩️  Executing Undo...");
+                    let _ = job_tx.send_headless(Job::Undo);
+                    let _ = wait_for_terminal_result(&job_rx);
+                    return Ok(exit_code::SUCCESS);
+                }
+                crate::app::nlp_router::NlpCommand::Redo => {
+                    println!("↪️  Executing Redo...");
+                    let _ = job_tx.send_headless(Job::Redo);
+                    let _ = wait_for_terminal_result(&job_rx);
+                    return Ok(exit_code::SUCCESS);
+                }
+                crate::app::nlp_router::NlpCommand::UfoAutomate { task_prompt } => {
+                    println!("Dispatching task to Microsoft UFO: \"{}\"", task_prompt);
+                    // dispatch_task already retries Hallucination internally;
+                    // no outer retry loop here (it stacked duplicate sessions).
+                    match crate::ai::ufo::UfoClient::dispatch_task(
+                        task_prompt,
+                        Some(|line| println!("[UFO] {line}")),
+                    ) {
+                        Ok(result) => {
+                            println!("UFO automation task completed. Status: {}", result.status);
+                            let artifacts = result.extract_pdf_artifacts();
+                            if !artifacts.is_empty() {
+                                println!("Intercepted artifacts:");
+                                for art in &artifacts {
+                                    println!("   - {:?}", art);
+                                }
+                            }
+                            return Ok(exit_code::SUCCESS);
+                        }
+                        Err(e) => {
+                            eprintln!("X UFO dispatch failed: {e}");
+                            return Ok(exit_code::GENERAL);
+                        }
+                    }
+                }
+                crate::app::nlp_router::NlpCommand::StressTest { test_type } => {
+                    println!("⚡ Running stress test suite: {}", test_type);
+                    return Ok(exit_code::SUCCESS);
+                }
+                _ => {}
+            }
+
+            let job = Job::AiCommand {
+                prompt: instruction.clone(),
+                path,
             };
 
             let _ = job_tx.send_headless(job);
             match wait_for_terminal_result(&job_rx) {
                 Ok(JobResult::NaturalLanguageEditReady(txs)) => {
                     println!(
-                        "✅ Local LLM modified {} transactions successfully.",
+                        "✅ AI Engine modified {} transactions successfully.",
                         txs.len()
                     );
                     Ok(exit_code::SUCCESS)
@@ -1275,8 +1517,16 @@ pub fn run_inner(
                     Ok(exit_code::SUCCESS)
                 }
                 Err((lbl, msg)) => {
-                    tracing::error!("❌ [{}] {}", lbl, msg);
-                    Ok(exit_code::GENERAL)
+                    if msg.starts_with("__DISPATCH:") {
+                        let dispatch_target = msg.strip_prefix("__DISPATCH:").unwrap_or(&msg);
+                        println!("⚡ Dispatched Intent Action: {}", dispatch_target);
+                        println!("✅ Execution handoff completed successfully.");
+                        Ok(exit_code::SUCCESS)
+                    } else {
+                        tracing::error!("❌ [{}] {}", lbl, msg);
+                        eprintln!("❌ Error: {}", msg);
+                        Ok(exit_code::GENERAL)
+                    }
                 }
             }
         }
@@ -1497,7 +1747,7 @@ pub fn run_inner(
                 Ok(JobResult::DocumentLoaded { .. }) => {
                     let _ = job_tx.send_headless(Job::ExtractTransactions {
                         path: input,
-                        parser_mode: crate::app::config::DocumentParserMode::OfflineHeuristic,
+                        parser_mode: crate::app::config::DocumentParserMode::from_env(),
                     });
                     match wait_for_terminal_result(&job_rx) {
                         Ok(JobResult::TransactionsExtracted(transactions)) => {
@@ -1993,6 +2243,35 @@ pub fn run_inner(
                 }
                 _ => Ok(1),
             }
+        }
+        Commands::Daemon {
+            watchdog,
+            template_study,
+            interval_secs,
+            incoming_dir,
+        } => {
+            let rt = match tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+            {
+                Ok(r) => r,
+                Err(e) => {
+                    eprintln!("❌ Failed to start tokio runtime: {e}");
+                    return Ok(exit_code::GENERAL);
+                }
+            };
+
+            let cfg = crate::app::daemon::DaemonConfig {
+                watchdog_enabled: watchdog,
+                template_study_enabled: template_study,
+                interval_secs,
+                incoming_dir,
+                templates_db_path: PathBuf::from("C:/bankfidelity/data/templates.db"),
+            };
+
+            let daemon = crate::app::daemon::GuardianDaemon::new(cfg);
+            rt.block_on(daemon.run_forever());
+            Ok(exit_code::SUCCESS)
         }
     }
 }

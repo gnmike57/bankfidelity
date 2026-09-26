@@ -197,16 +197,297 @@ fn gate(id: &str, passed: bool, message: String) -> VerificationGate {
     )
 }
 
+/// Validates cross-reference and structural compliance of a PDF file according to ISO 32000-1:
+/// - %PDF- header presence within first 1024 bytes
+/// - %%EOF marker presence within trailing window
+/// - startxref keyword and valid numeric byte offset within file length
+/// - target at offset starts with 'xref' table or cross-reference stream object
+/// - trailer /Root catalog dictionary resolution
+/// - catalog /Pages reference and dictionary resolution with /Kids or /Count
+/// - page tree resolvable pages nonempty
+pub fn verify_xref_compliance(path: &Path, doc: Option<&Document>) -> (bool, String) {
+    let bytes = match std::fs::read(path) {
+        Ok(b) => b,
+        Err(e) => return (false, format!("cannot read PDF file: {e}")),
+    };
+
+    if bytes.len() < 32 {
+        return (false, "PDF file is too small (< 32 bytes)".into());
+    }
+
+    // 1. Header check: %PDF- within the first 1024 bytes
+    let header_len = bytes.len().min(1024);
+    if !bytes[..header_len].windows(5).any(|w| w == b"%PDF-") {
+        return (false, "missing %PDF- header in first 1024 bytes".into());
+    }
+
+    // 2. Trailing window: %%EOF within trailing 4096 bytes
+    let trailer_search_len = bytes.len().min(4096);
+    let trailer_start = bytes.len() - trailer_search_len;
+    let Some(eof_rel_pos) = bytes[trailer_start..]
+        .windows(5)
+        .rposition(|w| w == b"%%EOF")
+    else {
+        return (false, "missing %%EOF marker in trailing 4096 bytes".into());
+    };
+    let eof_abs_pos = trailer_start + eof_rel_pos;
+
+    // 3. startxref keyword preceding %%EOF
+    let Some(startxref_pos) = bytes[..eof_abs_pos]
+        .windows(9)
+        .rposition(|w| w == b"startxref")
+    else {
+        return (false, "missing startxref keyword before %%EOF".into());
+    };
+
+    let after_startxref = &bytes[startxref_pos + 9..eof_abs_pos];
+    let offset_digits: String = after_startxref
+        .iter()
+        .skip_while(|b| b.is_ascii_whitespace())
+        .take_while(|b| b.is_ascii_digit())
+        .map(|&b| b as char)
+        .collect();
+
+    if offset_digits.is_empty() {
+        return (
+            false,
+            "startxref keyword not followed by numeric byte offset".into(),
+        );
+    }
+
+    let Ok(startxref_offset) = offset_digits.parse::<usize>() else {
+        return (
+            false,
+            format!("invalid startxref byte offset '{offset_digits}'"),
+        );
+    };
+
+    if startxref_offset >= bytes.len() {
+        return (
+            false,
+            format!(
+                "startxref offset {startxref_offset} exceeds file length {}",
+                bytes.len()
+            ),
+        );
+    }
+
+    // 4. Verify target at startxref_offset points to xref table or stream object
+    let target = &bytes[startxref_offset..];
+    let skip_ws = target
+        .iter()
+        .position(|b| !b.is_ascii_whitespace())
+        .unwrap_or(0);
+    let trimmed_target = &target[skip_ws..];
+
+    let is_xref_table = trimmed_target.starts_with(b"xref");
+    let is_xref_stream = if !is_xref_table {
+        let prefix_len = trimmed_target.len().min(64);
+        let prefix = &trimmed_target[..prefix_len];
+        if let Ok(prefix_str) = std::str::from_utf8(prefix) {
+            let mut tokens = prefix_str.split_whitespace();
+            let num = tokens.next().and_then(|s| s.parse::<u32>().ok());
+            let gen = tokens.next().and_then(|s| s.parse::<u16>().ok());
+            let obj = tokens.next();
+            num.is_some() && gen.is_some() && obj == Some("obj")
+        } else {
+            false
+        }
+    } else {
+        false
+    };
+
+    if !is_xref_table && !is_xref_stream {
+        return (
+            false,
+            format!(
+                "startxref offset {startxref_offset} does not point to 'xref' table or cross-reference stream object"
+            ),
+        );
+    }
+
+    // 5. Document-level structural validation
+    let loaded_doc;
+    let document = match doc {
+        Some(d) => d,
+        None => match Document::load_from(&mut std::io::Cursor::new(&bytes)) {
+            Ok(d) => {
+                loaded_doc = d;
+                &loaded_doc
+            }
+            Err(e) => {
+                return (
+                    false,
+                    format!("PDF cross-reference or structural parse error: {e}"),
+                )
+            }
+        },
+    };
+
+    // Trailer /Root check
+    let root_obj = match document.trailer.get(b"Root") {
+        Ok(obj) => obj,
+        Err(_) => return (false, "trailer is missing /Root catalog reference".into()),
+    };
+
+    let (_, catalog_obj) = match document.dereference(root_obj) {
+        Ok(pair) => pair,
+        Err(e) => return (false, format!("cannot dereference /Root catalog: {e}")),
+    };
+
+    let catalog_dict = match catalog_obj.as_dict() {
+        Ok(dict) => dict,
+        Err(_) => return (false, "/Root catalog object is not a dictionary".into()),
+    };
+
+    if let Ok(type_obj) = catalog_dict.get(b"Type") {
+        if let Ok(type_name) = type_obj.as_name() {
+            if type_name != b"Catalog" {
+                return (
+                    false,
+                    format!(
+                        "catalog /Type is not /Catalog: /{}",
+                        String::from_utf8_lossy(type_name)
+                    ),
+                );
+            }
+        }
+    }
+
+    let pages_ref = match catalog_dict.get(b"Pages") {
+        Ok(obj) => obj,
+        Err(_) => {
+            return (
+                false,
+                "catalog dictionary is missing /Pages reference".into(),
+            )
+        }
+    };
+
+    let (_, pages_obj) = match document.dereference(pages_ref) {
+        Ok(pair) => pair,
+        Err(e) => return (false, format!("cannot dereference /Pages object: {e}")),
+    };
+
+    let pages_dict = match pages_obj.as_dict() {
+        Ok(dict) => dict,
+        Err(_) => return (false, "/Pages object is not a dictionary".into()),
+    };
+
+    if !pages_dict.has(b"Kids") && !pages_dict.has(b"Count") {
+        return (
+            false,
+            "/Pages dictionary is missing /Kids and /Count".into(),
+        );
+    }
+
+    let page_map = document.get_pages();
+    if page_map.is_empty() {
+        return (
+            false,
+            "PDF contains no resolvable pages in page tree".into(),
+        );
+    }
+
+    (
+        true,
+        "XRef table/stream, header, and catalog structure comply with PDF specification".into(),
+    )
+}
+
 pub fn verify_structural_invariants(
     original_path: &Path,
     edited_path: &Path,
 ) -> Result<Vec<VerificationGate>, String> {
     let original = Document::load(original_path)
         .map_err(|error| format!("cannot load original PDF structure: {error}"))?;
-    let edited = Document::load(edited_path)
-        .map_err(|error| format!("cannot load edited PDF structure: {error}"))?;
+
+    let edited = match Document::load(edited_path) {
+        Ok(doc) => doc,
+        Err(load_error) => {
+            let (_, compliance_msg) = verify_xref_compliance(edited_path, None);
+            let message = if compliance_msg.contains("comply") {
+                format!("PDF loading failed: {load_error}")
+            } else {
+                compliance_msg
+            };
+            return Ok(vec![
+                gate(
+                    "structure.page_count",
+                    false,
+                    "cannot load edited PDF structure".into(),
+                ),
+                gate(
+                    "structure.page_geometry",
+                    false,
+                    "cannot load edited PDF structure".into(),
+                ),
+                gate(
+                    "structure.content_presence",
+                    false,
+                    "cannot load edited PDF structure".into(),
+                ),
+                gate(
+                    "structure.page_identity",
+                    false,
+                    "cannot load edited PDF structure".into(),
+                ),
+                gate(
+                    "structure.font_resources",
+                    false,
+                    "cannot load edited PDF structure".into(),
+                ),
+                gate(
+                    "structure.metadata_policy",
+                    false,
+                    "cannot load edited PDF structure".into(),
+                ),
+                gate("structure.xref_compliance", false, message),
+            ]);
+        }
+    };
+
     let original_pages = page_signatures(&original)?;
-    let edited_pages = page_signatures(&edited)?;
+    let edited_pages = match page_signatures(&edited) {
+        Ok(pages) => pages,
+        Err(sig_error) => {
+            let (_, compliance_msg) = verify_xref_compliance(edited_path, Some(&edited));
+            return Ok(vec![
+                gate(
+                    "structure.page_count",
+                    false,
+                    format!("corrupted edited pages: {sig_error}"),
+                ),
+                gate(
+                    "structure.page_geometry",
+                    false,
+                    format!("corrupted edited pages: {sig_error}"),
+                ),
+                gate(
+                    "structure.content_presence",
+                    false,
+                    format!("corrupted edited pages: {sig_error}"),
+                ),
+                gate(
+                    "structure.page_identity",
+                    false,
+                    format!("corrupted edited pages: {sig_error}"),
+                ),
+                gate(
+                    "structure.font_resources",
+                    false,
+                    format!("corrupted edited pages: {sig_error}"),
+                ),
+                gate(
+                    "structure.metadata_policy",
+                    false,
+                    format!("corrupted edited pages: {sig_error}"),
+                ),
+                gate("structure.xref_compliance", false, compliance_msg),
+            ]);
+        }
+    };
+
     let page_counts_match = original_pages.len() == edited_pages.len();
     let mut gates = vec![gate(
         "structure.page_count",
@@ -326,6 +607,9 @@ pub fn verify_structural_invariants(
             )
         },
     ));
+
+    let (xref_passed, xref_message) = verify_xref_compliance(edited_path, Some(&edited));
+    gates.push(gate("structure.xref_compliance", xref_passed, xref_message));
 
     Ok(gates)
 }

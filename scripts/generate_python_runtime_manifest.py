@@ -64,7 +64,7 @@ def build_manifest() -> dict[str, object]:
         raise SystemExit(f"runtime source files missing: {', '.join(missing)}")
     return {
         "schema_version": 1,
-        "python": {"major": 3, "minor": 12},
+        "python": {"major": sys.version_info.major, "minor": sys.version_info.minor},
         "protocol_version": PROTOCOL_VERSION,
         "entrypoint": "worker.py",
         "packages": {

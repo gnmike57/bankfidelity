@@ -2,4 +2,4 @@
 
 # Optional commercial extension. A valid key determines active Pro capability;
 # installation alone must never be reported as a licensed/ready Pro runtime.
-PyMuPDFPro==1.28.0
+PyMuPDFPro==1.28.2

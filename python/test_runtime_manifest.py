@@ -61,13 +61,28 @@ class RuntimeManifestTests(unittest.TestCase):
     def test_package_version_drift_is_rejected(self) -> None:
         with mock.patch.object(
             runtime_manifest.importlib.metadata, "version", return_value="0.0.0"
+        ), self.assertRaisesRegex(
+            runtime_manifest.RuntimeManifestError,
+            "PyMuPDF 0.0.0 does not match 1.28.2",
         ):
-            with self.assertRaisesRegex(
-                runtime_manifest.RuntimeManifestError,
-                "PyMuPDF 0.0.0 does not match 1.28.2",
-            ):
-                runtime_manifest.verify("base")
+            runtime_manifest.verify("base")
+
+    def test_worker_runtime_blocks_when_manifest_fails(self) -> None:
+        import sys
+        source_dir = Path(runtime_manifest.__file__).resolve().parent
+        if str(source_dir) not in sys.path:
+            sys.path.insert(0, str(source_dir))
+        from worker import WorkerRuntime
+
+        with mock.patch("worker.verify_runtime_manifest", side_effect=runtime_manifest.RuntimeManifestError("tampered")):
+            runtime = WorkerRuntime()
+            self.assertIsNone(runtime.bridge)
+            self.assertEqual(runtime.bridge_error_class, "RuntimeManifestError")
+            handshake = runtime.handshake()
+            self.assertFalse(handshake["ready"])
+            self.assertEqual(handshake["bridge_error_class"], "RuntimeManifestError")
 
 
 if __name__ == "__main__":
     unittest.main()
+

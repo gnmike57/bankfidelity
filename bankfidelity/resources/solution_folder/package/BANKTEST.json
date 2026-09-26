@@ -1,0 +1,22 @@
+{
+  "docVersion": "1.0.0",
+  "resource": {
+    "name": "BANKTEST",
+    "kind": "package",
+    "apiVersion": "orchestrator.uipath.com/v1",
+    "projectKey": "8656dd48-c0dc-40bc-b2ab-9e603eb1cf5b",
+    "dependencies": [],
+    "runtimeDependencies": [],
+    "folders": [
+      {
+        "fullyQualifiedName": "solution_folder"
+      }
+    ],
+    "spec": {
+      "name": "BANKTEST"
+    },
+    "locks": [],
+    "key": "5fa765a7-3917-4552-9263-3f775909fd20",
+    "files": []
+  }
+}

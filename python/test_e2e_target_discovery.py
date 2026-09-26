@@ -2,7 +2,6 @@ import importlib.util
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "e2e_pipeline.py"
 SPEC = importlib.util.spec_from_file_location("e2e_pipeline", SCRIPT)

@@ -1,0 +1,1 @@
+Transcribe every transaction row of the ledger table on this bank statement page. Copy text and numbers EXACTLY as printed (keep currency symbols, commas, CR/DR markers). Return ONLY a JSON array of objects with keys: date, description, debit, credit, balance (use null for empty cells). Do not compute, correct or infer anything.

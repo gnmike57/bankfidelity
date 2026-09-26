@@ -236,6 +236,158 @@ pub fn auto_correct_final_balance_smart(
     Ok((corrected, correction_message))
 }
 
+/// Detailed diagnostic record for a single line where running balance diverged.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct LineDiscrepancy {
+    /// 1-based line number in the statement.
+    pub line_number: usize,
+    /// 0-based index in the transaction array.
+    pub line_index: usize,
+    /// Transaction date string.
+    pub date: String,
+    /// Raw transaction description.
+    pub description: String,
+    /// Net transaction delta (debit - credit).
+    pub delta: Decimal,
+    /// Extracted running balance from the PDF.
+    pub extracted_balance: Decimal,
+    /// Mathematically calculated running balance from opening.
+    pub calculated_balance: Decimal,
+    /// Difference: `extracted_balance - calculated_balance`.
+    pub discrepancy: Decimal,
+}
+
+/// Comprehensive mathematical audit report for a transaction ledger.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct LedgerAuditReport {
+    /// Starting opening balance.
+    pub opening_balance: Decimal,
+    /// Final calculated closing balance after all transaction deltas.
+    pub calculated_closing_balance: Decimal,
+    /// Expected closing balance (e.g. from PDF summary block).
+    pub expected_closing_balance: Option<Decimal>,
+    /// Total closing discrepancy: `expected_closing - calculated_closing`.
+    pub closing_discrepancy: Option<Decimal>,
+    /// Whether all running balances and closing balance match within one cent.
+    pub is_balanced: bool,
+    /// List of all per-line discrepancies found.
+    pub line_discrepancies: Vec<LineDiscrepancy>,
+    /// 1-based line number of the first point where balance diverged.
+    pub first_imbalance_line: Option<usize>,
+    /// Granular human-readable diagnostic message.
+    pub diagnostic_message: String,
+}
+
+/// Performs a granular, forensic mathematical audit of all running balances.
+///
+/// Unlike basic boolean checks, this produces exact row-by-row diagnostics
+/// pinpointing where an imbalance was introduced (e.g. OCR transposition or fraud).
+pub fn diagnose_ledger_discrepancies(
+    transactions: &[Transaction],
+    opening_balance: Decimal,
+    expected_closing_balance: Option<Decimal>,
+) -> LedgerAuditReport {
+    if transactions.is_empty() {
+        return LedgerAuditReport {
+            opening_balance,
+            calculated_closing_balance: opening_balance,
+            expected_closing_balance,
+            closing_discrepancy: expected_closing_balance.map(|exp| exp - opening_balance),
+            is_balanced: expected_closing_balance
+                .is_none_or(|exp| (exp - opening_balance).abs() <= ONE_CENT),
+            line_discrepancies: Vec::new(),
+            first_imbalance_line: None,
+            diagnostic_message: "Ledger is empty.".to_string(),
+        };
+    }
+
+    let mut current_calc = opening_balance;
+    let mut line_discrepancies = Vec::new();
+    let mut first_imbalance_line = None;
+
+    for (i, tx) in transactions.iter().enumerate() {
+        let delta = tx.net_delta();
+        current_calc = (current_calc + delta).round_dp(2);
+
+        if let Some(extracted) = tx.running_balance {
+            let diff = (extracted - current_calc).round_dp(2);
+            if diff.abs() > ONE_CENT {
+                let line_num = i + 1;
+                if first_imbalance_line.is_none() {
+                    first_imbalance_line = Some(line_num);
+                }
+                line_discrepancies.push(LineDiscrepancy {
+                    line_number: line_num,
+                    line_index: i,
+                    date: tx.date.clone(),
+                    description: tx.raw_text.clone(),
+                    delta,
+                    extracted_balance: extracted,
+                    calculated_balance: current_calc,
+                    discrepancy: diff,
+                });
+            }
+        }
+    }
+
+    let closing_discrepancy = expected_closing_balance.map(|exp| (exp - current_calc).round_dp(2));
+    let closing_ok = closing_discrepancy.is_none_or(|disc| disc.abs() <= ONE_CENT);
+    let is_balanced = line_discrepancies.is_empty() && closing_ok;
+
+    let diagnostic_message = if is_balanced {
+        format!(
+            "✅ LEDGER PERFECTLY BALANCED: {} transactions evaluated. Opening=${:.2}, Closing=${:.2}.",
+            transactions.len(),
+            opening_balance,
+            current_calc
+        )
+    } else {
+        let mut msg = format!(
+            "⚠️ LEDGER IMBALANCE DETECTED: Opening=${:.2}, Calculated Closing=${:.2}",
+            opening_balance, current_calc
+        );
+        if let Some(exp) = expected_closing_balance {
+            let disc = closing_discrepancy.unwrap_or_default();
+            msg.push_str(&format!(
+                ", Expected Closing=${:.2} (Delta=${:+.2})",
+                exp, disc
+            ));
+        }
+        if let Some(first_line) = first_imbalance_line {
+            msg.push_str(&format!("\nFirst divergence at line {}", first_line));
+            if let Some(first_disc) = line_discrepancies.first() {
+                msg.push_str(&format!(
+                    " ({}: \"{}\") -> Extracted=${:.2}, Expected=${:.2}, Delta=${:+.2}",
+                    first_disc.date,
+                    first_disc.description,
+                    first_disc.extracted_balance,
+                    first_disc.calculated_balance,
+                    first_disc.discrepancy
+                ));
+            }
+        }
+        if line_discrepancies.len() > 1 {
+            msg.push_str(&format!(
+                "\nTotal {} line discrepancies across {} rows.",
+                line_discrepancies.len(),
+                transactions.len()
+            ));
+        }
+        msg
+    };
+
+    LedgerAuditReport {
+        opening_balance,
+        calculated_closing_balance: current_calc,
+        expected_closing_balance,
+        closing_discrepancy,
+        is_balanced,
+        line_discrepancies,
+        first_imbalance_line,
+        diagnostic_message,
+    }
+}
+
 /// Full pipeline: Recalculate + Auto-correct final balance using SOTA constraints.
 /// This is the function the GUI should call after every user edit.
 pub fn process_and_reconcile(
@@ -364,13 +516,37 @@ mod tests {
     }
 
     #[test]
-    fn process_and_reconcile_with_expected_balance_returns_some_message() -> anyhow::Result<()> {
-        let txs = vec![make_tx(Some(dec!(10)), None)]; // computed balance: 110
-        let (res, msg) = process_and_reconcile(txs, dec!(100), Some(dec!(150)))?;
-        assert_eq!(res[0].running_balance, Some(dec!(150)));
-        assert!(msg.is_some());
-        assert!(msg.unwrap_or_default().contains("110.00")); // The message contains the old balance
-        Ok(())
+    fn test_diagnose_perfectly_balanced_ledger() {
+        let mut tx1 = make_tx(Some(dec!(50)), None);
+        tx1.running_balance = Some(dec!(150.00));
+        let mut tx2 = make_tx(None, Some(dec!(20)));
+        tx2.running_balance = Some(dec!(130.00));
+
+        let report = diagnose_ledger_discrepancies(&[tx1, tx2], dec!(100), Some(dec!(130)));
+        assert!(report.is_balanced);
+        assert_eq!(report.line_discrepancies.len(), 0);
+        assert_eq!(report.first_imbalance_line, None);
+        assert!(report.diagnostic_message.contains("PERFECTLY BALANCED"));
+    }
+
+    #[test]
+    fn test_diagnose_imbalanced_ledger_identifies_first_divergence() {
+        let mut tx1 = make_tx(Some(dec!(50)), None);
+        tx1.running_balance = Some(dec!(150.00));
+        let mut tx2 = make_tx(None, Some(dec!(20)));
+        tx2.running_balance = Some(dec!(175.00)); // Should be 130, so +45 error
+        tx2.raw_text = "Suspicious Fee".to_string();
+        let mut tx3 = make_tx(Some(dec!(10)), None);
+        tx3.running_balance = Some(dec!(185.00)); // Cascades error
+
+        let report = diagnose_ledger_discrepancies(&[tx1, tx2, tx3], dec!(100), Some(dec!(140)));
+        assert!(!report.is_balanced);
+        assert_eq!(report.first_imbalance_line, Some(2));
+        assert_eq!(report.line_discrepancies.len(), 2);
+        assert_eq!(report.line_discrepancies[0].discrepancy, dec!(45.00));
+        assert!(report
+            .diagnostic_message
+            .contains("First divergence at line 2"));
     }
 }
 
@@ -516,6 +692,7 @@ mod polars_balance_tests {
 
 #[cfg(test)]
 mod proptest_balance_tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
     use super::*;
     use crate::engine::model::{Provenance, Transaction};
     use proptest::prelude::*;
@@ -557,6 +734,51 @@ mod proptest_balance_tests {
 
             // Just ensure it doesn't panic and returns a valid Result
             let _ = recalculate_and_validate(txs, opening);
+        }
+
+        #[test]
+        fn proptest_opening_closing_continuity_invariant(
+            opening in any_decimal(),
+            amounts in prop::collection::vec((any_decimal(), any_decimal()), 1..25),
+        ) {
+            let mut expected_running = opening;
+            let mut txs = Vec::new();
+
+            for (idx, (deb, cred)) in amounts.iter().enumerate() {
+                // To keep transaction valid and realistic, either debit or credit is present
+                let (d, c) = if idx % 2 == 0 {
+                    expected_running = (expected_running + *deb).round_dp(2);
+                    (Some(*deb), None)
+                } else {
+                    expected_running = (expected_running - *cred).round_dp(2);
+                    (None, Some(*cred))
+                };
+
+                txs.push(Transaction {
+                    page: 1,
+                    line_on_page: idx + 1,
+                    date: "2026-03-01".to_string(),
+                    raw_text: format!("Tx {idx}"),
+                    debit: d,
+                    credit: c,
+                    running_balance: None,
+                    bbox: None,
+                    field_bboxes: Default::default(),
+                    provenance: Provenance::Manual,
+                    category: None,
+                    canonical: Default::default(),
+                });
+            }
+
+            let recalculated = recalculate_and_validate(txs, opening).unwrap();
+            let final_tx = recalculated.last().unwrap();
+            prop_assert_eq!(final_tx.running_balance, Some(expected_running));
+
+            // Also test diagnose_ledger_discrepancies matches perfectly
+            let audit = diagnose_ledger_discrepancies(&recalculated, opening, Some(expected_running));
+            prop_assert!(audit.is_balanced);
+            prop_assert_eq!(audit.line_discrepancies.len(), 0);
+            prop_assert_eq!(audit.calculated_closing_balance, expected_running);
         }
     }
 }

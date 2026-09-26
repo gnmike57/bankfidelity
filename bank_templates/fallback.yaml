@@ -1,0 +1,14 @@
+# Auto-generated from AU Bank Statements/. Review the column x-ranges before relying on them.
+id: fallback
+header_signatures:
+  - "NAB"
+  - "Business"
+  - "credits"
+  - "debits"
+date_format: "%d %b %Y"
+amount_regex: "^-?\\$?[0-9,]+\\.\\d{2}$"
+column_x_ranges:
+  date: [38.2, 116.4]
+  description: [353.0, 446.1]
+  credit: [392.1, 471.5]
+  balance: [404.2, 501.6]
